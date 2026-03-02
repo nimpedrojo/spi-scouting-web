@@ -1,0 +1,69 @@
+<h1 class="mb-4">Mi cuenta</h1>
+
+<form method="POST" action="/account" class="col-md-6">
+  <div class="mb-3">
+    <label for="name" class="form-label">Nombre</label>
+    <input
+      type="text"
+      class="form-control"
+      id="name"
+      name="name"
+      value="<%= user.name || '' %>"
+      required
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="email" class="form-label">Email</label>
+    <input
+      type="email"
+      class="form-control"
+      id="email"
+      name="email"
+      value="<%= user.email || '' %>"
+      required
+    />
+  </div>
+
+  <hr class="my-4" />
+
+  <h5>Valores por defecto para informes</h5>
+  <p class="text-muted">
+    Estos valores se usarán como Club y Equipo por defecto al crear nuevos informes.
+  </p>
+
+  <div class="mb-3">
+    <label for="default_club" class="form-label">Club por defecto</label>
+    <input
+      type="text"
+      class="form-control"
+      id="default_club"
+      name="default_club"
+      value="<%= user.default_club || 'Stadium Venecia' %>"
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="default_team" class="form-label">Equipo por defecto</label>
+    <select
+      class="form-select"
+      id="default_team"
+      name="default_team"
+    >
+      <% const currentTeam = user.default_team || 'Primera Infantil'; %>
+      <option value="">-- Selecciona equipo --</option>
+      <% if (typeof teams !== 'undefined' && teams && teams.length) { %>
+        <% teams.forEach(function (t) { %>
+          <option value="<%= t %>" <%= t === currentTeam ? 'selected' : '' %>>
+            <%= t %>
+          </option>
+        <% }) %>
+      <% } %>
+      <% if (!teams || !teams.includes(currentTeam)) { %>
+        <option value="<%= currentTeam %>" selected><%= currentTeam %></option>
+      <% } %>
+    </select>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+</form>

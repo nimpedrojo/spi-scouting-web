@@ -1,0 +1,218 @@
+body {
+  background-color: #f3f7f4;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Colores inspirados en la web de Stadium Venecia:
+   rojo protagonista + blanco y grises suaves */
+:root {
+  --sv-red: #c1121f;
+  --sv-red-dark: #780000;
+  --sv-accent: #ffc107;
+  --sv-text-dark: #1f2933;
+}
+
+.navbar {
+  background: linear-gradient(90deg, var(--sv-red-dark), var(--sv-red));
+}
+
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.navbar-brand-logo {
+  height: 36px;
+  width: auto;
+  border-radius: 4px;
+  background-color: #ffffff;
+  padding: 2px;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+  font-weight: 500;
+}
+
+.navbar-dark .navbar-nav .nav-link.active,
+.navbar-dark .navbar-nav .nav-link:focus,
+.navbar-dark .navbar-nav .nav-link:hover {
+  color: var(--sv-accent);
+}
+
+.btn-primary {
+  background-color: var(--sv-red);
+  border-color: var(--sv-red);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--sv-red-dark);
+  border-color: var(--sv-red-dark);
+}
+
+.btn-outline-secondary {
+  color: var(--sv-red-dark);
+  border-color: var(--sv-red);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+  background-color: var(--sv-red);
+  color: #ffffff;
+}
+
+.card {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(120, 0, 0, 0.12);
+}
+
+.card-header {
+  background: linear-gradient(
+    90deg,
+    rgba(193, 18, 31, 0.95),
+    rgba(120, 0, 0, 0.98)
+  );
+  color: #ffffff;
+}
+
+.card-title {
+  color: var(--sv-text-dark);
+}
+
+.table thead th {
+  background-color: rgba(193, 18, 31, 0.06);
+  border-bottom-color: rgba(193, 18, 31, 0.25);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(193, 18, 31, 0.015);
+}
+
+.pitch-container {
+  background-color: #0b3d2e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  position: relative;
+  color: #fff;
+}
+
+.pitch {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-top: 140%;
+  background: radial-gradient(circle at center, #3a7d65 0, #0b3d2e 70%);
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+}
+
+.pitch-position {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.pitch-position.selected {
+  background-color: #ffcc00;
+  color: #000;
+  transform: scale(1.1);
+}
+
+/* Aproximación de posiciones en el campo (vista vertical) */
+.pos-por {
+  top: 85%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-central {
+  top: 62%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-ld {
+  top: 62%;
+  left: 74%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-li {
+  top: 62%;
+  left: 26%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-mc {
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-id {
+  top: 46%;
+  left: 72%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-ii {
+  top: 46%;
+  left: 28%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-mp {
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-ed {
+  top: 28%;
+  left: 76%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-ei {
+  top: 28%;
+  left: 24%;
+  transform: translate(-50%, -50%);
+}
+
+.pos-del {
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.icon-dashboard {
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.login-card {
+  max-width: 420px;
+  width: 100%;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.login-logo {
+  max-width: 220px;
+  height: auto;
+  background-color: var(--sv-red);
+  border-radius: 0.75rem;
+  padding: 6px;
+}

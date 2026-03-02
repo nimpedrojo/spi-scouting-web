@@ -1,0 +1,74 @@
+<h1 class="mb-4">Editar jugador</h1>
+
+<form method="POST" action="/admin/players/<%= player.id %>/edit">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label" for="first_name">Nombre</label>
+      <input
+        type="text"
+        class="form-control"
+        id="first_name"
+        name="first_name"
+        value="<%= player.first_name || '' %>"
+        required
+      />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="last_name">Apellidos</label>
+      <input
+        type="text"
+        class="form-control"
+        id="last_name"
+        name="last_name"
+        value="<%= player.last_name || '' %>"
+        required
+      />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="team">Equipo</label>
+      <input
+        type="text"
+        class="form-control"
+        id="team"
+        name="team"
+        value="<%= player.team || '' %>"
+      />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="birth_year">Año de nacimiento</label>
+      <input
+        type="number"
+        class="form-control"
+        id="birth_year"
+        name="birth_year"
+        value="<%= player.birth_year || '' %>"
+      />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="birth_date">Fecha de nacimiento</label>
+      <input
+        type="date"
+        class="form-control"
+        id="birth_date"
+        name="birth_date"
+        value="<%= player.birth_date ? player.birth_date.toISOString().slice(0, 10) : '' %>"
+      />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="laterality">Lateralidad</label>
+      <input
+        type="text"
+        class="form-control"
+        id="laterality"
+        name="laterality"
+        value="<%= player.laterality || '' %>"
+      />
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    <a href="/admin/players" class="btn btn-secondary">Cancelar</a>
+  </div>
+</form>
+

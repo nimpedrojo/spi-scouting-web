@@ -1,0 +1,106 @@
+<h1 class="mb-4">
+  Panel principal
+</h1>
+<p class="text-muted mb-4">
+  Hola, <strong><%= currentUser && currentUser.name ? currentUser.name : 'usuario' %></strong>.
+  Selecciona una opción para continuar.
+</p>
+
+<div class="row g-4">
+  <!-- Nuevo informe -->
+  <div class="col-sm-6 col-lg-3">
+        <a href="/reports/new" class="text-decoration-none text-reset">
+      <div class="card h-100 shadow-sm">
+        <img
+          src="/img/report.svg"
+          class="card-img-top icon-dashboard p-3"
+          alt="Nuevo informe"
+        />
+        <div class="card-body">
+          <h5 class="card-title">Nuevo informe</h5>
+          <p class="card-text">
+            Crear un nuevo informe de jugador.
+          </p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Cuenta -->
+  <div class="col-sm-6 col-lg-3">
+    <a href="/account" class="text-decoration-none text-reset">
+      <div class="card h-100 shadow-sm">
+        <img
+          src="/img/account.svg"
+          class="card-img-top icon-dashboard p-3"
+          alt="Mi cuenta"
+        />
+        <div class="card-body">
+          <h5 class="card-title">Mi cuenta</h5>
+          <p class="card-text">
+            Datos personales y configuraciones por defecto.
+          </p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <% if (currentUser && currentUser.role === 'admin') { %>
+  <!-- Gestión de jugadores (solo admin) -->
+  <div class="col-sm-6 col-lg-3">
+    <a href="/admin/players" class="text-decoration-none text-reset">
+      <div class="card h-100 shadow-sm">
+        <img
+          src="/img/list.svg"
+          class="card-img-top icon-dashboard p-3"
+          alt="Gestión de jugadores"
+        />
+        <div class="card-body">
+          <h5 class="card-title">Jugadores</h5>
+          <p class="card-text">
+            Ver, editar y borrar jugadores de la base.
+          </p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Listado de informes (solo admin) -->
+  <div class="col-sm-6 col-lg-3">
+    <a href="/reports" class="text-decoration-none text-reset">
+      <div class="card h-100 shadow-sm">
+        <img
+          src="/img/list.svg"
+          class="card-img-top icon-dashboard p-3"
+          alt="Listado de informes"
+        />
+        <div class="card-body">
+          <h5 class="card-title">Listado de informes</h5>
+          <p class="card-text">
+            Ver todos los informes registrados.
+          </p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Gestión de usuarios (solo admin) -->
+  <div class="col-sm-6 col-lg-3">
+    <a href="/admin/users" class="text-decoration-none text-reset">
+      <div class="card h-100 shadow-sm">
+        <img
+          src="/img/users.svg"
+          class="card-img-top icon-dashboard p-3"
+          alt="Gestión de usuarios"
+        />
+        <div class="card-body">
+          <h5 class="card-title">Usuarios</h5>
+          <p class="card-text">
+            Ver, editar y gestionar usuarios registrados.
+          </p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <% } %>
+</div>

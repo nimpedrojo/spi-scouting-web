@@ -1,0 +1,925 @@
+<h1 class="mb-4">Nuevo informe</h1>
+
+<form method="POST" action="/reports/new">
+  <div class="row mb-3">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Seleccionar jugador (opcional)</label>
+      <select id="playerSelect" class="form-select">
+        <option value="">-- Selecciona un jugador --</option>
+        <% if (typeof players !== 'undefined' && players && players.length) { %>
+          <% players.forEach(function (p) { %>
+            <option
+              value="<%= p.id %>"
+              data-first-name="<%= p.first_name %>"
+              data-last-name="<%= p.last_name %>"
+              data-team="<%= p.team || '' %>"
+              data-year="<%= p.birth_year || '' %>"
+              data-laterality="<%= p.laterality || '' %>"
+            >
+              <%= p.first_name %> <%= p.last_name %> (<%= p.team || 'Sin equipo' %>)
+            </option>
+          <% }) %>
+        <% } %>
+      </select>
+      <small class="text-muted">
+        Al seleccionar un jugador se rellenarán automáticamente nombre, apellidos, equipo, año y lateralidad.
+      </small>
+    </div>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Nombre <span class="text-danger">*</span></label>
+      <input
+        type="text"
+        name="player_name"
+        class="form-control <%= validationErrors.player_name ? 'is-invalid' : '' %>"
+        value="<%= (formData && formData.player_name) || '' %>"
+        required
+        aria-required="true"
+      />
+      <% if (validationErrors.player_name) { %>
+      <div class="invalid-feedback">El nombre es obligatorio.</div>
+      <% } %>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Apellidos <span class="text-danger">*</span></label>
+      <input
+        type="text"
+        name="player_surname"
+        class="form-control <%= validationErrors.player_surname ? 'is-invalid' : '' %>"
+        value="<%= (formData && formData.player_surname) || '' %>"
+        required
+        aria-required="true"
+      />
+      <% if (validationErrors.player_surname) { %>
+      <div class="invalid-feedback">Los apellidos son obligatorios.</div>
+      <% } %>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Año</label>
+      <input
+        type="number"
+        name="year"
+        class="form-control"
+        value="<%= (formData && formData.year) || '' %>"
+      />
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Lateralidad</label>
+      <input
+        type="text"
+        name="laterality"
+        class="form-control"
+        value="<%= (formData && formData.laterality) || '' %>"
+      />
+    </div>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <div class="row mb-3">
+        <div class="col-12">
+          <label class="form-label">Club</label>
+          <input
+            type="text"
+            name="club"
+            class="form-control"
+            value="<%= (formData && formData.club) || '' %>"
+          />
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-12">
+          <label class="form-label">Equipo</label>
+          <input
+            type="text"
+            name="team"
+            class="form-control"
+            value="<%= (formData && formData.team) || '' %>"
+          />
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-12">
+          <label class="form-label">Contacto</label>
+          <input
+            type="text"
+            name="contact"
+            class="form-control"
+            value="<%= (formData && formData.contact) || '' %>"
+          />
+        </div>
+      </div>
+      <div class="row mb-2">
+        <div class="col-md-6">
+          <label class="form-label">Posición 1</label>
+          <input
+            type="text"
+            name="pos1"
+            class="form-control"
+            value="<%= (formData && formData.pos1) || '' %>"
+          />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Posición 2</label>
+          <input
+            type="text"
+            name="pos2"
+            class="form-control"
+            value="<%= (formData && formData.pos2) || '' %>"
+          />
+        </div>
+      </div>
+      <div class="row mb-2">
+        <div class="col-md-6">
+          <label class="form-label">Posición 3</label>
+          <input
+            type="text"
+            name="pos3"
+            class="form-control"
+            value="<%= (formData && formData.pos3) || '' %>"
+          />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Posición 4</label>
+          <input
+            type="text"
+            name="pos4"
+            class="form-control"
+            value="<%= (formData && formData.pos4) || '' %>"
+          />
+        </div>
+      </div>
+      <small class="text-muted"
+        >Usa los códigos de la leyenda (POR, LD, LI, DEF, MC, ID, II, MP, ED,
+        EI, DEL).</small
+      >
+    </div>
+    <div class="col-md-6 d-flex align-items-center justify-content-center">
+      <div class="pitch-container mt-2">
+        <div class="pitch">
+          <div
+            class="pitch-position pos-por"
+            data-position-code="POR"
+          >
+            POR
+          </div>
+          <div
+            class="pitch-position pos-central"
+            data-position-code="DEF"
+          >
+            DEF
+          </div>
+          <div class="pitch-position pos-ld" data-position-code="LD">LD</div>
+          <div class="pitch-position pos-li" data-position-code="LI">LI</div>
+          <div class="pitch-position pos-mc" data-position-code="MC">MC</div>
+          <div class="pitch-position pos-id" data-position-code="ID">ID</div>
+          <div class="pitch-position pos-ii" data-position-code="II">II</div>
+          <div class="pitch-position pos-mp" data-position-code="MP">MP</div>
+          <div class="pitch-position pos-ed" data-position-code="ED">ED</div>
+          <div class="pitch-position pos-ei" data-position-code="EI">EI</div>
+          <div
+            class="pitch-position pos-del"
+            data-position-code="DEL"
+          >
+            DEL
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header fw-bold">Valoración técnica</div>
+        <div class="card-body">
+          <div class="row mb-2">
+            <div class="col-8">Cobertura de balón</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_cobertura_balon"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_cobertura_balon) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Conducción</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_conduccion"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_conduccion) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Control</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_control"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_control) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Regate</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_regate"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_regate) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Disparo</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_disparo"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_disparo) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Pase</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_pase"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_pase) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Remate de cabeza</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_remate_cabeza"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_remate_cabeza) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Anticipación</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tech_anticipacion"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tech_anticipacion) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-8 fw-bold">Total técnico</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                readonly
+                name="tech_total"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header fw-bold">Valoración física</div>
+        <div class="card-body">
+          <div class="row mb-2">
+            <div class="col-8">Capacidad de sacrificio</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_sacrificio"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_sacrificio) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Velocidad punta</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_velocidad_punta"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_velocidad_punta) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Velocidad de reacción</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_velocidad_reaccion"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_velocidad_reaccion) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Fuerza</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_fuerza"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_fuerza) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Potencia</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_potencia"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_potencia) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Resistencia</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_resistencia"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_resistencia) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Coordinación</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="phys_coordinacion"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.phys_coordinacion) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-8 fw-bold">Total físico</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                readonly
+                name="phys_total"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header fw-bold">Valoración táctica</div>
+        <div class="card-body">
+          <div class="row mb-2">
+            <div class="col-8">Transición ataque-defensa</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_transicion_ataque_defensa"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_transicion_ataque_defensa) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Movimientos sin balón</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_movimientos_sin_balon"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_movimientos_sin_balon) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Ayudas defensivas</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_ayudas_defensivas"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_ayudas_defensivas) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Ayudas ofensivas</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_ayudas_ofensivas"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_ayudas_ofensivas) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Desmarques</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_desmarques"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_desmarques) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Marcajes</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="tact_marcajes"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.tact_marcajes) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-8 fw-bold">Total táctico</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                readonly
+                name="tact_total"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header fw-bold">Valoración psicológica</div>
+        <div class="card-body">
+          <div class="row mb-2">
+            <div class="col-8">Concentración</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="psych_concentracion"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.psych_concentracion) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Control emocional</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="psych_control_emocional"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.psych_control_emocional) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Reacción errores arbitrales</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="psych_reaccion_errores_arbitrales"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.psych_reaccion_errores_arbitrales) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-8 fw-bold">Total psicológico</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                readonly
+                name="psych_total"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header fw-bold">Personalidad</div>
+        <div class="card-body">
+          <div class="row mb-2">
+            <div class="col-8">Liderazgo</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="pers_liderazgo"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.pers_liderazgo) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Disciplina</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="pers_disciplina"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.pers_disciplina) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Reacción a correcciones del compañero</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="pers_reaccion_correcciones_companero"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.pers_reaccion_correcciones_companero) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-8">Reacción a correcciones de los técnicos</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                name="pers_reaccion_correcciones_tecnico"
+                class="form-control form-control-sm"
+                value="<%= (formData && formData.pers_reaccion_correcciones_tecnico) || '' %>"
+              />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-8 fw-bold">Total personalidad</div>
+            <div class="col-4">
+              <input
+                type="number"
+                step="0.01"
+                readonly
+                name="pers_total"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var select = document.getElementById('playerSelect');
+      if (!select) return;
+
+      select.addEventListener('change', function () {
+        var opt = select.options[select.selectedIndex];
+        if (!opt || !opt.value) return;
+
+        var firstName = opt.getAttribute('data-first-name') || '';
+        var lastName = opt.getAttribute('data-last-name') || '';
+        var team = opt.getAttribute('data-team') || '';
+        var year = opt.getAttribute('data-year') || '';
+        var laterality = opt.getAttribute('data-laterality') || '';
+
+        var nameInput = document.querySelector('input[name=\"player_name\"]');
+        var surnameInput = document.querySelector('input[name=\"player_surname\"]');
+        var teamInput = document.querySelector('input[name=\"team\"]');
+        var yearInput = document.querySelector('input[name=\"year\"]');
+        var lateralityInput = document.querySelector('input[name=\"laterality\"]');
+
+        if (nameInput) nameInput.value = firstName;
+        if (surnameInput) surnameInput.value = lastName;
+        if (teamInput) teamInput.value = team;
+        if (yearInput) {
+          yearInput.value = year;
+          // forzar actualización de opciones de recomendación ligadas al año
+          const evt = new Event('input', { bubbles: true });
+          yearInput.dispatchEvent(evt);
+        }
+        if (lateralityInput) lateralityInput.value = laterality;
+      });
+    });
+  </script>
+
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Valoración global</label>
+      <input
+        type="number"
+        step="0.01"
+        readonly
+        name="overall_rating"
+        class="form-control"
+      />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Recomendación</label>
+      <select
+        name="recommendation"
+        class="form-select"
+        id="recommendation"
+        data-current-value="<%= (formData && formData.recommendation) || '' %>"
+      >
+        <option value="">Selecciona recomendación</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Fiabilidad info</label>
+      <input
+        type="number"
+        step="0.01"
+        name="info_reliability"
+        class="form-control"
+        value="<%= (formData && formData.info_reliability) || '' %>"
+      />
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Comentarios</label>
+    <textarea
+      name="comments"
+      rows="4"
+      class="form-control"
+      placeholder="Comentarios del informe"
+    ><%= (formData && formData.comments) || '' %></textarea>
+  </div>
+
+  <button type="submit" class="btn btn-success">Guardar informe</button>
+</form>
+
+<script>
+  (function () {
+    function toNumber(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    function average(inputs) {
+      const values = inputs
+        .map((el) => toNumber(el.value))
+        .filter((v) => v !== null && !Number.isNaN(v));
+      if (!values.length) return '';
+      const sum = values.reduce((a, b) => a + b, 0);
+      return (sum / values.length).toFixed(2);
+    }
+
+    function setupGroup(fieldNames, totalName) {
+      const inputs = fieldNames
+        .map((name) => document.querySelector(`input[name="${name}"]`))
+        .filter(Boolean);
+      const totalInput = document.querySelector(`input[name="${totalName}"]`);
+      if (!inputs.length || !totalInput) return;
+
+      function recalc() {
+        totalInput.value = average(inputs);
+        const event = new Event('input', { bubbles: true });
+        totalInput.dispatchEvent(event);
+      }
+
+      inputs.forEach((input) => {
+        input.addEventListener('input', recalc);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupGroup(
+        [
+          'tech_cobertura_balon',
+          'tech_conduccion',
+          'tech_control',
+          'tech_regate',
+          'tech_disparo',
+          'tech_pase',
+          'tech_remate_cabeza',
+          'tech_anticipacion',
+        ],
+        'tech_total',
+      );
+      setupGroup(
+        [
+          'tact_transicion_ataque_defensa',
+          'tact_movimientos_sin_balon',
+          'tact_ayudas_defensivas',
+          'tact_ayudas_ofensivas',
+          'tact_desmarques',
+          'tact_marcajes',
+        ],
+        'tact_total',
+      );
+      setupGroup(
+        [
+          'phys_sacrificio',
+          'phys_velocidad_punta',
+          'phys_velocidad_reaccion',
+          'phys_fuerza',
+          'phys_potencia',
+          'phys_resistencia',
+          'phys_coordinacion',
+        ],
+        'phys_total',
+      );
+      setupGroup(
+        [
+          'psych_concentracion',
+          'psych_control_emocional',
+          'psych_reaccion_errores_arbitrales',
+        ],
+        'psych_total',
+      );
+      setupGroup(
+        [
+          'pers_liderazgo',
+          'pers_disciplina',
+          'pers_reaccion_correcciones_companero',
+          'pers_reaccion_correcciones_tecnico',
+        ],
+        'pers_total',
+      );
+
+      // Recomendación según año de nacimiento
+      const recommendationByYear = {
+        2008: ['JUVENIL A', 'JUVENIL B'],
+        2009: ['JUVENIL A', 'JUVENIL B'],
+        2010: ['JUVENIL A', 'JUVENIL B'],
+        2011: ['CADETE A', 'CADETE B', 'CADETE C'],
+        2012: ['CADETE A', 'CADETE B', 'CADETE C'],
+        2013: ['INFANTIL A', 'INFANTIL B', 'INFANTIL C'],
+        2014: ['INFANTIL A', 'INFANTIL B', 'INFANTIL C'],
+        2015: ['ALEVIN A', 'ALEVIN B', 'ALEVIN C'],
+        2016: ['ALEVIN A', 'ALEVIN B', 'ALEVIN C'],
+        2017: ['BENJAMIN A', 'BENJAMIN B', 'BENJAMIN C'],
+        2018: ['BENJAMIN A', 'BENJAMIN B', 'BENJAMIN C'],
+        2019: ['PREBENJAMIN'],
+      };
+
+      function updateRecommendationOptions() {
+        const yearInput = document.querySelector('input[name="year"]');
+        const select = document.getElementById('recommendation');
+        if (!yearInput || !select) return;
+
+        const year = parseInt(yearInput.value, 10);
+        const options = recommendationByYear[year] || [];
+        const currentValue = select.dataset.currentValue || '';
+
+        // reset opciones
+        select.innerHTML =
+          '<option value="">' + 'Selecciona recomendación' + '</option>';
+
+        options.forEach((opt) => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          if (opt === currentValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        select.disabled = options.length === 0;
+      }
+
+      const yearEl = document.querySelector('input[name="year"]');
+      if (yearEl) {
+        yearEl.addEventListener('input', updateRecommendationOptions);
+        updateRecommendationOptions();
+      }
+
+      // Valoración global como media de los totales
+      function updateOverall() {
+        const techTotal = toNumber(
+          document.querySelector('input[name="tech_total"]')?.value,
+        );
+        const tactTotal = toNumber(
+          document.querySelector('input[name="tact_total"]')?.value,
+        );
+        const physTotal = toNumber(
+          document.querySelector('input[name="phys_total"]')?.value,
+        );
+        const psychTotal = toNumber(
+          document.querySelector('input[name="psych_total"]')?.value,
+        );
+        const persTotal = toNumber(
+          document.querySelector('input[name="pers_total"]')?.value,
+        );
+
+        const values = [
+          techTotal,
+          tactTotal,
+          physTotal,
+          psychTotal,
+          persTotal,
+        ].filter((v) => v !== null);
+
+        const overallInput = document.querySelector(
+          'input[name="overall_rating"]',
+        );
+        if (!overallInput) return;
+        if (!values.length) {
+          overallInput.value = '';
+          return;
+        }
+        const sum = values.reduce((a, b) => a + b, 0);
+        overallInput.value = (sum / values.length).toFixed(2);
+      }
+
+      ['tech_total', 'tact_total', 'phys_total', 'psych_total', 'pers_total']
+        .map((name) => document.querySelector(`input[name="${name}"]`))
+        .filter(Boolean)
+        .forEach((input) => {
+          input.addEventListener('input', updateOverall);
+        });
+
+      updateOverall();
+
+      function updatePitch() {
+        const selectedCodes = [
+          document.querySelector('input[name="pos1"]'),
+          document.querySelector('input[name="pos2"]'),
+          document.querySelector('input[name="pos3"]'),
+          document.querySelector('input[name="pos4"]'),
+        ]
+          .filter(Boolean)
+          .map((el) => el.value.trim().toUpperCase())
+          .filter((v) => v);
+
+        document
+          .querySelectorAll('[data-position-code]')
+          .forEach((el) => {
+            const code = (el.dataset.positionCode || '').toUpperCase();
+            if (selectedCodes.includes(code)) {
+              el.classList.add('selected');
+            } else {
+              el.classList.remove('selected');
+            }
+          });
+      }
+
+      ['pos1', 'pos2', 'pos3', 'pos4'].forEach((name) => {
+        const el = document.querySelector(`input[name="${name}"]`);
+        if (el) {
+          el.addEventListener('input', updatePitch);
+        }
+      });
+
+      updatePitch();
+    });
+  })();
+</script>

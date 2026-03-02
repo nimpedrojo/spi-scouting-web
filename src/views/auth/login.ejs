@@ -1,0 +1,36 @@
+<div class="d-flex justify-content-center">
+  <div class="login-card text-center p-4 p-md-5">
+    <img
+      src="/img/logo-stadium-login.png"
+      alt="Stadium Venecia"
+      class="mb-4 login-logo"
+    />
+    <h1 class="mb-4">Iniciar sesión</h1>
+
+    <form method="POST" action="/login">
+      <div class="mb-3 text-start">
+        <label for="email" class="form-label">Email</label>
+        <input
+          type="email"
+          class="form-control"
+          id="email"
+          name="email"
+          required
+        />
+      </div>
+      <div class="mb-3 text-start">
+        <label for="password" class="form-label">Contraseña</label>
+        <input
+          type="password"
+          class="form-control"
+          id="password"
+          name="password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn btn-primary w-100">
+        Entrar
+      </button>
+    </form>
+  </div>
+</div>

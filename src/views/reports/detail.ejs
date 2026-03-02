@@ -1,0 +1,180 @@
+<h1 class="mb-4">
+  Informe de <%= report.player_name %> <%= report.player_surname %>
+</h1>
+
+<div class="mb-3">
+  <a href="/reports" class="btn btn-secondary btn-sm">Volver al listado</a>
+  <a href="/reports/<%= report.id %>/excel" class="btn btn-success btn-sm ms-2">
+    Descargar Excel
+  </a>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-4">
+    <h5>Datos generales</h5>
+    <ul class="list-unstyled mb-0">
+      <li><strong>Año:</strong> <%= report.year || '-' %></li>
+      <li><strong>Club:</strong> <%= report.club || '-' %></li>
+      <li><strong>Equipo:</strong> <%= report.team || '-' %></li>
+      <li><strong>Lateralidad:</strong> <%= report.laterality || '-' %></li>
+      <li><strong>Contacto:</strong> <%= report.contact || '-' %></li>
+      <li>
+        <strong>Posiciones:</strong>
+        <%= [report.pos1, report.pos2, report.pos3, report.pos4].filter(Boolean).join(', ') || '-' %>
+      </li>
+      <li><strong>Valoración global:</strong> <%= report.overall_rating || '-' %></li>
+      <li><strong>Recomendación:</strong> <%= report.recommendation || '-' %></li>
+      <li><strong>Fiabilidad info:</strong> <%= report.info_reliability || '-' %></li>
+    </ul>
+  </div>
+  <div class="col-md-4">
+    <h5>Autor del informe</h5>
+    <ul class="list-unstyled mb-0">
+      <li><strong>Scout:</strong> <%= report.created_by_name || '-' %></li>
+      <li><strong>Email:</strong> <%= report.created_by_email || '-' %></li>
+      <li><strong>Fecha creación:</strong> <%= report.created_at.toISOString().slice(0, 10) %></li>
+    </ul>
+  </div>
+  <div class="col-md-4">
+    <h5>Resumen gráfico de valoraciones</h5>
+    <p class="text-muted mb-2">
+      Comparativa de las valoraciones medias en cada bloque.
+    </p>
+    <div class="bg-white border rounded p-2">
+      <canvas id="ratingsRadarChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <h5>Valoración técnica</h5>
+    <ul class="list-unstyled">
+      <li><strong>Cobertura de balón:</strong> <%= report.tech_cobertura_balon || '-' %></li>
+      <li><strong>Conducción:</strong> <%= report.tech_conduccion || '-' %></li>
+      <li><strong>Control:</strong> <%= report.tech_control || '-' %></li>
+      <li><strong>Regate:</strong> <%= report.tech_regate || '-' %></li>
+      <li><strong>Disparo:</strong> <%= report.tech_disparo || '-' %></li>
+      <li><strong>Pase:</strong> <%= report.tech_pase || '-' %></li>
+      <li><strong>Remate de cabeza:</strong> <%= report.tech_remate_cabeza || '-' %></li>
+      <li><strong>Anticipación:</strong> <%= report.tech_anticipacion || '-' %></li>
+      <li><strong>Total técnico:</strong> <%= report.tech_total || '-' %></li>
+    </ul>
+
+    <h5>Valoración física</h5>
+    <ul class="list-unstyled">
+      <li><strong>Capacidad de sacrificio:</strong> <%= report.phys_sacrificio || '-' %></li>
+      <li><strong>Velocidad punta:</strong> <%= report.phys_velocidad_punta || '-' %></li>
+      <li><strong>Velocidad reacción:</strong> <%= report.phys_velocidad_reaccion || '-' %></li>
+      <li><strong>Fuerza:</strong> <%= report.phys_fuerza || '-' %></li>
+      <li><strong>Potencia:</strong> <%= report.phys_potencia || '-' %></li>
+      <li><strong>Resistencia:</strong> <%= report.phys_resistencia || '-' %></li>
+      <li><strong>Coordinación:</strong> <%= report.phys_coordinacion || '-' %></li>
+      <li><strong>Total físico:</strong> <%= report.phys_total || '-' %></li>
+    </ul>
+  </div>
+  <div class="col-md-6">
+    <h5>Valoración táctica</h5>
+    <ul class="list-unstyled">
+      <li>
+        <strong>Transición ataque-defensa:</strong>
+        <%= report.tact_transicion_ataque_defensa || '-' %>
+      </li>
+      <li><strong>Movimientos sin balón:</strong> <%= report.tact_movimientos_sin_balon || '-' %></li>
+      <li><strong>Ayudas defensivas:</strong> <%= report.tact_ayudas_defensivas || '-' %></li>
+      <li><strong>Ayudas ofensivas:</strong> <%= report.tact_ayudas_ofensivas || '-' %></li>
+      <li><strong>Desmarques:</strong> <%= report.tact_desmarques || '-' %></li>
+      <li><strong>Marcajes:</strong> <%= report.tact_marcajes || '-' %></li>
+      <li><strong>Total táctico:</strong> <%= report.tact_total || '-' %></li>
+    </ul>
+
+    <h5>Valoración psicológica</h5>
+    <ul class="list-unstyled">
+      <li><strong>Concentración:</strong> <%= report.psych_concentracion || '-' %></li>
+      <li><strong>Control emocional:</strong> <%= report.psych_control_emocional || '-' %></li>
+      <li>
+        <strong>Reacción errores arbitrales:</strong>
+        <%= report.psych_reaccion_errores_arbitrales || '-' %>
+      </li>
+      <li><strong>Total psicológico:</strong> <%= report.psych_total || '-' %></li>
+    </ul>
+
+    <h5>Personalidad</h5>
+    <ul class="list-unstyled">
+      <li><strong>Liderazgo:</strong> <%= report.pers_liderazgo || '-' %></li>
+      <li><strong>Disciplina:</strong> <%= report.pers_disciplina || '-' %></li>
+      <li>
+        <strong>Reacción a correcciones compañero:</strong>
+        <%= report.pers_reaccion_correcciones_companero || '-' %>
+      </li>
+      <li>
+        <strong>Reacción a correcciones técnicos:</strong>
+        <%= report.pers_reaccion_correcciones_tecnico || '-' %>
+      </li>
+      <li><strong>Total personalidad:</strong> <%= report.pers_total || '-' %></li>
+    </ul>
+  </div>
+</div>
+
+<div class="mt-4">
+  <h5>Comentarios</h5>
+  <p><%= report.comments || 'Sin comentarios.' %></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (function () {
+    var ctx = document.getElementById('ratingsRadarChart');
+    if (!ctx) return;
+
+    var tech = <%= report.tech_total != null ? Number(report.tech_total).toFixed(2) : 'null' %>;
+    var tact = <%= report.tact_total != null ? Number(report.tact_total).toFixed(2) : 'null' %>;
+    var phys = <%= report.phys_total != null ? Number(report.phys_total).toFixed(2) : 'null' %>;
+    var psych = <%= report.psych_total != null ? Number(report.psych_total).toFixed(2) : 'null' %>;
+    var pers = <%= report.pers_total != null ? Number(report.pers_total).toFixed(2) : 'null' %>;
+
+    var dataValues = [tech, tact, phys, psych, pers].map(function (v) {
+      return (v === null || isNaN(v)) ? 0 : v;
+    });
+
+    // Si todos son 0 (no hay datos), no dibujamos nada
+    if (dataValues.every(function (v) { return v === 0; })) {
+      ctx.parentNode.innerHTML = '<p class="text-muted mb-0">No hay datos suficientes para mostrar el gráfico.</p>';
+      return;
+    }
+
+    new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['Técnica', 'Táctica', 'Física', 'Psicológica', 'Personalidad'],
+        datasets: [
+          {
+            label: 'Valoración media',
+            data: dataValues,
+            backgroundColor: 'rgba(220, 53, 69, 0.2)',
+            borderColor: 'rgba(220, 53, 69, 1)',
+            pointBackgroundColor: 'rgba(220, 53, 69, 1)',
+            pointBorderColor: '#fff',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          r: {
+            beginAtZero: true,
+            suggestedMax: 10,
+            ticks: {
+              stepSize: 1,
+            },
+          },
+        },
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+      },
+    });
+  })();
+</script>
