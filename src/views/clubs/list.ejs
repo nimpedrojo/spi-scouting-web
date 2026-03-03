@@ -21,6 +21,12 @@
           <td><code><%= club.code %></code></td>
           <td><%= club.created_at.toISOString().slice(0, 10) %></td>
           <td class="text-end">
+            <a
+              href="/admin/clubs/<%= club.id %>/edit"
+              class="btn btn-sm btn-outline-secondary me-2"
+            >
+              Editar
+            </a>
             <form
               method="POST"
               action="/admin/clubs/<%= club.id %>/delete"
@@ -43,4 +49,3 @@
     <% } %>
   </tbody>
 </table>
-

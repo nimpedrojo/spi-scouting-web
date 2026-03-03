@@ -83,7 +83,7 @@ router.post(
     }
 
     try {
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
@@ -114,8 +114,8 @@ router.post(
           firstName,
           lastName,
           team,
-          birthDate,
-          birthYear,
+          birthRaw,
+          birthYearRaw,
           laterality,
         ] = row;
 
@@ -124,14 +124,44 @@ router.post(
           continue;
         }
 
+        let birthDate = null;
+        let birthYear = null;
+
+        if (birthRaw instanceof Date) {
+          birthDate = birthRaw.toISOString().slice(0, 10);
+          birthYear = birthRaw.getFullYear();
+        } else if (typeof birthRaw === 'number') {
+          // Fecha como número de serie de Excel
+          const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+          const d = new Date(excelEpoch.getTime() + birthRaw * 24 * 60 * 60 * 1000);
+          if (!Number.isNaN(d.getTime())) {
+            birthDate = d.toISOString().slice(0, 10);
+            birthYear = d.getUTCFullYear();
+          }
+        } else if (typeof birthRaw === 'string' && birthRaw.trim()) {
+          const d = new Date(birthRaw);
+          if (!Number.isNaN(d.getTime())) {
+            birthDate = d.toISOString().slice(0, 10);
+            birthYear = d.getFullYear();
+          }
+        }
+
+        if (!birthYear && birthYearRaw) {
+          const by = Number(birthYearRaw);
+          // eslint-disable-next-line no-restricted-globals
+          if (!Number.isNaN(by)) {
+            birthYear = by;
+          }
+        }
+
         // eslint-disable-next-line no-await-in-loop
         await insertPlayer({
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
           club,
           team: team ? String(team).trim() : null,
-          birthDate: birthDate || null,
-          birthYear: birthYear ? Number(birthYear) : null,
+          birthDate,
+          birthYear,
           laterality: laterality ? String(laterality).trim() : null,
         });
         imported += 1;
@@ -164,13 +194,16 @@ router.post(
 
 // Formulario de nuevo jugador
 router.get('/new', ensureAdmin, (req, res) => {
-  res.render('players/new');
+  const { user } = req.session;
+  const isSuperAdmin = user && user.role === 'superadmin';
+  res.render('players/new', { isSuperAdmin });
 });
 
 router.post('/new', ensureAdmin, async (req, res) => {
   const {
     first_name,
     last_name,
+    club,
     team,
     birth_date,
     birth_year,
@@ -184,15 +217,17 @@ router.post('/new', ensureAdmin, async (req, res) => {
 
   try {
     const { user } = req.session;
-    const club =
-      user && user.role === 'admin'
-        ? user.default_club || null
-        : (user && user.default_club) || null;
+    let clubValue = null;
+    if (user && user.role === 'superadmin') {
+      clubValue = club && club.trim() ? club.trim() : null;
+    } else if (user && user.role === 'admin') {
+      clubValue = user.default_club || null;
+    }
 
     await insertPlayer({
       firstName: first_name,
       lastName: last_name,
-      club,
+      club: clubValue,
       team: team || null,
       birthDate: birth_date || null,
       birthYear: birth_year || null,

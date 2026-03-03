@@ -32,6 +32,19 @@ async function getClubByCode(code) {
   return rows[0];
 }
 
+async function getClubById(id) {
+  const [rows] = await db.query('SELECT * FROM clubs WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function updateClub(id, { name }) {
+  const [result] = await db.query(
+    'UPDATE clubs SET name = ? WHERE id = ?',
+    [name, id],
+  );
+  return result.affectedRows;
+}
+
 async function deleteClub(id) {
   const [result] = await db.query('DELETE FROM clubs WHERE id = ?', [id]);
   return result.affectedRows;
@@ -42,6 +55,7 @@ module.exports = {
   createClub,
   getAllClubs,
   getClubByCode,
+   getClubById,
+   updateClub,
   deleteClub,
 };
-

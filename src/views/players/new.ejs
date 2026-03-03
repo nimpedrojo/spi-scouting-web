@@ -2,6 +2,18 @@
 
 <form method="POST" action="/admin/players/new" class="col-md-6">
   <div class="mb-3">
+    <label for="club" class="form-label">Club</label>
+    <input
+      type="text"
+      class="form-control"
+      id="club"
+      name="club"
+      value="<%= isSuperAdmin ? '' : (currentUser && currentUser.default_club ? currentUser.default_club : '') %>"
+      <%= isSuperAdmin ? '' : 'readonly' %>
+    />
+  </div>
+
+  <div class="mb-3">
     <label for="first_name" class="form-label">Nombre</label>
     <input
       type="text"
@@ -70,4 +82,3 @@
   <button type="submit" class="btn btn-primary">Guardar jugador</button>
   <a href="/admin/players" class="btn btn-link">Cancelar</a>
 </form>
-

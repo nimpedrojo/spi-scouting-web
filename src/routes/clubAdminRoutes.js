@@ -2,6 +2,8 @@ const express = require('express');
 const {
   getAllClubs,
   createClub,
+  getClubById,
+  updateClub,
   deleteClub,
 } = require('../models/clubModel');
 
@@ -56,6 +58,49 @@ router.post('/new', ensureSuperAdmin, async (req, res) => {
   }
 });
 
+// Formulario edición de club
+router.get('/:id/edit', ensureSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const club = await getClubById(id);
+    if (!club) {
+      req.flash('error', 'El club indicado no existe.');
+      return res.redirect('/admin/clubs');
+    }
+    return res.render('clubs/edit', { club });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al cargar club para edición:', err);
+    req.flash('error', 'Ha ocurrido un error al cargar el club.');
+    return res.redirect('/admin/clubs');
+  }
+});
+
+router.post('/:id/edit', ensureSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    req.flash('error', 'El nombre del club es obligatorio.');
+    return res.redirect(`/admin/clubs/${id}/edit`);
+  }
+
+  try {
+    const affected = await updateClub(id, { name: name.trim() });
+    if (!affected) {
+      req.flash('error', 'No se ha podido actualizar el club.');
+      return res.redirect(`/admin/clubs/${id}/edit`);
+    }
+    req.flash('success', 'Club actualizado correctamente.');
+    return res.redirect('/admin/clubs');
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al actualizar club:', err);
+    req.flash('error', 'Ha ocurrido un error al actualizar el club.');
+    return res.redirect(`/admin/clubs/${id}/edit`);
+  }
+});
+
 // Borrar club
 router.post('/:id/delete', ensureSuperAdmin, async (req, res) => {
   const { id } = req.params;
@@ -76,4 +121,3 @@ router.post('/:id/delete', ensureSuperAdmin, async (req, res) => {
 });
 
 module.exports = router;
-
