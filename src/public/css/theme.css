@@ -1,0 +1,137 @@
+/* SoccerReport Theme Tokens */
+:root {
+  /* Brand */
+  --sr-primary: #0f3d2e;      /* Verde esmeralda profundo (navbar, sidebar, footer) */
+  --sr-secondary: #19c37d;    /* Verde eléctrico (CTA, activos, highlights) */
+  --sr-tech: #0b2545;         /* Azul petróleo (fondos alternativos, secciones) */
+
+  /* Neutrals */
+  --sr-bg: #f5f7fa;           /* Fondo app claro */
+  --sr-surface: #ffffff;      /* Cards / paneles */
+  --sr-border: #e4e7eb;       /* Bordes suaves */
+  --sr-text: #3e4c59;         /* Texto principal */
+  --sr-text-strong: #1f2933;  /* Texto fuerte */
+
+  /* Status */
+  --sr-success: #16a34a;
+  --sr-warning: #f59e0b;
+  --sr-danger: #dc2626;
+  --sr-info: #0284c7;
+
+  /* Visual */
+  --sr-radius: 12px;
+  --sr-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* Base */
+html,
+body {
+  background: var(--sr-bg);
+  color: var(--sr-text);
+}
+
+/* Links */
+a {
+  color: var(--sr-info);
+}
+a:hover {
+  color: #016aa3;
+}
+
+/* Navbar */
+.sr-navbar {
+  background: var(--sr-primary) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sr-navbar .navbar-brand,
+.sr-navbar .nav-link {
+  color: #fff !important;
+}
+.sr-navbar .nav-link:hover {
+  color: var(--sr-secondary) !important;
+}
+
+/* Footer */
+.sr-footer {
+  background: var(--sr-primary);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Buttons */
+.btn-sr-primary {
+  background: var(--sr-secondary);
+  border-color: var(--sr-secondary);
+  color: #fff;
+}
+.btn-sr-primary:hover {
+  background: var(--sr-success);
+  border-color: var(--sr-success);
+  color: #fff;
+}
+
+.btn-sr-outline {
+  background: transparent;
+  border: 1px solid var(--sr-secondary);
+  color: var(--sr-secondary);
+}
+.btn-sr-outline:hover {
+  background: rgba(25, 195, 125, 0.12);
+  color: var(--sr-secondary);
+}
+
+/* Cards */
+.sr-card {
+  background: var(--sr-surface);
+  border: 1px solid var(--sr-border);
+  border-radius: var(--sr-radius);
+  box-shadow: var(--sr-shadow);
+}
+.sr-card--accent {
+  border-left: 6px solid var(--sr-secondary);
+}
+
+/* Badges */
+.badge-sr-success {
+  background: var(--sr-success);
+}
+.badge-sr-warning {
+  background: var(--sr-warning);
+}
+.badge-sr-danger {
+  background: var(--sr-danger);
+}
+.badge-sr-info {
+  background: var(--sr-info);
+}
+
+/* Sections (optional) */
+.sr-section-tech {
+  background: var(--sr-tech);
+  color: #fff;
+}
+
+/* Categorías de valoración (opcional) */
+:root {
+  --sr-cat-tecnica: #0284c7; /* azul */
+  --sr-cat-tactica: #19c37d; /* verde */
+  --sr-cat-fisica: #f59e0b; /* naranja */
+  --sr-cat-psico: #7c3aed; /* morado */
+  --sr-cat-personalidad: #14b8a6; /* turquesa */
+}
+
+.sr-cat-tecnica {
+  border-left: 6px solid var(--sr-cat-tecnica);
+}
+.sr-cat-tactica {
+  border-left: 6px solid var(--sr-cat-tactica);
+}
+.sr-cat-fisica {
+  border-left: 6px solid var(--sr-cat-fisica);
+}
+.sr-cat-psico {
+  border-left: 6px solid var(--sr-cat-psico);
+}
+.sr-cat-personalidad {
+  border-left: 6px solid var(--sr-cat-personalidad);
+}
+

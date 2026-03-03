@@ -222,9 +222,8 @@ body {
 }
 
 .login-logo {
-  max-width: 220px;
+  max-width: 100%;
+  width: 100%;
   height: auto;
-  background-color: var(--sv-red);
   border-radius: 0.75rem;
-  padding: 6px;
 }
