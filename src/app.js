@@ -9,7 +9,7 @@ const expressLayouts = require('express-ejs-layouts');
 dotenv.config();
 
 const app = express();
-
+app.set('trust proxy', 1);
 // Middlewares
 app.use(morgan('dev'));
 app.use(express.urlencoded({ extended: true }));
