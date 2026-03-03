@@ -39,6 +39,13 @@ async function main() {
     if (birthRaw instanceof Date) {
       birthDate = birthRaw.toISOString().slice(0, 10);
       birthYear = birthRaw.getFullYear();
+    } else if (typeof birthRaw === 'number') {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      const d = new Date(excelEpoch.getTime() + birthRaw * 24 * 60 * 60 * 1000);
+      if (!Number.isNaN(d.getTime())) {
+        birthDate = d.toISOString().slice(0, 10);
+        birthYear = d.getUTCFullYear();
+      }
     } else if (typeof birthRaw === 'string' && birthRaw.trim()) {
       const d = new Date(birthRaw);
       if (!Number.isNaN(d.getTime())) {
@@ -73,4 +80,3 @@ main().catch((err) => {
   console.error('Error al importar jugadores desde Excel:', err);
   db.end().finally(() => process.exit(1));
 });
-
