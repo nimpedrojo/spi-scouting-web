@@ -1,0 +1,85 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="GET" action="/season-comparison" class="row g-3">
+      <div class="col-md-3">
+        <label for="source_season_id" class="form-label">Temporada origen</label>
+        <select id="source_season_id" name="source_season_id" class="form-select">
+          <option value="">Selecciona</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= selectedFilters.sourceSeasonId === season.id ? 'selected' : '' %>><%= season.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="target_season_id" class="form-label">Temporada destino</label>
+        <select id="target_season_id" name="target_season_id" class="form-select">
+          <option value="">Selecciona</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= selectedFilters.targetSeasonId === season.id ? 'selected' : '' %>><%= season.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="section" class="form-label">Sección</label>
+        <select id="section" name="section" class="form-select">
+          <option value="">Todas</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.sections.forEach((section) => { %>
+              <option value="<%= section.name %>" <%= selectedFilters.section === section.name ? 'selected' : '' %>><%= section.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="category" class="form-label">Categoría</label>
+        <select id="category" name="category" class="form-select">
+          <option value="">Todas</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.categories.forEach((category) => { %>
+              <option value="<%= category.name %>" <%= selectedFilters.category === category.name ? 'selected' : '' %>><%= category.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.teams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= selectedFilters.teamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label for="player_id" class="form-label">Jugador</label>
+        <select id="player_id" name="player_id" class="form-select">
+          <option value="">Selecciona</option>
+          <% if (filterOptions) { %>
+            <% filterOptions.players.forEach((player) => { %>
+              <option value="<%= player.id %>" <%= String(selectedFilters.playerId || '') === String(player.id) ? 'selected' : '' %>><%= player.first_name %> <%= player.last_name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <% if (selectedFilters.playerId && selectedFilters.sourceSeasonId && selectedFilters.targetSeasonId) { %>
+          <a href="/season-comparison/player/<%= selectedFilters.playerId %>?source_season_id=<%= selectedFilters.sourceSeasonId %>&target_season_id=<%= selectedFilters.targetSeasonId %>&section=<%= encodeURIComponent(selectedFilters.section || '') %>&category=<%= encodeURIComponent(selectedFilters.category || '') %>&team_id=<%= selectedFilters.teamId || '' %>" class="btn btn-primary">
+            Comparar jugador
+          </a>
+        <% } %>
+        <% if (selectedFilters.teamId && selectedFilters.sourceSeasonId && selectedFilters.targetSeasonId) { %>
+          <a href="/season-comparison/team/<%= selectedFilters.teamId %>?source_season_id=<%= selectedFilters.sourceSeasonId %>&target_season_id=<%= selectedFilters.targetSeasonId %>&section=<%= encodeURIComponent(selectedFilters.section || '') %>&category=<%= encodeURIComponent(selectedFilters.category || '') %>" class="btn btn-outline-secondary">
+            Comparar equipo
+          </a>
+        <% } %>
+        <a href="/season-comparison" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>

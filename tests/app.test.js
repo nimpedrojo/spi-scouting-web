@@ -162,6 +162,37 @@ describe('Aplicación SoccerReport', () => {
     };
   }
 
+  async function createSeasonComparisonContext(baseName = 'Club Season Compare') {
+    const context = await createTeamContext(baseName);
+    const secondSeasonId = randomUUID();
+    await db.query(
+      'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+      [secondSeasonId, context.club.id, '2025/26'],
+    );
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [teamId, context.club.id, context.season.id, context.masculina.id, context.juvenil.id, 'Juvenil Compara'],
+    );
+    const [playerResult] = await db.query(
+      `INSERT INTO players (first_name, last_name, club, club_id, current_team_id, team)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ['Sergio', 'Compara', context.club.name, context.club.id, teamId, 'Juvenil Compara'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), teamId, playerResult.insertId, '8', 'MC'],
+    );
+    return {
+      ...context,
+      teamId,
+      playerId: playerResult.insertId,
+      secondSeasonId,
+    };
+  }
+
   async function seedEvaluationScoresForEvaluation(evaluationId, values = {}) {
     const defaults = {
       tecnica_control: 7,
@@ -1699,5 +1730,89 @@ describe('Aplicación SoccerReport', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Plantilla Render');
     expect(res.text).toContain('Control Premium');
+  });
+
+  test('comparison page renders', async () => {
+    const context = await createSeasonComparisonContext('Club Season Index');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/season-comparison');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Comparativa 26/27');
+    expect(res.text).toContain('Temporada origen');
+  });
+
+  test('player season comparison works', async () => {
+    const context = await createSeasonComparisonContext('Club Season Player');
+    const evalSource = randomUUID();
+    const evalTarget = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evalSource, context.club.id, context.secondSeasonId, context.teamId, context.playerId, context.admin.id, '2025-10-01', 'manual', 'Origen', 'Notas', 6.8,
+        evalTarget, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-10-01', 'manual', 'Destino', 'Notas', 7.9,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evalSource, { tecnica_control: 6, tactica_posicionamiento: 6 });
+    await seedEvaluationScoresForEvaluation(evalTarget, { tecnica_control: 8, tactica_posicionamiento: 8 });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-comparison/player/${context.playerId}?source_season_id=${context.secondSeasonId}&target_season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Comparativa estacional de jugador');
+    expect(res.text).toContain('seasonPlayerRadarChart');
+    expect(res.text).toContain('Variación');
+  });
+
+  test('team season comparison works', async () => {
+    const context = await createSeasonComparisonContext('Club Season Team');
+    const evalSource = randomUUID();
+    const evalTarget = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evalSource, context.club.id, context.secondSeasonId, context.teamId, context.playerId, context.admin.id, '2025-10-01', 'manual', 'Origen Team', 'Notas', 6.5,
+        evalTarget, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-10-01', 'manual', 'Destino Team', 'Notas', 7.7,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evalSource);
+    await seedEvaluationScoresForEvaluation(evalTarget, { fisica_velocidad: 9 });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-comparison/team/${context.teamId}?source_season_id=${context.secondSeasonId}&target_season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Comparativa estacional de equipo');
+    expect(res.text).toContain('Deltas por área');
+    expect(res.text).toContain('Pendientes origen');
+  });
+
+  test('empty state when one season has no evaluations', async () => {
+    const context = await createSeasonComparisonContext('Club Season Empty');
+    const evalTarget = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evalTarget, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-10-01', 'manual', 'Solo destino', 'Notas', 7.4,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evalTarget);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-comparison/player/${context.playerId}?source_season_id=${context.secondSeasonId}&target_season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('No hay suficientes datos para comparar este jugador');
   });
 });

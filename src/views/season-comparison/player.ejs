@@ -1,0 +1,83 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h4 mb-3">Comparativa estacional de jugador</h2>
+    <% if (!comparison || comparison.missingData) { %>
+      <p class="mb-0 text-muted">No hay suficientes datos para comparar este jugador entre las temporadas seleccionadas.</p>
+    <% } else { %>
+      <p class="mb-0 text-muted"><%= comparison.player.first_name %> <%= comparison.player.last_name %> · <%= comparison.sourceSeason.name %> vs <%= comparison.targetSeason.name %></p>
+    <% } %>
+  </div>
+</div>
+
+<% if (comparison && !comparison.missingData) { %>
+  <div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Media origen</div><div class="display-6 fw-semibold"><%= comparison.sourceAnalytics.overallAverage.toFixed(2) %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Media destino</div><div class="display-6 fw-semibold"><%= comparison.targetAnalytics.overallAverage.toFixed(2) %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Evaluaciones origen</div><div class="display-6 fw-semibold"><%= comparison.sourceAnalytics.history.totalEvaluations %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Evaluaciones destino</div><div class="display-6 fw-semibold"><%= comparison.targetAnalytics.history.totalEvaluations %></div></div></div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="chart-panel">
+        <canvas id="seasonPlayerRadarChart" height="320"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h3 class="h5 mb-3">Evolución por métrica</h3>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Área</th>
+              <th>Métrica</th>
+              <th><%= comparison.sourceSeason.name %></th>
+              <th><%= comparison.targetSeason.name %></th>
+              <th>Variación</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% comparison.metricEvolution.forEach((row) => { %>
+              <tr>
+                <td><%= row.areaLabel %></td>
+                <td><%= row.metricLabel %></td>
+                <td><%= row.sourceValue.toFixed(2) %></td>
+                <td><%= row.targetValue.toFixed(2) %></td>
+                <td><span class="badge text-bg-<%= row.badge.tone %>"><%= row.badge.text %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var canvas = document.getElementById('seasonPlayerRadarChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      var chartData = <%- chartJson %>;
+      new Chart(canvas, {
+        type: 'radar',
+        data: chartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { r: { min: 0, max: 10, ticks: { stepSize: 2 } } }
+        }
+      });
+    })();
+  </script>
+<% } %>

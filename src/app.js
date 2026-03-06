@@ -80,6 +80,7 @@ const teamRoutes = require('./routes/teamRoutes');
 const evaluationRoutes = require('./routes/evaluationRoutes');
 const playerProfileRoutes = require('./routes/playerProfileRoutes');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplateRoutes');
+const seasonComparisonRoutes = require('./routes/seasonComparisonRoutes');
 
 app.use('/', authRoutes);
 app.use('/reports', reportRoutes);
@@ -91,6 +92,7 @@ app.use('/teams', teamRoutes);
 app.use('/', evaluationRoutes);
 app.use('/', playerProfileRoutes);
 app.use('/', evaluationTemplateRoutes);
+app.use('/', seasonComparisonRoutes);
 
 app.get('/', (req, res) => {
   if (req.session.user) {

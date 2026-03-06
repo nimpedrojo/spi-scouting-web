@@ -1,0 +1,51 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h4 mb-3">Comparativa estacional de equipo</h2>
+    <% if (!comparison || comparison.missingData) { %>
+      <p class="mb-0 text-muted">No hay suficientes datos para comparar este equipo entre las temporadas seleccionadas.</p>
+    <% } else { %>
+      <p class="mb-0 text-muted"><%= comparison.team.name %> · <%= comparison.sourceSeason.name %> vs <%= comparison.targetSeason.name %></p>
+    <% } %>
+  </div>
+</div>
+
+<% if (comparison && !comparison.missingData) { %>
+  <div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Jugadores origen</div><div class="display-6 fw-semibold"><%= comparison.sourceAggregate.total_players %></div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Jugadores destino</div><div class="display-6 fw-semibold"><%= comparison.targetAggregate.total_players %></div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Media origen</div><div class="display-6 fw-semibold"><%= Number(comparison.sourceAggregate.average_team_score || 0).toFixed(2) %></div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Media destino</div><div class="display-6 fw-semibold"><%= Number(comparison.targetAggregate.average_team_score || 0).toFixed(2) %></div></div></div></div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h3 class="h5 mb-3">Deltas por área</h3>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Área</th>
+              <th><%= comparison.sourceSeason.name %></th>
+              <th><%= comparison.targetSeason.name %></th>
+              <th>Variación</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% comparison.areaDeltas.forEach((row) => { %>
+              <tr>
+                <td><%= row.label %></td>
+                <td><%= row.sourceValue.toFixed(2) %></td>
+                <td><%= row.targetValue.toFixed(2) %></td>
+                <td><span class="badge text-bg-<%= row.badge.tone %>"><%= row.badge.text %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 row g-3">
+        <div class="col-md-6"><div class="border rounded p-3"><span class="text-muted d-block">Pendientes origen</span><strong><%= comparison.sourceAggregate.pending_evaluations %></strong></div></div>
+        <div class="col-md-6"><div class="border rounded p-3"><span class="text-muted d-block">Pendientes destino</span><strong><%= comparison.targetAggregate.pending_evaluations %></strong></div></div>
+      </div>
+    </div>
+  </div>
+<% } %>
