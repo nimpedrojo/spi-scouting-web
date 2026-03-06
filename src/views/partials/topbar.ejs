@@ -1,0 +1,17 @@
+<header class="app-topbar">
+  <div>
+    <h1 class="h4 mb-1"><%= pageTitle || 'SoccerReport' %></h1>
+    <% if (typeof pageDescription !== 'undefined' && pageDescription) { %>
+      <p class="text-muted mb-0"><%= pageDescription %></p>
+    <% } %>
+  </div>
+
+  <% if (currentUser) { %>
+    <div class="d-flex align-items-center gap-3">
+      <a href="/account" class="btn btn-outline-secondary btn-sm">Mi cuenta</a>
+      <form method="POST" action="/logout">
+        <button class="btn btn-primary btn-sm" type="submit">Salir</button>
+      </form>
+    </div>
+  <% } %>
+</header>

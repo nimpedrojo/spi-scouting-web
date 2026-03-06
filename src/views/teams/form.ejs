@@ -1,0 +1,59 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= formAction %>" class="row g-3">
+      <div class="col-12">
+        <label for="name" class="form-label">Nombre del equipo</label>
+        <input
+          type="text"
+          class="form-control"
+          id="name"
+          name="name"
+          required
+          value="<%= team ? team.name : '' %>"
+          placeholder="Ej. Juvenil A"
+        />
+      </div>
+
+      <div class="col-md-4">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select" required>
+          <% formData.seasons.forEach((season) => { %>
+            <option
+              value="<%= season.id %>"
+              <%= ((team && team.season_id === season.id) || (!team && formData.activeSeason && formData.activeSeason.id === season.id)) ? 'selected' : '' %>
+            >
+              <%= season.name %><%= season.is_active ? ' (activa)' : '' %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="section_id" class="form-label">Sección</label>
+        <select id="section_id" name="section_id" class="form-select" required>
+          <% formData.sections.forEach((section) => { %>
+            <option value="<%= section.id %>" <%= team && team.section_id === section.id ? 'selected' : '' %>>
+              <%= section.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="category_id" class="form-label">Categoría</label>
+        <select id="category_id" name="category_id" class="form-select" required>
+          <% formData.categories.forEach((category) => { %>
+            <option value="<%= category.id %>" <%= team && team.category_id === category.id ? 'selected' : '' %>>
+              <%= category.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/teams" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

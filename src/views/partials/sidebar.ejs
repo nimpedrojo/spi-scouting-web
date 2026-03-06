@@ -1,0 +1,57 @@
+<%
+  const navigationItems = [
+    { label: 'Panel general', href: '/dashboard' },
+    { label: 'Plantillas', href: '/teams' },
+    { label: 'Jugadores', href: '/admin/players', adminOnly: true },
+    { label: 'Previsión 2026/27', href: '#' },
+    { label: 'Comparativa 26/27', href: '#' },
+    { label: 'Informes', href: '/reports' },
+    { label: 'Evaluaciones', href: '#' },
+    { label: 'Scouting', href: '/reports/new' },
+    { label: 'Usuarios', href: '/admin/users', adminOnly: true },
+  ];
+  const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+%>
+
+<aside class="app-sidebar">
+  <div class="app-sidebar__brand">
+    <a href="/dashboard" class="text-decoration-none text-reset d-flex align-items-center gap-2">
+      <img src="/img/soccerreport-logo.png" alt="SoccerReport" class="app-sidebar__logo" />
+      <div>
+        <div class="app-sidebar__title">SoccerReport</div>
+        <div class="app-sidebar__subtitle">Academy OS</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="app-sidebar__meta">
+    <div class="small text-uppercase text-muted">Club</div>
+    <div class="fw-semibold"><%= activeClubName || 'Sin club asignado' %></div>
+    <div class="small text-uppercase text-muted mt-3">Temporada</div>
+    <div class="fw-semibold"><%= activeSeasonLabel || 'Pendiente' %></div>
+  </div>
+
+  <nav class="nav flex-column app-sidebar__nav">
+    <% navigationItems.forEach((item) => { %>
+      <% if (!item.adminOnly || isAdminUser) { %>
+        <% const isDisabled = item.href === '#'; %>
+        <% const isActive = item.href !== '#' && activeRoute && (activeRoute === item.href || activeRoute.startsWith(item.href + '/')); %>
+        <a
+          href="<%= item.href %>"
+          class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
+          <%= isDisabled ? 'tabindex="-1" aria-disabled="true"' : '' %>
+        >
+          <%= item.label %>
+        </a>
+      <% } %>
+    <% }) %>
+  </nav>
+
+  <div class="app-sidebar__footer">
+    <div class="fw-semibold"><%= currentUser ? currentUser.name : 'Invitado' %></div>
+    <div class="small text-muted"><%= currentUser ? currentUser.email : '' %></div>
+    <% if (currentUser) { %>
+      <div class="small text-uppercase text-muted mt-2"><%= currentUser.role %></div>
+    <% } %>
+  </div>
+</aside>

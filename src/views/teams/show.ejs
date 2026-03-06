@@ -1,0 +1,57 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2 class="mb-1"><%= team.name %></h2>
+        <p class="text-muted mb-2">
+          <%= team.season_name %> · <%= team.category_name %> · <%= team.section_name %>
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge text-bg-light"><%= team.club_name %></span>
+          <span class="badge text-bg-primary"><%= team.players.length %> jugadores</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/teams/<%= team.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+        <a href="/admin/players/new" class="btn btn-primary">Asignar / añadir jugadores</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h3 class="h5 mb-3">Listado completo</h3>
+
+    <% if (!team.players.length) { %>
+      <p class="mb-0 text-muted">No hay jugadores asignados a esta plantilla.</p>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Dorsal</th>
+              <th>Jugador</th>
+              <th>Posiciones</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% team.players.forEach((player) => { %>
+              <tr>
+                <td><%= player.dorsal || '-' %></td>
+                <td><%= player.full_name %></td>
+                <td><%= player.positions || '-' %></td>
+                <td class="text-end">
+                  <a href="/admin/players/<%= player.id %>/edit" class="btn btn-sm btn-outline-secondary">
+                    Perfil
+                  </a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

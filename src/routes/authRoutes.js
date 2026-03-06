@@ -9,20 +9,13 @@ const {
 const { getClubByCode } = require('../models/clubModel');
 const { getPlayersByTeam } = require('../models/playerModel');
 const { getTeamsByClub } = require('../models/clubTeamModel');
+const { ensureAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 function ensureGuest(req, res, next) {
   if (req.session.user) {
     return res.redirect('/dashboard');
-  }
-  return next();
-}
-
-function ensureAuth(req, res, next) {
-  if (!req.session.user) {
-    req.flash('error', 'Debes iniciar sesión.');
-    return res.redirect('/login');
   }
   return next();
 }

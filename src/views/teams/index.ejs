@@ -1,0 +1,109 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <p class="text-muted mb-0">
+      <%= clubName %>
+      <% if (activeSeason) { %>
+        · Temporada activa <strong><%= activeSeason.name %></strong>
+      <% } %>
+    </p>
+  </div>
+  <a href="/teams/new" class="btn btn-primary">Nueva plantilla</a>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  <% availableSections.forEach((sectionName) => { %>
+    <li class="nav-item">
+      <a
+        class="nav-link <%= activeSection === sectionName ? 'active' : '' %>"
+        href="/teams?section=<%= encodeURIComponent(sectionName) %><%= activeCategory ? '&category=' + encodeURIComponent(activeCategory) : '' %>"
+      >
+        <%= sectionName %>
+      </a>
+    </li>
+  <% }) %>
+</ul>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a
+    href="/teams?section=<%= encodeURIComponent(activeSection) %>"
+    class="btn btn-sm <%= !activeCategory ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
+  >
+    Todas
+  </a>
+  <% availableCategories.forEach((categoryName) => { %>
+    <a
+      href="/teams?section=<%= encodeURIComponent(activeSection) %>&category=<%= encodeURIComponent(categoryName) %>"
+      class="btn btn-sm <%= activeCategory === categoryName ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
+    >
+      <%= categoryName %>
+    </a>
+  <% }) %>
+</div>
+
+<%
+  const sectionGroups = groupedTeams[activeSection] || {};
+  const groupKeys = Object.keys(sectionGroups);
+%>
+
+<% if (!groupKeys.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0">No hay plantillas registradas para los filtros actuales.</p>
+    </div>
+  </div>
+<% } %>
+
+<% groupKeys.forEach((categoryName) => { %>
+  <section class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h5 mb-0"><%= categoryName %></h2>
+      <span class="badge text-bg-light"><%= sectionGroups[categoryName].length %> equipos</span>
+    </div>
+
+    <div class="row g-4">
+      <% sectionGroups[categoryName].forEach((team) => { %>
+        <div class="col-xl-4 col-lg-6">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex justify-content-between gap-3 align-items-start mb-3">
+                <div>
+                  <h3 class="h5 mb-1"><%= team.name %></h3>
+                  <div class="text-muted small">
+                    <%= team.season_name %> · <%= team.category_name %>
+                  </div>
+                </div>
+                <span class="badge text-bg-primary"><%= team.player_count %> jugadores</span>
+              </div>
+
+              <div class="team-card-player-list mb-3">
+                <% if (team.player_previews.length) { %>
+                  <% team.player_previews.forEach((player) => { %>
+                    <div class="team-card-player-row">
+                      <span class="text-muted">#<%= player.dorsal || '-' %></span>
+                      <span><%= player.fullName %></span>
+                      <span class="text-muted text-end"><%= player.position || '-' %></span>
+                    </div>
+                  <% }) %>
+                <% } else { %>
+                  <p class="text-muted small mb-0">Sin jugadores asignados todavía.</p>
+                <% } %>
+              </div>
+
+              <div class="mt-auto d-flex gap-2 flex-wrap">
+                <a href="/teams/<%= team.id %>" class="btn btn-sm btn-primary">Ver</a>
+                <a href="/teams/<%= team.id %>/edit" class="btn btn-sm btn-outline-secondary">Editar</a>
+                <form
+                  method="POST"
+                  action="/teams/<%= team.id %>/delete"
+                  onsubmit="return confirm('¿Seguro que quieres eliminar esta plantilla?');"
+                >
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+<% }) %>

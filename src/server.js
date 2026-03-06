@@ -1,24 +1,9 @@
 const app = require('./app');
-const { createUsersTable, ensureAdminUser } = require('./models/userModel');
-const { createReportsTable } = require('./models/reportModel');
-const { createPlayersTable } = require('./models/playerModel');
-const { createClubsTable } = require('./models/clubModel');
-const { createClubTeamsTable } = require('./models/clubTeamModel');
-const { createClubRecommendationsTable } = require('./models/clubRecommendationModel');
+const { initDatabaseOnce } = require('./initDb');
 
 const PORT = process.env.PORT || 3000;
 
-async function init() {
-  await createUsersTable();
-  await createClubsTable();
-  await createClubTeamsTable();
-  await createClubRecommendationsTable();
-  await createReportsTable();
-  await createPlayersTable();
-  await ensureAdminUser();
-}
-
-init()
+initDatabaseOnce()
   .then(() => {
     app.listen(PORT, () => {
       // eslint-disable-next-line no-console

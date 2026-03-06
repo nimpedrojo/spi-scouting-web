@@ -2,6 +2,7 @@ body {
   background-color: #f3f7f4;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--sv-text-dark);
 }
 
 /* Paleta azul para SoccerReport */
@@ -226,4 +227,144 @@ body {
   width: 100%;
   height: auto;
   border-radius: 0.75rem;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(11, 59, 140, 0.12), transparent 32%),
+    linear-gradient(180deg, #eef3f8 0%, #f8fbf9 100%);
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(11, 59, 140, 0.08), transparent 25%),
+    #eef3f1;
+}
+
+.app-frame {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #0a2d66 0%, #113e8d 100%);
+  color: #fff;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.app-sidebar__logo,
+.app-sidebar__brand img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.2rem;
+}
+
+.app-sidebar__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.app-sidebar__subtitle {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.app-sidebar__meta,
+.app-sidebar__footer {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.app-sidebar__nav .nav-link {
+  border-radius: 0.8rem;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 0.75rem 0.9rem;
+  font-weight: 500;
+}
+
+.app-sidebar__nav .nav-link:hover,
+.app-sidebar__nav .nav-link:focus,
+.app-sidebar__nav .nav-link.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.app-sidebar__nav .nav-link.disabled {
+  opacity: 0.55;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  padding: 1.5rem;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(11, 59, 140, 0.08);
+  border-radius: 1.25rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.app-content {
+  padding: 0.5rem 0;
+}
+
+.filter-chip {
+  border-radius: 999px;
+}
+
+.team-card-player-list {
+  min-height: 180px;
+}
+
+.team-card-player-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 90px;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(11, 59, 140, 0.08);
+}
+
+.team-card-player-row:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 991.98px) {
+  .app-frame {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+  }
+
+  .app-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

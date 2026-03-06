@@ -46,7 +46,7 @@
           <td><%= p.id %></td>
           <td><%= p.first_name %></td>
           <td><%= p.last_name %></td>
-          <td><%= p.team || '' %></td>
+          <td><%= p.relational_team_name || p.team || '' %></td>
           <td><%= p.birth_year || '' %></td>
           <td><%= p.laterality || '' %></td>
           <td>

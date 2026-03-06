@@ -32,6 +32,11 @@ async function getClubByCode(code) {
   return rows[0];
 }
 
+async function getClubByName(name) {
+  const [rows] = await db.query('SELECT * FROM clubs WHERE name = ?', [name]);
+  return rows[0];
+}
+
 async function getClubById(id) {
   const [rows] = await db.query('SELECT * FROM clubs WHERE id = ?', [id]);
   return rows[0];
@@ -55,7 +60,8 @@ module.exports = {
   createClub,
   getAllClubs,
   getClubByCode,
-   getClubById,
-   updateClub,
+  getClubByName,
+  getClubById,
+  updateClub,
   deleteClub,
 };

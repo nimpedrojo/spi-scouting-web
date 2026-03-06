@@ -9,6 +9,7 @@ const {
   deletePlayer,
   insertPlayer,
 } = require('../models/playerModel');
+const { ensureAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,18 +17,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
-
-function ensureAdmin(req, res, next) {
-  if (
-    !req.session.user
-    || (req.session.user.role !== 'admin'
-      && req.session.user.role !== 'superadmin')
-  ) {
-    req.flash('error', 'No tienes permisos para acceder a esta sección.');
-    return res.redirect('/');
-  }
-  return next();
-}
 
 // Listado de jugadores
 router.get('/', ensureAdmin, async (req, res) => {

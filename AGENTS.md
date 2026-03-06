@@ -1,108 +1,285 @@
-# AGENTS.md — Informes STV
+# AGENTS.md — SoccerReport
 
-Este proyecto es una aplicación Node.js/Express con EJS para gestionar informes de scouting de jugadores. Las siguientes normas están pensadas para cualquier agente que modifique este repositorio.
+## Project Overview
 
-## Arquitectura y stack
+SoccerReport is a web application used by football academies and clubs to manage:
 
-- Backend: Node.js + Express.
-- Vistas: EJS con un layout principal `src/views/layout.ejs`.
-- Estilos: CSS propio en `src/public/css/styles.css` + Bootstrap 5 vía CDN.
-- BD: MySQL, acceso mediante modelos en `src/models/*.js`.
-- Tests: Jest + Supertest (`tests/app.test.js`).
-- Servidor de arranque: `src/server.js` (inicializa tablas y arranca Express).
-- App principal: `src/app.js` (middlewares, sesiones, rutas).
+* players
+* teams
+* scouting reports
+* player evaluations
+* academy analytics
 
-## Convenciones generales
+The application is used by coaches, coordinators and technical staff to monitor player development across seasons.
 
-- Usa **CommonJS** (`require/module.exports`) para módulos de Node.
-- Mantén rutas, modelos y vistas coherentes:
-  - Rutas en `src/routes/`.
-  - Modelos de datos en `src/models/`.
-  - Vistas EJS en `src/views/`.
-- No cambies la forma básica de inicializar la app:
-  - Tablas se crean en `init()` dentro de `src/server.js`.
-  - `app.js` no debe hacer trabajo de inicialización de BD ni escuchar el puerto.
+The project is evolving from a **scouting report manager** into a **football academy coordination platform**.
 
-## Estilo de código
+Primary domain:
 
-- JavaScript:
-  - Usa `async/await` para operaciones asíncronas.
-  - Maneja errores con `try/catch` en rutas y reporta con `console.error` cuando sea relevante.
-  - Mantén las funciones de acceso a datos en los modelos, no en las rutas.
-- Vistas EJS:
-  - Reutiliza el layout principal (`layout.ejs`).
-  - Evita lógica compleja en EJS; mejor preparar datos en la ruta.
-  - Para scripts pequeños específicos de una vista (por ejemplo select-all, autocompletar), inclúyelos al final de la plantilla.
-- CSS:
-  - Extiende `src/public/css/styles.css` en lugar de crear múltiples ficheros de estilos.
-  - Usa las variables definidas en `:root` para colores del club (rojo) y no introduzcas paletas paralelas.
+* Club
+* Season
+* Section
+* Category
+* Team
+* Player
+* Evaluation
+* Report
+* User
 
-## Rutas y seguridad
+---
 
-- Autenticación y roles:
-  - Usa `ensureAuth` para rutas que requieran usuario logueado.
-  - Usa `ensureAdmin` para rutas de administración (informes globales, usuarios).
-- Sesiones:
-  - Mantén el uso de `express-session` tal y como está configurado en `app.js`.
-  - No guardes información sensible en la sesión más allá de `id`, `name`, `email`, `role` y defaults.
-- Exportaciones:
-  - Para CSV u otros formatos de descarga, establece correctamente:
-    - `Content-Type`.
-    - `Content-Disposition` con un nombre de archivo descriptivo.
+# Technology Stack
 
-## Base de datos
+The stack **must remain simple and stable**.
 
-- Tablas principales:
-  - `users`: incluye `role`, `default_club`, `default_team`.
-  - `reports`: todos los campos de informe más `created_by` y `created_at`.
-  - `players`: base de jugadores importada desde Excel.
-  - `clubs`: catálogo de clubes con nombre y código de registro.
-  - `club_teams`: equipos asociados a cada club (para selección de equipos por defecto y filtros).
-  - `club_recommendations`: mapeo configurable año → opciones de recomendación por club (y valores por defecto para el club genérico `DEFAULT`).
-- Migraciones “suaves”:
-  - Cuando añadas columnas nuevas, sigue el patrón actual:
-    - `CREATE TABLE IF NOT EXISTS`.
-    - `ALTER TABLE ... ADD COLUMN ...` dentro de `try/catch` ignorando `ER_DUP_FIELDNAME`.
-- Relaciones:
-  - `reports.created_by` referencia `users.id`, pero se permite `NULL`.
-  - Antes de borrar usuarios, desvincula sus informes (`created_by = NULL`).
-  - Al borrar un club se borran también los usuarios asociados a ese club (sus informes quedan desvinculados).
+Backend:
 
-## Funcionalidad clave existente (no romper)
+* Node.js
+* Express
 
-- **Dashboard**:
-  - `/dashboard` es la pantalla principal tras login, con cards según el rol.
-- **Informes**:
-  - Creación desde `/reports/new` con autocompletado de jugador desde `players`.
-  - Listado, edición, borrado individual y múltiple.
-  - Exportación a Excel desde plantilla `.xlsm`.
-  - Exportación a CSV desde `/reports/export/csv` con encabezado.
-  - API JSON `/reports/api/:id`.
-- **Cuenta**:
-  - `/account` permite editar datos del usuario y defaults (club/equipo) con desplegable de equipos desde `players`.
-- **Administración**:
-  - `/admin/users` permite listar, editar, cambiar rol, borrar (individual y múltiple) usuarios.
+Frontend:
 
-## Tests
+* EJS templates
+* Bootstrap
 
-- Usa y amplía `tests/app.test.js` para cualquier nueva funcionalidad de rutas.
-  - Preferir `request.agent(app)` para flujos con sesión.
-  - Cuando crees datos directamente en la BD dentro de tests, límpialos comprobando efectos (selects) en el mismo test.
-- Antes de finalizar cambios, ejecuta:
+Database:
 
-  ```bash
-  npm test
-  ```
+* MySQL
 
-  y asegúrate de que la suite pasa.
-- Una vez que la suite pase elimina los registros de prueba de la BBDD   
+Testing:
 
+* Jest
+* Supertest
 
-## Qué evitar
+Deployment:
 
-- No mezclar estilos de autenticación (no introducir otros sistemas distintos a sesiones ya existentes).
-- No mover grandes piezas (como cambiar Express/EJS por otro framework) dentro de este agente.
-- No cambiar la semántica de rutas públicas ya usadas (`/login`, `/dashboard`, `/reports`, `/admin/users`) sin actualizar tests y README.
-- No introducir dependencias de pago.
+* VPS (no container orchestration)
 
-Si necesitas nuevas capacidades (p.ej. filtros avanzados, nuevos formatos de exportación), sigue la estructura actual: modelos para datos, rutas para lógica HTTP, vistas para renderizado y tests que cubran los flujos principales.
+---
+
+# Architecture Principles
+
+## 1. Do not rewrite the project
+
+The application must evolve incrementally.
+
+Avoid introducing:
+
+* React
+* Vue
+* TypeScript
+* Prisma
+* Docker
+* GraphQL
+
+Keep the stack simple.
+
+---
+
+## 2. Maintain existing functionality
+
+Current modules must keep working:
+
+* authentication
+* users
+* clubs
+* reports
+* players
+* scouting
+
+New features must not break them.
+
+---
+
+## 3. Server Side Rendering
+
+The project uses **EJS**.
+
+Do not introduce SPA frameworks.
+
+All pages must render server-side.
+
+---
+
+## 4. Business Logic Separation
+
+Never put complex logic inside EJS templates.
+
+All aggregation and calculations must be implemented inside:
+
+```
+src/services/
+```
+
+Examples:
+
+* dashboard calculations
+* player evaluation averages
+* team statistics
+* import logic
+
+---
+
+## 5. Folder Structure
+
+New code should follow this structure.
+
+```
+src/
+  controllers/
+  models/
+  routes/
+  services/
+  views/
+  middleware/
+```
+
+Responsibilities:
+
+controllers → request handling
+models → database access
+services → business logic
+routes → route definitions
+views → EJS templates
+
+---
+
+## 6. Database Rules
+
+Use MySQL tables created in code.
+
+Avoid complex migrations.
+
+Tables should be created if they do not exist.
+
+Use UUID identifiers.
+
+Foreign keys should enforce integrity.
+
+---
+
+## 7. Code Style
+
+Follow existing project style.
+
+Rules:
+
+* use async/await
+* avoid deeply nested callbacks
+* keep functions small
+* prefer descriptive names
+* avoid large controllers
+* move reusable logic into services
+
+---
+
+## 8. UI Design Principles
+
+Use Bootstrap components.
+
+The UI should follow a **football academy dashboard style**.
+
+Common components:
+
+* cards
+* badges
+* progress bars
+* chips
+* radar charts
+* grouped lists
+
+Sidebar navigation must remain consistent across pages.
+
+---
+
+## 9. Player Evaluations
+
+Evaluations are a core feature.
+
+Each evaluation contains:
+
+* player
+* team
+* season
+* author
+* date
+* scores
+
+Scores belong to areas:
+
+* técnica
+* táctica
+* física
+* psicológica
+* personalidad
+
+Scores must be stored in a flexible structure so metrics can evolve.
+
+---
+
+## 10. Testing
+
+All new routes must include tests.
+
+Testing stack:
+
+* Jest
+* Supertest
+
+Test cases must cover:
+
+* route responses
+* entity creation
+* basic validation
+
+---
+
+## 11. Security
+
+Respect existing authentication.
+
+Routes that modify data must require authentication.
+
+Admin-only actions must enforce role checks.
+
+---
+
+## 12. Performance
+
+Avoid N+1 queries.
+
+Prefer aggregated SQL queries when computing statistics.
+
+Use indexes where necessary.
+
+---
+
+## 13. Code Generated by Codex
+
+When Codex generates code it must:
+
+* follow this architecture
+* not introduce new frameworks
+* keep compatibility with existing modules
+* include tests for new routes
+* document new services when needed
+
+---
+
+## 14. Main Modules
+
+The application will contain the following modules.
+
+Dashboard
+Plantillas (teams by section/category)
+Players
+Evaluations
+Reports
+Scouting
+Analytics (future)
+
+Each module must follow the MVC structure.
+
+---
+
+End of AGENTS.md

@@ -7,22 +7,63 @@ async function createPlayersTable() {
       first_name VARCHAR(100) NOT NULL,
       last_name VARCHAR(150) NOT NULL,
       club VARCHAR(150),
+      club_id INT,
       team VARCHAR(150),
+      current_team_id CHAR(36),
       birth_date DATE,
       birth_year INT,
       laterality VARCHAR(5),
+      phone VARCHAR(50),
+      email VARCHAR(150),
+      nationality VARCHAR(100),
+      preferred_foot VARCHAR(20),
+      avatar_color VARCHAR(20),
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
   await db.query(sql);
 
-  // Intentar añadir columna club si la tabla ya existía previamente
+  const alterStatements = [
+    'ALTER TABLE players ADD COLUMN club VARCHAR(150)',
+    'ALTER TABLE players ADD COLUMN club_id INT',
+    'ALTER TABLE players ADD COLUMN current_team_id CHAR(36)',
+    'ALTER TABLE players ADD COLUMN phone VARCHAR(50)',
+    'ALTER TABLE players ADD COLUMN email VARCHAR(150)',
+    'ALTER TABLE players ADD COLUMN nationality VARCHAR(100)',
+    'ALTER TABLE players ADD COLUMN preferred_foot VARCHAR(20)',
+    'ALTER TABLE players ADD COLUMN avatar_color VARCHAR(20)',
+    'ALTER TABLE players ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1',
+  ];
+
+  for (const statement of alterStatements) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await db.query(statement);
+    } catch (e) {
+      if (e && e.code !== 'ER_DUP_FIELDNAME') {
+        // eslint-disable-next-line no-console
+        console.error('Error altering players table', e);
+      }
+    }
+  }
+
   try {
-    await db.query('ALTER TABLE players ADD COLUMN club VARCHAR(150)');
+    await db.query(
+      `ALTER TABLE players
+       ADD CONSTRAINT fk_players_current_team
+       FOREIGN KEY (current_team_id) REFERENCES teams(id)
+       ON DELETE SET NULL`,
+    );
   } catch (e) {
-    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+    if (
+      e
+      && e.code !== 'ER_CANT_CREATE_TABLE'
+      && e.code !== 'ER_DUP_KEYNAME'
+      && e.code !== 'ER_FK_DUP_NAME'
+    ) {
       // eslint-disable-next-line no-console
-      console.error('Error altering players table', e);
+      console.error('Error adding fk_players_current_team', e);
     }
   }
 }
@@ -44,55 +85,81 @@ async function insertPlayer({
 
 async function getPlayersByTeam(team, club = null) {
   if (team) {
-    let sql = 'SELECT * FROM players WHERE team = ?';
+    let sql = `
+      SELECT
+        p.*,
+        t.name AS relational_team_name
+      FROM players p
+      LEFT JOIN teams t ON t.id = p.current_team_id
+      WHERE COALESCE(t.name, p.team) = ?
+    `;
     const params = [team];
 
     if (club) {
-      sql += ' AND club = ?';
+      sql += ' AND p.club = ?';
       params.push(club);
     }
 
-    sql += ' ORDER BY last_name, first_name';
+    sql += ' ORDER BY p.last_name, p.first_name';
 
     const [rows] = await db.query(sql, params);
     return rows;
   }
 
-  let sql = 'SELECT * FROM players';
+  let sql = `
+    SELECT
+      p.*,
+      t.name AS relational_team_name
+    FROM players p
+    LEFT JOIN teams t ON t.id = p.current_team_id
+  `;
   const params = [];
 
   if (club) {
-    sql += ' WHERE club = ?';
+    sql += ' WHERE p.club = ?';
     params.push(club);
   }
 
-  sql += ' ORDER BY team, last_name, first_name';
+  sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
   return rows;
 }
 
 async function getAllPlayers(club = null) {
-  let sql = 'SELECT * FROM players';
+  let sql = `
+    SELECT
+      p.*,
+      t.name AS relational_team_name
+    FROM players p
+    LEFT JOIN teams t ON t.id = p.current_team_id
+  `;
   const params = [];
 
   if (club) {
-    sql += ' WHERE club = ?';
+    sql += ' WHERE p.club = ?';
     params.push(club);
   }
 
-  sql += ' ORDER BY team, last_name, first_name';
+  sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
   return rows;
 }
 
 async function getPlayerById(id, club = null) {
-  let sql = 'SELECT * FROM players WHERE id = ?';
+  let sql = `
+    SELECT
+      p.*,
+      t.name AS relational_team_name
+    FROM players p
+    LEFT JOIN teams t ON t.id = p.current_team_id
+    WHERE p.id = ?
+  `;
   const params = [id];
 
   if (club) {
-    sql += ' AND club = ?';
+    sql += ' AND p.club = ?';
     params.push(club);
   }
 

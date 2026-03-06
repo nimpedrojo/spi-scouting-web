@@ -1,6 +1,17 @@
 const request = require('supertest');
+const { randomUUID } = require('crypto');
 const app = require('../src/app');
 const db = require('../src/db');
+const { initDatabaseOnce } = require('../src/initDb');
+
+async function createTestClub(name) {
+  const code = `club_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+  const [result] = await db.query(
+    'INSERT INTO clubs (name, code) VALUES (?, ?)',
+    [name, code],
+  );
+  return { id: result.insertId, name, code };
+}
 
 async function createTestUser({
   name = 'Test User',
@@ -28,9 +39,55 @@ async function createTestUser({
 }
 
 describe('Aplicación SoccerReport', () => {
+  beforeAll(async () => {
+    await initDatabaseOnce();
+  });
+
   afterAll(async () => {
     await db.end();
   });
+
+  async function createTeamContext(baseName = 'Club Plantillas') {
+    const suffix = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+    const club = await createTestClub(`${baseName} ${suffix}`);
+    const admin = await createTestUser({
+      name: `Admin ${suffix}`,
+      role: 'admin',
+      defaultClub: club.name,
+    });
+
+    const [sectionRows] = await db.query(
+      'SELECT id, name FROM sections WHERE name IN ("Masculina", "Femenina")',
+    );
+    const [categoryRows] = await db.query(
+      'SELECT id, name FROM categories WHERE name IN ("Juvenil", "Cadete", "Infantil")',
+    );
+    const [seasonRows] = await db.query(
+      'SELECT id, name FROM seasons WHERE club_id = ? ORDER BY created_at DESC',
+      [club.id],
+    );
+
+    let season = seasonRows[0];
+    if (!season) {
+      const seasonId = randomUUID();
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 1)',
+        [seasonId, club.id, '2026/27'],
+      );
+      season = { id: seasonId, name: '2026/27' };
+    }
+
+    return {
+      club,
+      admin,
+      season,
+      masculina: sectionRows.find((row) => row.name === 'Masculina'),
+      femenina: sectionRows.find((row) => row.name === 'Femenina'),
+      juvenil: categoryRows.find((row) => row.name === 'Juvenil'),
+      cadete: categoryRows.find((row) => row.name === 'Cadete'),
+      infantil: categoryRows.find((row) => row.name === 'Infantil'),
+    };
+  }
 
   test('redirección inicial a /login si no hay sesión', async () => {
     const res = await request(app).get('/');
@@ -670,5 +727,169 @@ describe('Aplicación SoccerReport', () => {
     const resNew = await agent.get('/reports/new');
     expect(resNew.status).toBe(200);
     expect(resNew.text).toContain('name="recommendation"');
+  });
+
+  test('GET /teams muestra la página de plantillas', async () => {
+    const context = await createTeamContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil A',
+      ],
+    );
+
+    const res = await agent.get('/teams');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Plantillas');
+    expect(res.text).toContain('Juvenil A');
+    expect(res.text).toContain('Masculina');
+  });
+
+  test('create team crea una plantilla nueva', async () => {
+    const context = await createTeamContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/teams').send({
+      name: 'Cadete B',
+      season_id: context.season.id,
+      section_id: context.masculina.id,
+      category_id: context.cadete.id,
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/^\/teams\//);
+
+    const [rows] = await db.query(
+      'SELECT name FROM teams WHERE club_id = ? AND name = ?',
+      [context.club.id, 'Cadete B'],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  test('view team detail muestra el detalle del equipo', async () => {
+    const context = await createTeamContext();
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.femenina.id,
+        context.infantil.id,
+        'Infantil F',
+      ],
+    );
+
+    const [playerResult] = await db.query(
+      `INSERT INTO players (first_name, last_name, club, club_id, current_team_id, team)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ['Lucia', 'Pardo', context.club.name, context.club.id, teamId, 'Legacy Team'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), teamId, playerResult.insertId, '7', 'EI'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/teams/${teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Infantil F');
+    expect(res.text).toContain('Lucia Pardo');
+    expect(res.text).toContain('Perfil');
+  });
+
+  test('update team actualiza una plantilla', async () => {
+    const context = await createTeamContext();
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil C',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post(`/teams/${teamId}/update`).send({
+      name: 'Juvenil C Actualizado',
+      season_id: context.season.id,
+      section_id: context.masculina.id,
+      category_id: context.cadete.id,
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/teams/${teamId}`);
+
+    const [rows] = await db.query(
+      'SELECT name, category_id FROM teams WHERE id = ?',
+      [teamId],
+    );
+    expect(rows[0].name).toBe('Juvenil C Actualizado');
+    expect(rows[0].category_id).toBe(context.cadete.id);
+  });
+
+  test('delete team elimina una plantilla', async () => {
+    const context = await createTeamContext();
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Delete',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post(`/teams/${teamId}/delete`);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/teams');
+
+    const [rows] = await db.query('SELECT id FROM teams WHERE id = ?', [teamId]);
+    expect(rows).toHaveLength(0);
   });
 });
