@@ -1,0 +1,106 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <% if (errors && errors.length) { %>
+      <div class="alert alert-danger">
+        <ul class="mb-0">
+          <% errors.forEach((error) => { %><li><%= error %></li><% }) %>
+        </ul>
+      </div>
+    <% } %>
+
+    <form method="POST" action="<%= formAction %>" class="row g-3">
+      <div class="col-md-6">
+        <label for="name" class="form-label">Nombre</label>
+        <input type="text" id="name" name="name" class="form-control" required value="<%= formValues.name || (template ? template.name : '') %>" />
+      </div>
+      <div class="col-md-3">
+        <label for="section_id" class="form-label">Sección</label>
+        <select id="section_id" name="section_id" class="form-select">
+          <option value="">Todas</option>
+          <% formData.sections.forEach((section) => { %>
+            <option value="<%= section.id %>" <%= String(formValues.section_id || (template ? template.section_id || '' : '')) === String(section.id) ? 'selected' : '' %>><%= section.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="category_id" class="form-label">Categoría</label>
+        <select id="category_id" name="category_id" class="form-select">
+          <option value="">Todas</option>
+          <% formData.categories.forEach((category) => { %>
+            <option value="<%= category.id %>" <%= String(formValues.category_id || (template ? template.category_id || '' : '')) === String(category.id) ? 'selected' : '' %>><%= category.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12">
+        <label for="description" class="form-label">Descripción</label>
+        <textarea id="description" name="description" class="form-control" rows="3"><%= formValues.description || (template ? template.description || '' : '') %></textarea>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input
+            type="checkbox"
+            class="form-check-input"
+            id="is_active"
+            name="is_active"
+            value="1"
+            <%= (typeof formValues.is_active !== 'undefined'
+              ? Boolean(formValues.is_active)
+              : (template ? Boolean(template.is_active) : true)) ? 'checked' : '' %>
+          />
+          <label for="is_active" class="form-check-label">Plantilla activa</label>
+        </div>
+      </div>
+
+      <% const currentMetrics = template ? template.metrics : formData.fallbackTemplate.metrics; %>
+      <% currentMetrics.forEach((area) => { %>
+        <div class="col-12">
+          <div class="card border-0 bg-light">
+            <div class="card-body">
+              <h2 class="h5 mb-3"><%= area.label %></h2>
+              <div class="row g-3">
+                <% area.metrics.forEach((metric) => { %>
+                  <% const metricName = area.key + '_' + metric.key; %>
+                  <div class="col-lg-6">
+                    <div class="border rounded p-3 bg-white">
+                      <div class="form-check mb-2">
+                        <input
+                          type="checkbox"
+                          class="form-check-input"
+                          id="metric_enabled_<%= metricName %>"
+                          name="metric_enabled_<%= metricName %>"
+                          value="1"
+                          checked
+                        />
+                        <label class="form-check-label fw-semibold" for="metric_enabled_<%= metricName %>"><%= metric.label %></label>
+                      </div>
+                      <label class="form-label small" for="metric_label_<%= metricName %>">Etiqueta</label>
+                      <input type="text" class="form-control form-control-sm mb-2" id="metric_label_<%= metricName %>" name="metric_label_<%= metricName %>" value="<%= metric.label %>" />
+                      <div class="form-check mb-2">
+                        <input
+                          type="checkbox"
+                          class="form-check-input"
+                          id="metric_required_<%= metricName %>"
+                          name="metric_required_<%= metricName %>"
+                          value="1"
+                          <%= metric.isRequired ? 'checked' : '' %>
+                        />
+                        <label class="form-check-label small" for="metric_required_<%= metricName %>">Obligatoria</label>
+                      </div>
+                      <label class="form-label small" for="metric_weight_<%= metricName %>">Peso por defecto</label>
+                      <input type="number" step="0.1" class="form-control form-control-sm" id="metric_weight_<%= metricName %>" name="metric_weight_<%= metricName %>" value="<%= metric.defaultWeight || '' %>" />
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/evaluation-templates" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

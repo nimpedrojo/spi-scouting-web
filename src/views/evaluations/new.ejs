@@ -11,6 +11,23 @@
     <% } %>
 
     <form method="POST" action="/evaluations" class="row g-3">
+      <div class="col-md-4">
+        <label for="template_id" class="form-label">Plantilla</label>
+        <select id="template_id" name="template_id" class="form-select">
+          <% if (formData.availableTemplates && formData.availableTemplates.length) { %>
+            <% formData.availableTemplates.forEach((templateOption) => { %>
+              <option
+                value="<%= templateOption.id %>"
+                <%= String(formValues.template_id || formData.templateId || '') === String(templateOption.id) ? 'selected' : '' %>
+              >
+                <%= templateOption.name %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option value="<%= formData.templateId || 'fallback-default' %>">Plantilla por defecto</option>
+          <% } %>
+        </select>
+      </div>
       <div class="col-md-3">
         <label for="season_id" class="form-label">Temporada</label>
         <select id="season_id" name="season_id" class="form-select" required>
@@ -74,7 +91,7 @@
                       class="form-control"
                       id="score_<%= area.key %>_<%= metric.key %>"
                       name="score_<%= area.key %>_<%= metric.key %>"
-                      required
+                      <%= metric.isRequired ? 'required' : '' %>
                       value="<%= formValues['score_' + area.key + '_' + metric.key] || '' %>"
                     />
                   </div>

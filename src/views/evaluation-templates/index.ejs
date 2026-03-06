@@ -1,0 +1,45 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <p class="text-muted mb-0">Configura métricas por sección y categoría con fallback por defecto.</p>
+  </div>
+  <a href="/evaluation-templates/new" class="btn btn-primary">Nueva plantilla</a>
+</div>
+
+<% if (!templates.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0">No hay plantillas registradas todavía.</p>
+    </div>
+  </div>
+<% } else { %>
+  <div class="row g-4">
+    <% templates.forEach((template) => { %>
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h2 class="h5 mb-1"><%= template.name %></h2>
+                <div class="text-muted small">
+                  <%= template.section_name || 'Todas las secciones' %> · <%= template.category_name || 'Todas las categorias' %>
+                </div>
+              </div>
+              <span class="badge <%= template.is_active ? 'text-bg-success' : 'text-bg-secondary' %>">
+                <%= template.is_active ? 'Activa' : 'Inactiva' %>
+              </span>
+            </div>
+            <p class="small text-muted"><%= template.description || 'Sin descripción.' %></p>
+            <div class="small mb-3"><strong><%= template.metrics.reduce((sum, area) => sum + area.metrics.length, 0) %></strong> métricas</div>
+            <div class="d-flex gap-2 flex-wrap">
+              <a href="/evaluation-templates/<%= template.id %>" class="btn btn-sm btn-primary">Ver</a>
+              <a href="/evaluation-templates/<%= template.id %>/edit" class="btn btn-sm btn-outline-secondary">Editar</a>
+              <form method="POST" action="/evaluation-templates/<%= template.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar esta plantilla?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>

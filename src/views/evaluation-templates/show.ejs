@@ -1,0 +1,50 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2 class="mb-1"><%= template.name %></h2>
+        <p class="text-muted mb-2"><%= template.description || 'Sin descripción.' %></p>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge text-bg-light"><%= template.section_name || 'Todas las secciones' %></span>
+          <span class="badge text-bg-light"><%= template.category_name || 'Todas las categorías' %></span>
+          <span class="badge <%= template.is_active ? 'text-bg-success' : 'text-bg-secondary' %>"><%= template.is_active ? 'Activa' : 'Inactiva' %></span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/evaluation-templates/<%= template.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <% template.metrics.forEach((area) => { %>
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 mb-3"><%= area.label %></h3>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Obligatoria</th>
+                  <th>Peso</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% area.metrics.forEach((metric) => { %>
+                  <tr>
+                    <td><%= metric.label %></td>
+                    <td><%= metric.isRequired ? 'Sí' : 'No' %></td>
+                    <td><%= metric.defaultWeight || '-' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>

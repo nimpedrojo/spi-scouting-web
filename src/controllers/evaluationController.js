@@ -52,7 +52,11 @@ async function renderIndex(req, res) {
 
 async function renderNew(req, res) {
   try {
-    const formData = await getEvaluationFormData(req.session.user);
+    const formData = await getEvaluationFormData(req.session.user, {
+      templateId: req.query.template_id || null,
+      teamId: req.query.team_id || null,
+      playerId: req.query.player_id || null,
+    });
     if (!formData) {
       req.flash('error', 'Configura primero un club por defecto para crear evaluaciones.');
       return res.redirect('/dashboard');
@@ -74,17 +78,23 @@ async function renderNew(req, res) {
 
 async function create(req, res) {
   try {
-    const formData = await getEvaluationFormData(req.session.user);
+    const formData = await getEvaluationFormData(req.session.user, {
+      templateId: req.body.template_id || null,
+      teamId: req.body.team_id || null,
+      playerId: req.body.player_id || null,
+    });
     const groupedScores = buildGroupedScoresFromBody(req.body, formData.template);
     const payload = {
       seasonId: req.body.season_id,
       teamId: req.body.team_id,
       playerId: req.body.player_id,
+      templateId: req.body.template_id,
       evaluationDate: req.body.evaluation_date,
       title: req.body.title,
       notes: req.body.notes,
       source: 'manual',
       groupedScores,
+      templateMetrics: formData.template,
     };
     const result = await createEvaluationWithScores(req.session.user, payload);
     if (result.errors && result.errors.length) {

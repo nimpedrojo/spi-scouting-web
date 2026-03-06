@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const app = require('../src/app');
 const db = require('../src/db');
 const { initDatabaseOnce } = require('../src/initDb');
+const { resolveBestTemplateForContext } = require('../src/services/evaluationTemplateService');
 
 async function createTestClub(name) {
   const code = `club_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -1558,5 +1559,145 @@ describe('Aplicación SoccerReport', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Selecciona al menos 2 jugadores');
     expect(res.text).not.toContain('comparisonRadarChart');
+  });
+
+  test('create template crea una plantilla de evaluación', async () => {
+    const context = await createTeamContext('Club Template Create');
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/evaluation-templates').send({
+      name: 'Plantilla Cadete',
+      description: 'Template para cadete',
+      section_id: context.masculina.id,
+      category_id: context.cadete.id,
+      is_active: '1',
+      metric_enabled_tecnica_control: '1',
+      metric_label_tecnica_control: 'Primer control',
+      metric_required_tecnica_control: '1',
+      metric_weight_tecnica_control: '1',
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/^\/evaluation-templates\//);
+
+    const [rows] = await db.query(
+      'SELECT name FROM evaluation_templates WHERE club_id = ? AND name = ?',
+      [context.club.id, 'Plantilla Cadete'],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  test('edit template actualiza una plantilla', async () => {
+    const context = await createTeamContext('Club Template Edit');
+    const [templateInsert] = await db.query(
+      `INSERT INTO evaluation_templates (id, club_id, name, description, section_id, category_id, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [randomUUID(), context.club.id, 'Template Edit', 'Desc', context.masculina.id, context.juvenil.id],
+    );
+    const [templateRows] = await db.query(
+      'SELECT id FROM evaluation_templates WHERE club_id = ? AND name = ? ORDER BY created_at DESC LIMIT 1',
+      [context.club.id, 'Template Edit'],
+    );
+    const templateId = templateRows[0].id;
+    await db.query(
+      `INSERT INTO evaluation_template_metrics (
+        id, template_id, area, metric_key, metric_label, sort_order, is_required
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), templateId, 'tecnica', 'control', 'Control', 1, 1],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post(`/evaluation-templates/${templateId}/update`).send({
+      name: 'Template Editado',
+      description: 'Nueva desc',
+      section_id: context.masculina.id,
+      category_id: context.cadete.id,
+      is_active: '1',
+      metric_enabled_tecnica_control: '1',
+      metric_label_tecnica_control: 'Control orientado',
+      metric_required_tecnica_control: '1',
+      metric_weight_tecnica_control: '2',
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/evaluation-templates/${templateId}`);
+
+    const [rows] = await db.query(
+      'SELECT name, category_id FROM evaluation_templates WHERE id = ?',
+      [templateId],
+    );
+    expect(rows[0].name).toBe('Template Editado');
+    expect(rows[0].category_id).toBe(context.cadete.id);
+  });
+
+  test('delete template elimina una plantilla', async () => {
+    const context = await createTeamContext('Club Template Delete');
+    const templateId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluation_templates (id, club_id, name, is_active)
+       VALUES (?, ?, ?, 1)`,
+      [templateId, context.club.id, 'Template Delete'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post(`/evaluation-templates/${templateId}/delete`);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/evaluation-templates');
+
+    const [rows] = await db.query('SELECT id FROM evaluation_templates WHERE id = ?', [templateId]);
+    expect(rows).toHaveLength(0);
+  });
+
+  test('resolve default template usa fallback si no hay plantilla específica', async () => {
+    const context = await createEvaluationContext('Club Template Resolve');
+    const resolved = await resolveBestTemplateForContext(
+      { default_club: context.club.name },
+      { teamId: context.teamId, playerId: context.playerId },
+    );
+
+    expect(resolved).toBeTruthy();
+    expect(resolved.name).toContain('Plantilla');
+    expect(resolved.metrics.length).toBeGreaterThan(0);
+  });
+
+  test('render evaluation form from template', async () => {
+    const context = await createTeamContext('Club Template Render');
+    const templateId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluation_templates (id, club_id, name, description, section_id, category_id, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [templateId, context.club.id, 'Plantilla Render', 'Desc', context.masculina.id, context.juvenil.id],
+    );
+    await db.query(
+      `INSERT INTO evaluation_template_metrics (
+        id, template_id, area, metric_key, metric_label, sort_order, is_required
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), templateId, 'tecnica', 'control', 'Control Premium', 1, 1],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/evaluations/new?template_id=${templateId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Plantilla Render');
+    expect(res.text).toContain('Control Premium');
   });
 });

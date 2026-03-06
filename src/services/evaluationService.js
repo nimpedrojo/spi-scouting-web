@@ -14,14 +14,19 @@ const {
   getScoresByEvaluationId,
 } = require('../models/evaluationScoreModel');
 const { requireClubForUser, getActiveSeasonByClub } = require('./teamService');
-const { EVALUATION_TEMPLATE } = require('./evaluationTemplate');
+const {
+  resolveBestTemplateForContext,
+  getDefaultFallbackTemplate,
+  listTemplates,
+  getTemplateDetail,
+} = require('./evaluationTemplateService');
 
 const MIN_SCORE = 0;
 const MAX_SCORE = 10;
 
-function flattenGroupedScores(groupedScores) {
+function flattenGroupedScores(groupedScores, templateAreas) {
   const flattened = [];
-  EVALUATION_TEMPLATE.forEach((area) => {
+  templateAreas.forEach((area) => {
     area.metrics.forEach((metric, index) => {
       const rawScore = groupedScores
         && groupedScores[area.key]
@@ -41,14 +46,23 @@ function flattenGroupedScores(groupedScores) {
   return flattened;
 }
 
-function validateScores(groupedScores) {
-  const flattenedScores = flattenGroupedScores(groupedScores);
+function validateScores(groupedScores, templateAreas) {
+  const flattenedScores = flattenGroupedScores(groupedScores, templateAreas);
   const errors = [];
 
   flattenedScores.forEach((entry) => {
     const numericValue = Number(entry.score);
-    if (entry.score === undefined || entry.score === null || entry.score === '') {
+    const templateArea = templateAreas.find((area) => area.key === entry.area);
+    const templateMetric = templateArea
+      ? templateArea.metrics.find((metric) => metric.key === entry.metricKey)
+      : null;
+    const isRequired = templateMetric ? Boolean(templateMetric.isRequired) : true;
+
+    if ((entry.score === undefined || entry.score === null || entry.score === '') && isRequired) {
       errors.push(`La metrica ${entry.metricLabel} es obligatoria.`);
+      return;
+    }
+    if (entry.score === undefined || entry.score === null || entry.score === '') {
       return;
     }
     if (Number.isNaN(numericValue) || numericValue < MIN_SCORE || numericValue > MAX_SCORE) {
@@ -58,10 +72,12 @@ function validateScores(groupedScores) {
 
   return {
     errors,
-    flattenedScores: flattenedScores.map((entry) => ({
-      ...entry,
-      score: Number(entry.score),
-    })),
+    flattenedScores: flattenedScores
+      .filter((entry) => !(entry.score === undefined || entry.score === null || entry.score === ''))
+      .map((entry) => ({
+        ...entry,
+        score: Number(entry.score),
+      })),
   };
 }
 
@@ -78,6 +94,19 @@ async function createEvaluationWithScores(user, payload, options = {}) {
   if (!club) {
     return { errors: ['Debes tener un club activo para crear evaluaciones.'] };
   }
+
+  const resolvedTemplate = payload.templateId
+    ? await resolveBestTemplateForContext(user, {
+      teamId: payload.teamId,
+      playerId: payload.playerId,
+    })
+    : await resolveBestTemplateForContext(user, {
+      teamId: payload.teamId,
+      playerId: payload.playerId,
+    });
+  const template = payload.templateMetrics && payload.templateMetrics.length
+    ? { metrics: payload.templateMetrics }
+    : (resolvedTemplate || getDefaultFallbackTemplate());
 
   const [team, player, season] = await Promise.all([
     findTeamById(payload.teamId),
@@ -99,7 +128,7 @@ async function createEvaluationWithScores(user, payload, options = {}) {
     validationErrors.push('La fecha de evaluacion es obligatoria.');
   }
 
-  const scoreValidation = validateScores(payload.groupedScores);
+  const scoreValidation = validateScores(payload.groupedScores, template.metrics);
   validationErrors.push(...scoreValidation.errors);
 
   if (validationErrors.length) {
@@ -238,18 +267,30 @@ async function getEvaluationDetail(user, evaluationId) {
   };
 }
 
-async function getEvaluationFormData(user) {
+async function getEvaluationFormData(user, options = {}) {
   const club = await requireClubForUser(user);
   if (!club) {
     return null;
   }
 
-  const [teams, players, seasons, activeSeason] = await Promise.all([
+  const [teams, players, seasons, activeSeason, availableTemplates] = await Promise.all([
     getTeamsByClubId(club.id),
     getAllPlayers(club.name),
     getSeasonsByClubId(club.id),
     getActiveSeasonByClub(club.id),
+    listTemplates(user),
   ]);
+
+  let resolvedTemplate = null;
+  if (options.templateId) {
+    resolvedTemplate = await getTemplateDetail(user, options.templateId);
+  }
+  if (!resolvedTemplate) {
+    resolvedTemplate = await resolveBestTemplateForContext(user, {
+      teamId: options.teamId || null,
+      playerId: options.playerId || null,
+    });
+  }
 
   return {
     club,
@@ -257,7 +298,9 @@ async function getEvaluationFormData(user) {
     players,
     seasons,
     activeSeason,
-    template: EVALUATION_TEMPLATE,
+    template: resolvedTemplate.metrics,
+    templateId: resolvedTemplate.id,
+    availableTemplates: availableTemplates || [],
   };
 }
 
