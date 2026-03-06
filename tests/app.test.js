@@ -1919,4 +1919,66 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Datos insuficientes');
     expect(res.text).toContain('seguir observando');
   });
+
+  test('PDF route renders', async () => {
+    const context = await createEvaluationContext('Club PDF Render');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/players/${context.playerId}/pdf`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(`Informe de Mario Sanz`);
+    expect(res.text).toContain('Comunicación trimestral');
+  });
+
+  test('PDF route works with player with evaluations', async () => {
+    const context = await createEvaluationContext('Club PDF Eval');
+    const evaluationId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-02',
+        'manual',
+        'Quarterly Review',
+        'Buen trimestre y margen de mejora en ritmo competitivo.',
+        7.6,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationId, { tecnica_control: 8, fisica_velocidad: 8 });
+    await db.query(
+      `INSERT INTO reports (player_name, player_surname, club, team, overall_rating, comments, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ['Mario', 'Sanz', context.club.name, 'Juvenil Eval', 7.9, 'Comentario de seguimiento para familias.', context.admin.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/players/${context.playerId}/pdf`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Media global');
+    expect(res.text).toContain('playerPdfRadarChart');
+    expect(res.text).toContain('Comentario del cuerpo técnico');
+    expect(res.text).toContain('Buen trimestre y margen de mejora en ritmo competitivo.');
+  });
+
+  test('PDF route works with missing optional data', async () => {
+    const context = await createEvaluationContext('Club PDF Empty');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/players/${context.playerId}/pdf`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Todavía no hay evaluaciones suficientes');
+    expect(res.text).toContain('No hay comentarios recientes disponibles');
+    expect(res.text).toContain('Informes registrados');
+  });
 });

@@ -3,6 +3,7 @@ const { getPlayerAnalytics } = require('../services/playerAnalyticsService');
 const { getAreaLabel } = require('../services/evaluationAreaHelper');
 const { getReportsForPlayerProfile } = require('../models/reportModel');
 const { getPlayerById } = require('../models/playerModel');
+const { buildPlayerPdfReport } = require('../services/pdfReportService');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -92,4 +93,56 @@ async function renderProfile(req, res) {
 
 module.exports = {
   renderProfile,
+  async renderPdf(req, res) {
+    try {
+      const report = await buildPlayerPdfReport(
+        req.session.user,
+        req.params.id,
+        req.query.season_id || null,
+      );
+
+      if (!report) {
+        req.flash('error', 'Jugador no encontrado.');
+        return res.redirect('/admin/players');
+      }
+
+      return res.render('players/pdf', {
+        layout: false,
+        pageTitle: `Informe de ${report.player.fullName}`,
+        report,
+        previewMode: false,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading player PDF report', err);
+      req.flash('error', 'Ha ocurrido un error al generar el informe del jugador.');
+      return res.redirect(`/players/${req.params.id}`);
+    }
+  },
+  async renderPdfPreview(req, res) {
+    try {
+      const report = await buildPlayerPdfReport(
+        req.session.user,
+        req.params.id,
+        req.query.season_id || null,
+      );
+
+      if (!report) {
+        req.flash('error', 'Jugador no encontrado.');
+        return res.redirect('/admin/players');
+      }
+
+      return res.render('players/pdf', {
+        layout: false,
+        pageTitle: `Previsualizacion de ${report.player.fullName}`,
+        report,
+        previewMode: true,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading player PDF preview', err);
+      req.flash('error', 'Ha ocurrido un error al generar la previsualización.');
+      return res.redirect(`/players/${req.params.id}`);
+    }
+  },
 };
