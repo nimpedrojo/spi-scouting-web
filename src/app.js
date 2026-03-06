@@ -81,6 +81,7 @@ const evaluationRoutes = require('./routes/evaluationRoutes');
 const playerProfileRoutes = require('./routes/playerProfileRoutes');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplateRoutes');
 const seasonComparisonRoutes = require('./routes/seasonComparisonRoutes');
+const seasonForecastRoutes = require('./routes/seasonForecastRoutes');
 
 app.use('/', authRoutes);
 app.use('/reports', reportRoutes);
@@ -93,6 +94,7 @@ app.use('/', evaluationRoutes);
 app.use('/', playerProfileRoutes);
 app.use('/', evaluationTemplateRoutes);
 app.use('/', seasonComparisonRoutes);
+app.use('/', seasonForecastRoutes);
 
 app.get('/', (req, res) => {
   if (req.session.user) {

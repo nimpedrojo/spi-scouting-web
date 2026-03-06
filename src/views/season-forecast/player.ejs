@@ -1,0 +1,65 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h4 mb-2">Previsión individual</h2>
+    <% if (!result || !result.forecast) { %>
+      <p class="mb-0 text-muted">No hay datos disponibles para proyectar este jugador.</p>
+    <% } else { %>
+      <p class="mb-0 text-muted"><%= result.forecast.player.fullName %> · <%= result.forecast.currentTeam %> · <%= result.forecast.currentCategory %></p>
+    <% } %>
+  </div>
+</div>
+
+<% if (result && result.forecast) { %>
+  <div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Categoría actual</div><div class="display-6 fw-semibold"><%= result.forecast.currentCategory %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Categoría proyectada</div><div class="display-6 fw-semibold"><%= result.forecast.projectedNextCategory %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Preparación</div><div class="display-6 fw-semibold text-capitalize"><%= result.forecast.readinessLevel %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Recomendación</div><div class="display-6 fw-semibold"><%= result.forecast.recommendation %></div></div></div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Explicación de la proyección</h3>
+          <ul class="mb-0 text-muted ps-3">
+            <% result.forecast.explanation.forEach((reason) => { %>
+              <li><%= reason %></li>
+            <% }) %>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Señales disponibles</h3>
+          <dl class="row mb-0 small">
+            <dt class="col-6 text-muted">Media reciente</dt>
+            <dd class="col-6 fw-semibold"><%= result.forecast.latestOverallAverage.toFixed(2) %></dd>
+            <dt class="col-6 text-muted">Tendencia</dt>
+            <dd class="col-6 fw-semibold"><%= result.forecast.recentTrend.label %></dd>
+            <dt class="col-6 text-muted">Evaluaciones</dt>
+            <dd class="col-6 fw-semibold"><%= result.forecast.totalEvaluations %></dd>
+            <dt class="col-6 text-muted">Última evaluación</dt>
+            <dd class="col-6 fw-semibold"><%= result.forecast.lastEvaluationDate || 'Sin datos' %></dd>
+            <dt class="col-6 text-muted">Informes recientes</dt>
+            <dd class="col-6 fw-semibold"><%= result.forecast.reportSignals.recentReports %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if (result.forecast.hasInsufficientData) { %>
+    <div class="alert alert-warning mt-4 mb-0">Datos insuficientes: conviene ampliar la muestra antes de tomar decisiones estructurales.</div>
+  <% } %>
+<% } %>

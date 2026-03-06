@@ -193,6 +193,31 @@ describe('Aplicación SoccerReport', () => {
     };
   }
 
+  async function createForecastContext(baseName = 'Club Forecast') {
+    const context = await createEvaluationContext(baseName);
+    const [secondPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Pablo', 'Proyeccion', context.club.name, context.club.id, context.teamId, 'Juvenil Eval', 2011],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), context.teamId, secondPlayerResult.insertId, '7', 'EI'],
+    );
+
+    await db.query(
+      'UPDATE players SET birth_year = ? WHERE id = ?',
+      [2010, context.playerId],
+    );
+
+    return {
+      ...context,
+      secondPlayerId: secondPlayerResult.insertId,
+    };
+  }
+
   async function seedEvaluationScoresForEvaluation(evaluationId, values = {}) {
     const defaults = {
       tecnica_control: 7,
@@ -1814,5 +1839,84 @@ describe('Aplicación SoccerReport', () => {
     const res = await agent.get(`/season-comparison/player/${context.playerId}?source_season_id=${context.secondSeasonId}&target_season_id=${context.season.id}`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('No hay suficientes datos para comparar este jugador');
+  });
+
+  test('forecast page renders', async () => {
+    const context = await createForecastContext('Club Forecast Render');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/season-forecast');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Previsión 26/27');
+    expect(res.text).toContain('Aplicar filtros');
+  });
+
+  test('player forecast works', async () => {
+    const context = await createForecastContext('Club Forecast Player');
+    const evaluationA = randomUUID();
+    const evaluationB = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationA, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-01-15', 'manual', 'Forecast A', 'Notas', 6.4,
+        evaluationB, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-03-01', 'manual', 'Forecast B', 'Notas', 8.3,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationA, { tecnica_control: 6, fisica_velocidad: 6 });
+    await seedEvaluationScoresForEvaluation(evaluationB, { tecnica_control: 8, fisica_velocidad: 9 });
+    await db.query(
+      `INSERT INTO reports (player_name, player_surname, club, team, overall_rating, created_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ['Mario', 'Sanz', context.club.name, 'Juvenil Eval', 8.2, context.admin.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-forecast/player/${context.playerId}?season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Previsión individual');
+    expect(res.text).toContain('Categoría proyectada');
+    expect(res.text).toContain('posible salto');
+  });
+
+  test('team forecast works', async () => {
+    const context = await createForecastContext('Club Forecast Team');
+    const evaluationA = randomUUID();
+    const evaluationB = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationA, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-02-01', 'manual', 'Team A', 'Notas', 7.8,
+        evaluationB, context.club.id, context.season.id, context.teamId, context.secondPlayerId, context.admin.id, '2026-02-10', 'manual', 'Team B', 'Notas', 6.2,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationA, { tecnica_control: 8 });
+    await seedEvaluationScoresForEvaluation(evaluationB, { tecnica_control: 6 });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-forecast/team/${context.teamId}?season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Previsión de equipo');
+    expect(res.text).toContain('Promociones previstas');
+    expect(res.text).toContain('Jugadores que necesitan más datos');
+  });
+
+  test('insufficient data case works', async () => {
+    const context = await createForecastContext('Club Forecast Empty');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/season-forecast/player/${context.secondPlayerId}?season_id=${context.season.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Datos insuficientes');
+    expect(res.text).toContain('seguir observando');
   });
 });

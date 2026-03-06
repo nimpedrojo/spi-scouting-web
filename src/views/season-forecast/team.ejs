@@ -1,0 +1,96 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h4 mb-2">Previsión de equipo</h2>
+    <% if (!result || !result.team) { %>
+      <p class="mb-0 text-muted">No se ha encontrado el equipo solicitado.</p>
+    <% } else { %>
+      <p class="mb-0 text-muted"><%= result.team.name %> · <%= result.team.category_name %> · <%= result.team.section_name %></p>
+    <% } %>
+  </div>
+</div>
+
+<% if (result && result.team) { %>
+  <div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Jugadores proyectados</div><div class="display-6 fw-semibold"><%= result.summary.totalPlayers %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Continuidad prevista</div><div class="display-6 fw-semibold"><%= result.summary.projectedContinuing %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Promociones previstas</div><div class="display-6 fw-semibold"><%= result.summary.projectedPromotions %></div></div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Pendientes de revisión</div><div class="display-6 fw-semibold"><%= result.summary.pendingReview %></div></div></div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Detalle de jugadores</h3>
+          <% if (!result.forecasts.length) { %>
+            <p class="mb-0 text-muted">No hay jugadores con información suficiente en este equipo.</p>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Jugador</th>
+                    <th>Categoría actual</th>
+                    <th>Siguiente</th>
+                    <th>Preparación</th>
+                    <th>Recomendación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% result.forecasts.forEach((entry) => { %>
+                    <tr>
+                      <td><a href="/season-forecast/player/<%= entry.player.id %>?season_id=<%= result.seasonId || '' %>"><%= entry.player.fullName %></a></td>
+                      <td><%= entry.currentCategory %></td>
+                      <td><%= entry.projectedNextCategory %></td>
+                      <td class="text-capitalize"><%= entry.readinessLevel %></td>
+                      <td><%= entry.recommendation %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Resumen del equipo</h3>
+          <dl class="row mb-0 small">
+            <dt class="col-7 text-muted">Jugadores con pocos datos</dt>
+            <dd class="col-5 fw-semibold"><%= result.summary.insufficientData %></dd>
+            <dt class="col-7 text-muted">Total plantilla</dt>
+            <dd class="col-5 fw-semibold"><%= result.aggregate ? result.aggregate.total_players : result.summary.totalPlayers %></dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Jugadores que necesitan más datos</h3>
+          <% if (!result.summary.needsMoreData.length) { %>
+            <p class="mb-0 text-muted">No hay casos críticos de falta de información.</p>
+          <% } else { %>
+            <ul class="list-group list-group-flush">
+              <% result.summary.needsMoreData.forEach((entry) => { %>
+                <li class="list-group-item px-0">
+                  <div class="fw-semibold"><%= entry.player.fullName %></div>
+                  <div class="small text-muted"><%= entry.totalEvaluations %> evaluaciones · <%= entry.recentTrend.label %></div>
+                </li>
+              <% }) %>
+            </ul>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>

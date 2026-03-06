@@ -1,0 +1,113 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h4 mb-3">Previsión 26/27</h2>
+    <form method="GET" action="/season-forecast" class="row g-3">
+      <div class="col-md-3">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select">
+          <option value="">Activa</option>
+          <% if (forecast && forecast.filterOptions) { %>
+            <% forecast.filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= selectedFilters.seasonId === season.id ? 'selected' : '' %>><%= season.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="section" class="form-label">Sección</label>
+        <select id="section" name="section" class="form-select">
+          <option value="">Todas</option>
+          <% if (forecast && forecast.filterOptions) { %>
+            <% forecast.filterOptions.sections.forEach((section) => { %>
+              <option value="<%= section.name %>" <%= selectedFilters.section === section.name ? 'selected' : '' %>><%= section.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="category" class="form-label">Categoría</label>
+        <select id="category" name="category" class="form-select">
+          <option value="">Todas</option>
+          <% if (forecast && forecast.filterOptions) { %>
+            <% forecast.filterOptions.categories.forEach((category) => { %>
+              <option value="<%= category.name %>" <%= selectedFilters.category === category.name ? 'selected' : '' %>><%= category.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (forecast && forecast.filterOptions) { %>
+            <% forecast.filterOptions.teams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= selectedFilters.teamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+        <a href="/season-forecast" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (!forecast || !forecast.rows.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body text-muted">No hay jugadores con datos suficientes para generar una previsión.</div>
+  </div>
+<% } else { %>
+  <div class="row g-4">
+    <% forecast.rows.forEach((entry) => { %>
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h3 class="h5 mb-1"><%= entry.player.fullName %></h3>
+                <div class="text-muted small"><%= entry.currentTeam %> · <%= entry.currentCategory %></div>
+              </div>
+              <span class="badge text-bg-<%= entry.readinessLevel === 'alta' ? 'success' : entry.readinessLevel === 'media' ? 'warning' : 'danger' %>">
+                Preparación <%= entry.readinessLevel %>
+              </span>
+            </div>
+
+            <div class="row g-3 small mb-3">
+              <div class="col-6">
+                <div class="text-muted">Siguiente categoría</div>
+                <div class="fw-semibold"><%= entry.projectedNextCategory %></div>
+              </div>
+              <div class="col-6">
+                <div class="text-muted">Media actual</div>
+                <div class="fw-semibold"><%= entry.latestOverallAverage.toFixed(2) %></div>
+              </div>
+              <div class="col-6">
+                <div class="text-muted">Tendencia</div>
+                <div class="fw-semibold"><%= entry.recentTrend.label %></div>
+              </div>
+              <div class="col-6">
+                <div class="text-muted">Recomendación</div>
+                <div class="fw-semibold"><%= entry.recommendation %></div>
+              </div>
+            </div>
+
+            <ul class="small text-muted ps-3 mb-3">
+              <% entry.explanation.forEach((reason) => { %>
+                <li><%= reason %></li>
+              <% }) %>
+            </ul>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <a href="/season-forecast/player/<%= entry.player.id %>?season_id=<%= selectedFilters.seasonId || '' %>" class="btn btn-sm btn-primary">Ver previsión</a>
+              <% if (entry.player.current_team_id) { %>
+                <a href="/season-forecast/team/<%= entry.player.current_team_id %>?season_id=<%= selectedFilters.seasonId || '' %>" class="btn btn-sm btn-outline-secondary">Ver equipo</a>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>
