@@ -232,14 +232,14 @@ body {
 .auth-shell {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(11, 59, 140, 0.12), transparent 32%),
+    radial-gradient(circle at top left, rgba(15, 61, 46, 0.12), transparent 32%),
     linear-gradient(180deg, #eef3f8 0%, #f8fbf9 100%);
 }
 
 .app-shell {
   min-height: 100vh;
   background:
-    linear-gradient(135deg, rgba(11, 59, 140, 0.08), transparent 25%),
+    linear-gradient(135deg, rgba(15, 61, 46, 0.08), transparent 25%),
     #eef3f1;
 }
 
@@ -250,7 +250,7 @@ body {
 
 .app-sidebar {
   width: 280px;
-  background: linear-gradient(180deg, #0a2d66 0%, #113e8d 100%);
+  background: linear-gradient(180deg, #0f3d2e 0%, #14503c 100%);
   color: #fff;
   padding: 1.5rem;
   display: flex;
@@ -332,6 +332,10 @@ body {
   padding: 0.5rem 0;
 }
 
+.app-topbar {
+  border: 1px solid rgba(15, 61, 46, 0.08);
+}
+
 .filter-chip {
   border-radius: 999px;
 }
@@ -360,7 +364,7 @@ body {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0b3b8c, #1d6bd1);
+  background: linear-gradient(135deg, #0f3d2e, #19c37d);
   color: #fff;
   display: flex;
   align-items: center;
@@ -386,6 +390,19 @@ body {
 .chart-panel {
   position: relative;
   min-height: 320px;
+}
+
+.comparison-stat-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.comparison-stat-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(15, 61, 46, 0.08);
 }
 
 @media (max-width: 991.98px) {

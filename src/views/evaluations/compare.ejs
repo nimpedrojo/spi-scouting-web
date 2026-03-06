@@ -1,8 +1,168 @@
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h2 class="h4 mb-3">Comparativa de jugadores</h2>
-    <p class="text-muted mb-0">
-      Esta pantalla queda preparada para la futura comparativa avanzada entre perfiles.
-    </p>
+    <form method="POST" action="/evaluations/compare" class="row g-3">
+      <div class="col-md-3">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select">
+          <option value="">Todas</option>
+          <% if (comparison && comparison.filterOptions) { %>
+            <% comparison.filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= comparison.selectedFilters.seasonId === season.id ? 'selected' : '' %>><%= season.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="section" class="form-label">Seccion</label>
+        <select id="section" name="section" class="form-select">
+          <option value="">Todas</option>
+          <% if (comparison && comparison.filterOptions) { %>
+            <% comparison.filterOptions.sections.forEach((section) => { %>
+              <option value="<%= section.name %>" <%= comparison.selectedFilters.section === section.name ? 'selected' : '' %>><%= section.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="category" class="form-label">Categoria</label>
+        <select id="category" name="category" class="form-select">
+          <option value="">Todas</option>
+          <% if (comparison && comparison.filterOptions) { %>
+            <% comparison.filterOptions.categories.forEach((category) => { %>
+              <option value="<%= category.name %>" <%= comparison.selectedFilters.category === category.name ? 'selected' : '' %>><%= category.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (comparison && comparison.filterOptions) { %>
+            <% comparison.filterOptions.teams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= comparison.selectedFilters.teamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-12">
+        <label for="player_ids" class="form-label">Jugadores (2 a 4)</label>
+        <select id="player_ids" name="player_ids" class="form-select" multiple size="8">
+          <% if (comparison && comparison.filterOptions) { %>
+            <% comparison.filterOptions.players.forEach((player) => { %>
+              <option value="<%= player.id %>" <%= comparison.selectedPlayerIds.includes(player.id) ? 'selected' : '' %>>
+                <%= player.first_name %> <%= player.last_name %><%= player.team_name ? ' · ' + player.team_name : '' %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+        <div class="form-text">Mantén pulsado `cmd` o `ctrl` para selección múltiple.</div>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Comparar</button>
+        <a href="/evaluations/compare" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
   </div>
 </div>
+
+<% if (!comparison || comparison.selectedPlayerIds.length < 2) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0">Selecciona al menos 2 jugadores para generar la comparativa.</p>
+    </div>
+  </div>
+<% } else { %>
+  <% if (comparison.warning) { %>
+    <div class="alert alert-warning"><%= comparison.warning %></div>
+  <% } %>
+
+  <div class="row g-4 mb-4">
+    <% comparison.playersComparison.forEach((player) => { %>
+      <div class="col-lg-6 col-xxl-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h2 class="h5 mb-1"><%= player.summary.fullName %></h2>
+            <p class="text-muted small mb-3">
+              <%= player.summary.team_name || 'Sin equipo' %>
+              <% if (player.summary.category_name) { %>
+                · <%= player.summary.category_name %>
+              <% } %>
+            </p>
+            <div class="comparison-stat-list">
+              <div><span>Media global</span><strong><%= player.overallAverage.toFixed(2) %></strong></div>
+              <div><span>Total evaluaciones</span><strong><%= player.history.totalEvaluations %></strong></div>
+              <div><span>Ultima evaluacion</span><strong><%= player.history.lastEvaluationDate ? new Date(player.history.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></strong></div>
+              <% player.averageByArea.forEach((area) => { %>
+                <div><span><%= area.label %></span><strong><%= area.average.toFixed(2) %></strong></div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Radar por area</h2>
+      <div class="chart-panel">
+        <canvas id="comparisonRadarChart" height="320"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Comparativa por metrica</h2>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Metrica</th>
+              <% comparison.playersComparison.forEach((player) => { %>
+                <th><%= player.summary.fullName %></th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <% comparison.metricTable.forEach((row) => { %>
+              <tr>
+                <td><%= row.areaLabel %></td>
+                <td><%= row.metricLabel %></td>
+                <% row.values.forEach((value) => { %>
+                  <td class="<%= value.isBest ? 'table-success fw-semibold' : '' %>"><%= value.value.toFixed(2) %></td>
+                <% }) %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var canvas = document.getElementById('comparisonRadarChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      var chartData = <%- chartJson %>;
+      new Chart(canvas, {
+        type: 'radar',
+        data: chartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 0,
+              max: 10,
+              ticks: { stepSize: 2 }
+            }
+          }
+        }
+      });
+    })();
+  </script>
+<% } %>

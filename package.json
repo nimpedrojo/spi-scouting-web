@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "jest --runInBand",
-    "import:players": "node scripts/import_players_from_excel.js"
+    "import:players": "node scripts/import_players_from_excel.js",
+    "cleanup:test-data": "node scripts/cleanup_test_data.js"
   },
   "keywords": [],
   "author": "ProcessIQ",

@@ -164,6 +164,64 @@ async function getPlayerAnalytics(playerId, clubId, seasonId = null) {
   };
 }
 
+async function getPlayersForComparison(clubId, filters = {}) {
+  const params = [clubId];
+  let sql = `
+    SELECT
+      p.id,
+      p.first_name,
+      p.last_name,
+      COALESCE(t.name, p.team) AS team_name,
+      t.id AS team_id,
+      sec.name AS section_name,
+      cat.name AS category_name
+    FROM players p
+    LEFT JOIN teams t ON t.id = p.current_team_id
+    LEFT JOIN sections sec ON sec.id = t.section_id
+    LEFT JOIN categories cat ON cat.id = t.category_id
+    WHERE p.club_id = ?
+  `;
+
+  if (filters.teamId) {
+    sql += ' AND t.id = ?';
+    params.push(filters.teamId);
+  }
+  if (filters.section) {
+    sql += ' AND sec.name = ?';
+    params.push(filters.section);
+  }
+  if (filters.category) {
+    sql += ' AND cat.name = ?';
+    params.push(filters.category);
+  }
+  if (filters.seasonId) {
+    sql += ' AND t.season_id = ?';
+    params.push(filters.seasonId);
+  }
+
+  sql += ' ORDER BY p.last_name ASC, p.first_name ASC';
+  const [rows] = await db.query(sql, params);
+  return rows;
+}
+
+async function getPlayersAnalyticsBatch(playerIds, clubId, seasonId = null) {
+  const analytics = [];
+  for (const playerId of playerIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const playerAnalytics = await getPlayerAnalytics(playerId, clubId, seasonId);
+    if (playerAnalytics.summary) {
+      analytics.push({
+        ...playerAnalytics,
+        summary: {
+          ...playerAnalytics.summary,
+          fullName: `${playerAnalytics.summary.first_name} ${playerAnalytics.summary.last_name}`.trim(),
+        },
+      });
+    }
+  }
+  return analytics;
+}
+
 module.exports = {
   getPlayerSummary,
   getOverallAverage,
@@ -172,4 +230,6 @@ module.exports = {
   buildRadarChartData,
   getEvaluationHistorySummary,
   getPlayerAnalytics,
+  getPlayersForComparison,
+  getPlayersAnalyticsBatch,
 };

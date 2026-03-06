@@ -1460,4 +1460,103 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Pendientes');
     expect(res.text).toContain('50%');
   });
+
+  test('compare page renders', async () => {
+    const context = await createEvaluationContext('Club Compare Render');
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/evaluations/compare');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Comparativa de jugadores');
+    expect(res.text).toContain('Selecciona al menos 2 jugadores');
+  });
+
+  test('comparison with 2 players renders chart and tables', async () => {
+    const context = await createEvaluationContext('Club Compare Two');
+    const [secondPlayer] = await db.query(
+      'INSERT INTO players (first_name, last_name, club, club_id, current_team_id, team) VALUES (?, ?, ?, ?, ?, ?)',
+      ['Adrian', 'Lopez', context.club.name, context.club.id, context.teamId, 'Juvenil Eval'],
+    );
+    await db.query(
+      'INSERT INTO team_players (id, team_id, player_id, dorsal, positions) VALUES (?, ?, ?, ?, ?)',
+      [randomUUID(), context.teamId, secondPlayer.insertId, '11', 'DEL'],
+    );
+
+    const evalA = randomUUID();
+    const evalB = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date, source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evalA, context.club.id, context.season.id, context.teamId, context.playerId, context.admin.id, '2026-11-01', 'manual', 'Comp A', 'Notas', 7.5,
+        evalB, context.club.id, context.season.id, context.teamId, secondPlayer.insertId, context.admin.id, '2026-11-01', 'manual', 'Comp B', 'Notas', 8.1,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evalA);
+    await seedEvaluationScoresForEvaluation(evalB, { tecnica_control: 9, fisica_velocidad: 9 });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/evaluations/compare').send({
+      season_id: context.season.id,
+      team_id: context.teamId,
+      player_ids: [String(context.playerId), String(secondPlayer.insertId)],
+    });
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('comparisonRadarChart');
+    expect(res.text).toContain('Mario Sanz');
+    expect(res.text).toContain('Adrian Lopez');
+    expect(res.text).toContain('Comparativa por metrica');
+  });
+
+  test('comparison with filters narrows player selector', async () => {
+    const context = await createEvaluationContext('Club Compare Filters');
+    const otherTeam = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [otherTeam, context.club.id, context.season.id, context.femenina.id, context.infantil.id, 'Infantil Filtro'],
+    );
+    await db.query(
+      'INSERT INTO players (first_name, last_name, club, club_id, current_team_id, team) VALUES (?, ?, ?, ?, ?, ?)',
+      ['Laura', 'Fuera', context.club.name, context.club.id, otherTeam, 'Infantil Filtro'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/evaluations/compare?section=Masculina&team_id=${context.teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Mario Sanz');
+    expect(res.text).not.toContain('Laura Fuera');
+  });
+
+  test('empty state with insufficient players', async () => {
+    const context = await createEvaluationContext('Club Compare Empty');
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/evaluations/compare').send({
+      season_id: context.season.id,
+      player_ids: [String(context.playerId)],
+    });
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Selecciona al menos 2 jugadores');
+    expect(res.text).not.toContain('comparisonRadarChart');
+  });
 });

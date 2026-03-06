@@ -7,6 +7,7 @@ const {
   getEvaluationFormData,
 } = require('../services/evaluationService');
 const { importEvaluationsFromWorkbook } = require('../services/importEvaluationService');
+const { buildComparison } = require('../services/comparisonService');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -181,6 +182,58 @@ async function importMany(req, res) {
   }
 }
 
+async function renderCompare(req, res) {
+  try {
+    const comparison = await buildComparison(req.session.user, {
+      seasonId: req.query.season_id || null,
+      section: req.query.section || null,
+      category: req.query.category || null,
+      teamId: req.query.team_id || null,
+      playerIds: req.query.player_ids || [],
+    });
+
+    return res.render('evaluations/compare', {
+      pageTitle: 'Comparativa de jugadores',
+      activeRoute: '/evaluations',
+      comparison,
+      chartJson: comparison && comparison.radarChartData
+        ? JSON.stringify(comparison.radarChartData)
+        : null,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error loading comparison page', err);
+    req.flash('error', 'Ha ocurrido un error al cargar la comparativa.');
+    return res.redirect('/evaluations');
+  }
+}
+
+async function submitCompare(req, res) {
+  try {
+    const comparison = await buildComparison(req.session.user, {
+      seasonId: req.body.season_id || null,
+      section: req.body.section || null,
+      category: req.body.category || null,
+      teamId: req.body.team_id || null,
+      playerIds: req.body.player_ids || [],
+    });
+
+    return res.render('evaluations/compare', {
+      pageTitle: 'Comparativa de jugadores',
+      activeRoute: '/evaluations',
+      comparison,
+      chartJson: comparison && comparison.radarChartData
+        ? JSON.stringify(comparison.radarChartData)
+        : null,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error submitting comparison', err);
+    req.flash('error', 'Ha ocurrido un error al comparar jugadores.');
+    return res.redirect('/evaluations/compare');
+  }
+}
+
 module.exports = {
   upload,
   renderIndex,
@@ -189,4 +242,6 @@ module.exports = {
   renderShow,
   renderPlayerHistory,
   importMany,
+  renderCompare,
+  submitCompare,
 };
