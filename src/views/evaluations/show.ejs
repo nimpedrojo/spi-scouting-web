@@ -1,0 +1,57 @@
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2 class="mb-1"><%= evaluation.title || 'Evaluacion' %></h2>
+        <p class="text-muted mb-2">
+          <%= evaluation.player_full_name %> · <%= evaluation.team_name %> · <%= evaluation.season_name %>
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge text-bg-light">Autor: <%= evaluation.author_name %></span>
+          <span class="badge text-bg-light">Fecha: <%= new Date(evaluation.evaluation_date).toISOString().slice(0, 10) %></span>
+          <span class="badge text-bg-primary">Media: <%= Number(evaluation.overall_score).toFixed(2) %></span>
+        </div>
+      </div>
+      <a href="/players/<%= evaluation.player_id %>/evaluations" class="btn btn-outline-secondary">Ver historial del jugador</a>
+    </div>
+  </div>
+</div>
+
+<% if (evaluation.notes) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h3 class="h5 mb-3">Notas</h3>
+      <p class="mb-0"><%= evaluation.notes %></p>
+    </div>
+  </div>
+<% } %>
+
+<div class="row g-4">
+  <% Object.keys(evaluation.groupedScores).forEach((area) => { %>
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 text-capitalize mb-3"><%= area %></h3>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Metrica</th>
+                  <th class="text-end">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% evaluation.groupedScores[area].forEach((score) => { %>
+                  <tr>
+                    <td><%= score.metric_label %></td>
+                    <td class="text-end"><strong><%= Number(score.score).toFixed(1) %></strong></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>

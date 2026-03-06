@@ -1,0 +1,94 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <% if (errors && errors.length) { %>
+      <div class="alert alert-danger">
+        <ul class="mb-0">
+          <% errors.forEach((error) => { %>
+            <li><%= error %></li>
+          <% }) %>
+        </ul>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/evaluations" class="row g-3">
+      <div class="col-md-3">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select" required>
+          <% formData.seasons.forEach((season) => { %>
+            <option
+              value="<%= season.id %>"
+              <%= String(formValues.season_id || (formData.activeSeason ? formData.activeSeason.id : '')) === String(season.id) ? 'selected' : '' %>
+            >
+              <%= season.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select" required>
+          <option value="">Selecciona equipo</option>
+          <% formData.teams.forEach((team) => { %>
+            <option value="<%= team.id %>" <%= String(formValues.team_id || '') === String(team.id) ? 'selected' : '' %>><%= team.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="player_id" class="form-label">Jugador</label>
+        <select id="player_id" name="player_id" class="form-select" required>
+          <option value="">Selecciona jugador</option>
+          <% formData.players.forEach((player) => { %>
+            <option value="<%= player.id %>" <%= String(formValues.player_id || '') === String(player.id) ? 'selected' : '' %>>
+              <%= player.first_name %> <%= player.last_name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="evaluation_date" class="form-label">Fecha</label>
+        <input type="date" id="evaluation_date" name="evaluation_date" class="form-control" required value="<%= formValues.evaluation_date || new Date().toISOString().slice(0, 10) %>" />
+      </div>
+      <div class="col-md-6">
+        <label for="title" class="form-label">Titulo</label>
+        <input type="text" id="title" name="title" class="form-control" value="<%= formValues.title || '' %>" placeholder="Ej. Seguimiento mensual" />
+      </div>
+      <div class="col-12">
+        <label for="notes" class="form-label">Notas</label>
+        <textarea id="notes" name="notes" class="form-control" rows="4"><%= formValues.notes || '' %></textarea>
+      </div>
+
+      <% formData.template.forEach((area) => { %>
+        <div class="col-12">
+          <div class="card border-0 bg-light">
+            <div class="card-body">
+              <h2 class="h5 mb-3"><%= area.label %></h2>
+              <div class="row g-3">
+                <% area.metrics.forEach((metric) => { %>
+                  <div class="col-md-3">
+                    <label for="score_<%= area.key %>_<%= metric.key %>" class="form-label"><%= metric.label %></label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      class="form-control"
+                      id="score_<%= area.key %>_<%= metric.key %>"
+                      name="score_<%= area.key %>_<%= metric.key %>"
+                      required
+                      value="<%= formValues['score_' + area.key + '_' + metric.key] || '' %>"
+                    />
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar evaluacion</button>
+        <a href="/evaluations" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

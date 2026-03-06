@@ -9,6 +9,8 @@ const { createSectionsTable, seedDefaultSections } = require('./models/sectionMo
 const { createCategoriesTable, seedDefaultCategories } = require('./models/categoryModel');
 const { createTeamsTable } = require('./models/teamModel');
 const { createTeamPlayersTable } = require('./models/teamPlayerModel');
+const { createEvaluationsTable } = require('./models/evaluationModel');
+const { createEvaluationScoresTable } = require('./models/evaluationScoreModel');
 
 let initializationPromise = null;
 
@@ -24,6 +26,8 @@ async function initializeDatabase() {
   await createTeamsTable();
   await createPlayersTable();
   await createTeamPlayersTable();
+  await createEvaluationsTable();
+  await createEvaluationScoresTable();
   await seedDefaultSections();
   await seedDefaultCategories();
   await ensureAdminUser();

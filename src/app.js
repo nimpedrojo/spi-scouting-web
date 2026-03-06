@@ -77,6 +77,7 @@ const playerAdminRoutes = require('./routes/playerAdminRoutes');
 const clubAdminRoutes = require('./routes/clubAdminRoutes');
 const clubConfigRoutes = require('./routes/clubConfigRoutes');
 const teamRoutes = require('./routes/teamRoutes');
+const evaluationRoutes = require('./routes/evaluationRoutes');
 
 app.use('/', authRoutes);
 app.use('/reports', reportRoutes);
@@ -85,6 +86,7 @@ app.use('/admin/players', playerAdminRoutes);
 app.use('/admin/clubs', clubAdminRoutes);
 app.use('/admin/club', clubConfigRoutes);
 app.use('/teams', teamRoutes);
+app.use('/', evaluationRoutes);
 
 app.get('/', (req, res) => {
   if (req.session.user) {

@@ -1,0 +1,128 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <p class="text-muted mb-0">Seguimiento manual e importado de evaluaciones por jugador.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/evaluations/new" class="btn btn-primary">Nueva evaluacion</a>
+    <button type="button" class="btn btn-outline-secondary" disabled>Comparar jugadores</button>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/evaluations" class="row g-3">
+      <div class="col-md-3">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (filterOptions && filterOptions.teams) { %>
+            <% filterOptions.teams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= filters.teamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="player_id" class="form-label">Jugador</label>
+        <select id="player_id" name="player_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (filterOptions && filterOptions.players) { %>
+            <% filterOptions.players.forEach((player) => { %>
+              <option value="<%= player.id %>" <%= String(filters.playerId || '') === String(player.id) ? 'selected' : '' %>>
+                <%= player.first_name %> <%= player.last_name %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="author_id" class="form-label">Autor</label>
+        <select id="author_id" name="author_id" class="form-select">
+          <option value="">Todos</option>
+          <% if (filterOptions && filterOptions.authors) { %>
+            <% filterOptions.authors.forEach((author) => { %>
+              <option value="<%= author.id %>" <%= String(filters.authorId || '') === String(author.id) ? 'selected' : '' %>><%= author.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="date_from" class="form-label">Desde</label>
+        <input type="date" id="date_from" name="date_from" class="form-control" value="<%= filters.dateFrom || '' %>" />
+      </div>
+      <div class="col-md-2">
+        <label for="date_to" class="form-label">Hasta</label>
+        <input type="date" id="date_to" name="date_to" class="form-control" value="<%= filters.dateTo || '' %>" />
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+        <a href="/evaluations" class="btn btn-link">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="POST" action="/evaluations/import" enctype="multipart/form-data" class="row g-3 align-items-end">
+      <div class="col-md-8">
+        <label for="file" class="form-label">Importar multiples evaluaciones desde Excel</label>
+        <input type="file" id="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Importar multiples Excel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (!groupedEvaluations || !groupedEvaluations.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0">No hay evaluaciones registradas para los filtros actuales.</p>
+    </div>
+  </div>
+<% } %>
+
+<% groupedEvaluations.forEach((group) => { %>
+  <section class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h5 mb-0"><%= group.teamName %></h2>
+      <span class="badge text-bg-primary"><%= group.total %> evaluaciones</span>
+    </div>
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th>Fecha</th>
+              <th>Autor</th>
+              <th>Origen</th>
+              <th>Media</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% group.items.forEach((item) => { %>
+              <tr>
+                <td>
+                  <div class="fw-semibold"><%= item.player_full_name %></div>
+                  <div class="small text-muted"><%= item.title || 'Sin titulo' %></div>
+                </td>
+                <td><%= item.evaluation_date ? new Date(item.evaluation_date).toISOString().slice(0, 10) : '' %></td>
+                <td><%= item.author_name %></td>
+                <td><span class="badge text-bg-light"><%= item.source %></span></td>
+                <td><strong><%= Number(item.overall_score).toFixed(2) %></strong></td>
+                <td class="text-end">
+                  <a href="/evaluations/<%= item.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+                  <a href="/players/<%= item.player_id %>/evaluations" class="btn btn-sm btn-primary">Historial</a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+<% }) %>

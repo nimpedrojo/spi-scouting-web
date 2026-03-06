@@ -1,5 +1,6 @@
 const request = require('supertest');
 const { randomUUID } = require('crypto');
+const XLSX = require('xlsx');
 const app = require('../src/app');
 const db = require('../src/db');
 const { initDatabaseOnce } = require('../src/initDb');
@@ -36,6 +37,42 @@ async function createTestUser({
     ],
   );
   return { id: result.insertId, email: userEmail, password };
+}
+
+function buildEvaluationPayload(overrides = {}) {
+  return {
+    title: 'Seguimiento semanal',
+    notes: 'Buen rendimiento general.',
+    evaluation_date: '2026-03-01',
+    score_tecnica_control: '7',
+    score_tecnica_pase: '8',
+    score_tecnica_golpeo: '6',
+    score_tecnica_conduccion: '7',
+    score_tactica_posicionamiento: '8',
+    score_tactica_comprension_juego: '7',
+    score_tactica_toma_decisiones: '6',
+    score_tactica_desmarques: '7',
+    score_fisica_velocidad: '8',
+    score_fisica_resistencia: '7',
+    score_fisica_coordinacion: '8',
+    score_fisica_fuerza: '6',
+    score_psicologica_concentracion: '8',
+    score_psicologica_competitividad: '8',
+    score_psicologica_confianza: '7',
+    score_psicologica_reaccion_error: '7',
+    score_personalidad_compromiso: '9',
+    score_personalidad_companerismo: '8',
+    score_personalidad_escucha: '8',
+    score_personalidad_disciplina: '9',
+    ...overrides,
+  };
+}
+
+function buildEvaluationWorkbookBuffer(rows) {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Evaluaciones');
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
 describe('Aplicación SoccerReport', () => {
@@ -86,6 +123,41 @@ describe('Aplicación SoccerReport', () => {
       juvenil: categoryRows.find((row) => row.name === 'Juvenil'),
       cadete: categoryRows.find((row) => row.name === 'Cadete'),
       infantil: categoryRows.find((row) => row.name === 'Infantil'),
+    };
+  }
+
+  async function createEvaluationContext(baseName = 'Club Evaluaciones') {
+    const context = await createTeamContext(baseName);
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Eval',
+      ],
+    );
+
+    const [playerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      ['Mario', 'Sanz', context.club.name, context.club.id, teamId, 'Juvenil Eval'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), teamId, playerResult.insertId, '10', 'MC'],
+    );
+
+    return {
+      ...context,
+      teamId,
+      playerId: playerResult.insertId,
     };
   }
 
@@ -891,5 +963,240 @@ describe('Aplicación SoccerReport', () => {
 
     const [rows] = await db.query('SELECT id FROM teams WHERE id = ?', [teamId]);
     expect(rows).toHaveLength(0);
+  });
+
+  test('create evaluation crea una evaluacion manual con sus notas', async () => {
+    const context = await createEvaluationContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: context.season.id,
+      team_id: context.teamId,
+      player_id: context.playerId,
+    }));
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/^\/evaluations\//);
+
+    const [evalRows] = await db.query(
+      'SELECT overall_score, source FROM evaluations WHERE player_id = ? ORDER BY created_at DESC LIMIT 1',
+      [context.playerId],
+    );
+    expect(evalRows).toHaveLength(1);
+    expect(Number(evalRows[0].overall_score)).toBeGreaterThan(0);
+    expect(evalRows[0].source).toBe('manual');
+
+    const [scoreRows] = await db.query(
+      'SELECT COUNT(*) AS total FROM evaluation_scores es INNER JOIN evaluations e ON e.id = es.evaluation_id WHERE e.player_id = ?',
+      [context.playerId],
+    );
+    expect(scoreRows[0].total).toBe(20);
+  });
+
+  test('reject invalid score values devuelve validacion', async () => {
+    const context = await createEvaluationContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: context.season.id,
+      team_id: context.teamId,
+      player_id: context.playerId,
+      score_tecnica_control: '15',
+    }));
+
+    expect(res.status).toBe(422);
+    expect(res.text).toContain('debe estar entre 0 y 10');
+  });
+
+  test('list evaluations muestra evaluaciones agrupadas', async () => {
+    const context = await createEvaluationContext();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-02',
+        'manual',
+        'Listado test',
+        'Notas test',
+        7.5,
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/evaluations');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Evaluaciones');
+    expect(res.text).toContain('Juvenil Eval');
+    expect(res.text).toContain('Mario Sanz');
+  });
+
+  test('view player evaluations muestra historial del jugador', async () => {
+    const context = await createEvaluationContext();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-03',
+        'manual',
+        'Historial jugador',
+        'Notas historial',
+        8.2,
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/players/${context.playerId}/evaluations`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Historial Mario Sanz');
+    expect(res.text).toContain('Historial jugador');
+  });
+
+  test('import evaluation file success case crea evaluaciones desde Excel', async () => {
+    const context = await createEvaluationContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const buffer = buildEvaluationWorkbookBuffer([
+      {
+        team_name: 'Juvenil Eval',
+        player_name: 'Mario Sanz',
+        evaluation_date: '2026-03-04',
+        source: 'excel',
+        title: 'Importada',
+        notes: 'Desde xlsx',
+        tecnica_control: 7,
+        tecnica_pase: 7,
+        tecnica_golpeo: 7,
+        tecnica_conduccion: 7,
+        tactica_posicionamiento: 8,
+        tactica_comprension_juego: 8,
+        tactica_toma_decisiones: 8,
+        tactica_desmarques: 8,
+        fisica_velocidad: 6,
+        fisica_resistencia: 6,
+        fisica_coordinacion: 6,
+        fisica_fuerza: 6,
+        psicologica_concentracion: 7,
+        psicologica_competitividad: 7,
+        psicologica_confianza: 7,
+        psicologica_reaccion_error: 7,
+        personalidad_compromiso: 9,
+        personalidad_companerismo: 9,
+        personalidad_escucha: 9,
+        personalidad_disciplina: 9,
+      },
+    ]);
+
+    const res = await agent
+      .post('/evaluations/import')
+      .attach('file', buffer, 'evaluaciones.xlsx');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/evaluations');
+
+    const [rows] = await db.query(
+      'SELECT title, source FROM evaluations WHERE player_id = ? AND title = ?',
+      [context.playerId, 'Importada'],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source).toBe('excel');
+  });
+
+  test('import evaluation file with invalid rows no crea registros validos', async () => {
+    const context = await createEvaluationContext();
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const beforeRows = await db.query(
+      'SELECT COUNT(*) AS total FROM evaluations WHERE club_id = ?',
+      [context.club.id],
+    );
+
+    const buffer = buildEvaluationWorkbookBuffer([
+      {
+        team_name: 'Equipo inexistente',
+        player_name: 'Mario Sanz',
+        evaluation_date: '2026-03-04',
+        tecnica_control: 7,
+      },
+      {
+        team_name: 'Juvenil Eval',
+        player_name: 'Mario Sanz',
+        evaluation_date: '2026-03-05',
+        tecnica_control: 20,
+        tecnica_pase: 7,
+        tecnica_golpeo: 7,
+        tecnica_conduccion: 7,
+        tactica_posicionamiento: 8,
+        tactica_comprension_juego: 8,
+        tactica_toma_decisiones: 8,
+        tactica_desmarques: 8,
+        fisica_velocidad: 6,
+        fisica_resistencia: 6,
+        fisica_coordinacion: 6,
+        fisica_fuerza: 6,
+        psicologica_concentracion: 7,
+        psicologica_competitividad: 7,
+        psicologica_confianza: 7,
+        psicologica_reaccion_error: 7,
+        personalidad_compromiso: 9,
+        personalidad_companerismo: 9,
+        personalidad_escucha: 9,
+        personalidad_disciplina: 9,
+      },
+    ]);
+
+    const res = await agent
+      .post('/evaluations/import')
+      .attach('file', buffer, 'evaluaciones-invalidas.xlsx');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/evaluations');
+
+    const [[afterCount]] = await db.query(
+      'SELECT COUNT(*) AS total FROM evaluations WHERE club_id = ?',
+      [context.club.id],
+    );
+    expect(afterCount.total).toBe(beforeRows[0][0].total);
   });
 });
