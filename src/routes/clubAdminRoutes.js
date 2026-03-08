@@ -10,19 +10,30 @@ const { getAllUsers, deleteUser } = require('../models/userModel');
 
 const router = express.Router();
 
-function ensureSuperAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== 'superadmin') {
+function ensureAdmin(req, res, next) {
+  if (
+    !req.session.user
+    || (req.session.user.role !== 'admin' && req.session.user.role !== 'superadmin')
+  ) {
     req.flash('error', 'No tienes permisos para acceder a esta sección.');
     return res.redirect('/');
   }
   return next();
 }
 
-// Listado de clubes
-router.get('/', ensureSuperAdmin, async (req, res) => {
+function getBasePath(req) {
+  return req.baseUrl || '/clubs';
+}
+
+router.get('/', ensureAdmin, async (req, res) => {
   try {
     const clubs = await getAllClubs();
-    return res.render('clubs/list', { clubs });
+    return res.render('clubs/index', {
+      pageTitle: 'Clubes',
+      activeRoute: '/clubs',
+      clubs,
+      basePath: getBasePath(req),
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener clubes:', err);
@@ -31,107 +42,109 @@ router.get('/', ensureSuperAdmin, async (req, res) => {
   }
 });
 
-// Formulario nuevo club
-router.get('/new', ensureSuperAdmin, (req, res) => {
-  res.render('clubs/new');
-});
+router.get('/new', ensureAdmin, (req, res) => res.render('clubs/form', {
+  pageTitle: 'Nuevo club',
+  activeRoute: '/clubs',
+  club: null,
+  basePath: getBasePath(req),
+  formAction: `${getBasePath(req)}`,
+  submitLabel: 'Crear club',
+}));
 
-router.post('/new', ensureSuperAdmin, async (req, res) => {
+router.post('/', ensureAdmin, async (req, res) => {
   const { name, code } = req.body;
 
   if (!name || !code) {
     req.flash('error', 'Nombre y código son obligatorios.');
-    return res.redirect('/admin/clubs/new');
+    return res.redirect(`${getBasePath(req)}/new`);
   }
 
   try {
-    await createClub({ name, code });
+    await createClub({ name: name.trim(), code: code.trim() });
     req.flash('success', 'Club creado correctamente.');
-    return res.redirect('/admin/clubs');
+    return res.redirect(getBasePath(req));
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al crear club:', err);
-    req.flash(
-      'error',
-      'Ha ocurrido un error al crear el club. Revisa que el código no esté duplicado.',
-    );
-    return res.redirect('/admin/clubs/new');
+    req.flash('error', 'Ha ocurrido un error al crear el club. Revisa que el código no esté duplicado.');
+    return res.redirect(`${getBasePath(req)}/new`);
   }
 });
 
-// Formulario edición de club
-router.get('/:id/edit', ensureSuperAdmin, async (req, res) => {
-  const { id } = req.params;
+router.get('/:id/edit', ensureAdmin, async (req, res) => {
   try {
-    const club = await getClubById(id);
+    const club = await getClubById(req.params.id);
     if (!club) {
       req.flash('error', 'El club indicado no existe.');
-      return res.redirect('/admin/clubs');
+      return res.redirect(getBasePath(req));
     }
-    return res.render('clubs/edit', { club });
+
+    return res.render('clubs/form', {
+      pageTitle: `Editar ${club.name}`,
+      activeRoute: '/clubs',
+      club,
+      basePath: getBasePath(req),
+      formAction: `${getBasePath(req)}/${club.id}/update`,
+      submitLabel: 'Guardar cambios',
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al cargar club para edición:', err);
     req.flash('error', 'Ha ocurrido un error al cargar el club.');
-    return res.redirect('/admin/clubs');
+    return res.redirect(getBasePath(req));
   }
 });
 
-router.post('/:id/edit', ensureSuperAdmin, async (req, res) => {
-  const { id } = req.params;
+router.post('/:id/update', ensureAdmin, async (req, res) => {
   const { name } = req.body;
 
   if (!name || !name.trim()) {
     req.flash('error', 'El nombre del club es obligatorio.');
-    return res.redirect(`/admin/clubs/${id}/edit`);
+    return res.redirect(`${getBasePath(req)}/${req.params.id}/edit`);
   }
 
   try {
-    const affected = await updateClub(id, { name: name.trim() });
+    const affected = await updateClub(req.params.id, { name: name.trim() });
     if (!affected) {
       req.flash('error', 'No se ha podido actualizar el club.');
-      return res.redirect(`/admin/clubs/${id}/edit`);
+      return res.redirect(`${getBasePath(req)}/${req.params.id}/edit`);
     }
     req.flash('success', 'Club actualizado correctamente.');
-    return res.redirect('/admin/clubs');
+    return res.redirect(getBasePath(req));
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al actualizar club:', err);
     req.flash('error', 'Ha ocurrido un error al actualizar el club.');
-    return res.redirect(`/admin/clubs/${id}/edit`);
+    return res.redirect(`${getBasePath(req)}/${req.params.id}/edit`);
   }
 });
 
-// Borrar club
-router.post('/:id/delete', ensureSuperAdmin, async (req, res) => {
-  const { id } = req.params;
+router.post('/:id/delete', ensureAdmin, async (req, res) => {
   try {
-    const club = await getClubById(id);
+    const club = await getClubById(req.params.id);
     if (!club) {
       req.flash('error', 'El club indicado no existe.');
-      return res.redirect('/admin/clubs');
+      return res.redirect(getBasePath(req));
     }
 
-    // Borrar usuarios asociados al club antes de eliminarlo
     const users = await getAllUsers(club.name);
-    // eslint-disable-next-line no-restricted-syntax
     for (const user of users) {
       // eslint-disable-next-line no-await-in-loop
       await deleteUser(user.id);
     }
 
-    const affected = await deleteClub(id);
+    const affected = await deleteClub(req.params.id);
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el club.');
     } else {
       req.flash('success', 'Club borrado correctamente.');
     }
-    return res.redirect('/admin/clubs');
+    return res.redirect(getBasePath(req));
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al borrar club:', err);
     req.flash('error', 'Ha ocurrido un error al borrar el club.');
-    return res.redirect('/admin/clubs');
+    return res.redirect(getBasePath(req));
   }
 });
 

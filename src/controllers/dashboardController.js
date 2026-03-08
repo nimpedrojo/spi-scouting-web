@@ -1,9 +1,8 @@
-const { requireClubForUser, getActiveSeasonByClub } = require('../services/teamService');
 const { getDashboardData } = require('../services/dashboardService');
 
 async function renderDashboard(req, res) {
   try {
-    const club = await requireClubForUser(req.session.user);
+    const club = req.context ? req.context.club : null;
     if (!club) {
       return res.render('dashboard/index', {
         pageTitle: 'Panel general',
@@ -12,7 +11,7 @@ async function renderDashboard(req, res) {
       });
     }
 
-    const activeSeason = await getActiveSeasonByClub(club.id);
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const dashboard = await getDashboardData(club.id, activeSeason);
 
     return res.render('dashboard/index', {

@@ -1,22 +1,26 @@
 const express = require('express');
 
-const { getAllUsers } = require('../models/userModel');
-const { getAllPlayers } = require('../models/playerModel');
-const { getAllReports } = require('../models/reportModel');
 const {
-  getTeamsByClub,
   createTeam,
   updateTeamName,
   deleteTeam,
 } = require('../models/clubTeamModel');
 const {
-  getRecommendationsByClub,
   upsertRecommendation,
   updateRecommendation,
   deleteRecommendation,
 } = require('../models/clubRecommendationModel');
+const {
+  resolveAdminClub,
+  getClubAdminData,
+  getClubAdminOptions,
+} = require('../services/clubAdminService');
 
 const router = express.Router();
+
+function buildClubConfigRedirect(club) {
+  return club && club.id ? `/admin/club?club_id=${club.id}` : '/admin/club';
+}
 
 function ensureAdmin(req, res, next) {
   if (
@@ -30,16 +34,8 @@ function ensureAdmin(req, res, next) {
   return next();
 }
 
-function getCurrentClubFromSession(req) {
-  const { user } = req.session;
-  if (!user || !user.default_club) {
-    return null;
-  }
-  return user.default_club;
-}
-
 router.get('/', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -49,22 +45,23 @@ router.get('/', ensureAdmin, async (req, res) => {
   }
 
   try {
-    const [users, players, reports, teams, recommendations] = await Promise.all([
-      getAllUsers(club),
-      getAllPlayers(club),
-      getAllReports(club),
-      getTeamsByClub(club),
-      getRecommendationsByClub(club),
+    const [data, clubOptions] = await Promise.all([
+      getClubAdminData(club),
+      getClubAdminOptions(req),
     ]);
 
     return res.render('club/config', {
-      club,
-      users,
-      players,
-      reports,
-      teams,
-      recommendations,
-      recommendations: [],
+      club: club.name,
+      clubRecord: club,
+      clubOptions,
+      selectedClubId: club.id,
+      users: data.users,
+      players: data.players,
+      reports: data.reports,
+      teams: data.legacyTeams,
+      recommendations: data.recommendations,
+      v2Teams: data.v2Teams,
+      seasons: data.seasons,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -78,7 +75,7 @@ router.get('/', ensureAdmin, async (req, res) => {
 });
 
 router.post('/teams', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -94,7 +91,7 @@ router.post('/teams', ensureAdmin, async (req, res) => {
   }
 
   try {
-    await createTeam({ club, name: name.trim() });
+    await createTeam({ club: club.name, name: name.trim() });
     req.flash('success', 'Equipo creado correctamente.');
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -104,11 +101,11 @@ router.post('/teams', ensureAdmin, async (req, res) => {
       'Ha ocurrido un error al crear el equipo. Revisa que no esté duplicado.',
     );
   }
-  return res.redirect('/admin/club');
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/teams/:id/rename', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -126,7 +123,7 @@ router.post('/teams/:id/rename', ensureAdmin, async (req, res) => {
   }
 
   try {
-    const affected = await updateTeamName(id, club, name.trim());
+    const affected = await updateTeamName(id, club.name, name.trim());
     if (!affected) {
       req.flash('error', 'No se ha podido actualizar el equipo.');
     } else {
@@ -141,11 +138,11 @@ router.post('/teams/:id/rename', ensureAdmin, async (req, res) => {
     );
   }
 
-  return res.redirect('/admin/club');
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/teams/:id/delete', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -157,7 +154,7 @@ router.post('/teams/:id/delete', ensureAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const affected = await deleteTeam(id, club);
+    const affected = await deleteTeam(id, club.name);
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el equipo.');
     } else {
@@ -172,11 +169,11 @@ router.post('/teams/:id/delete', ensureAdmin, async (req, res) => {
     );
   }
 
-  return res.redirect('/admin/club');
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/recommendations', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -200,7 +197,7 @@ router.post('/recommendations', ensureAdmin, async (req, res) => {
 
   try {
     await upsertRecommendation({
-      club,
+      club: club.name,
       year: yearNum,
       options: optionsText,
     });
@@ -214,11 +211,11 @@ router.post('/recommendations', ensureAdmin, async (req, res) => {
     );
   }
 
-  return res.redirect('/admin/club');
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/recommendations/:id/edit', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -242,7 +239,7 @@ router.post('/recommendations/:id/edit', ensureAdmin, async (req, res) => {
   }
 
   try {
-    const affected = await updateRecommendation(id, club, {
+    const affected = await updateRecommendation(id, club.name, {
       year: yearNum,
       options: optionsText,
     });
@@ -260,11 +257,11 @@ router.post('/recommendations/:id/edit', ensureAdmin, async (req, res) => {
     );
   }
 
-  return res.redirect('/admin/club');
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/recommendations/:id/delete', ensureAdmin, async (req, res) => {
-  const club = getCurrentClubFromSession(req);
+  const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(
       'error',
@@ -276,7 +273,7 @@ router.post('/recommendations/:id/delete', ensureAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const affected = await deleteRecommendation(id, club);
+    const affected = await deleteRecommendation(id, club.name);
     if (!affected) {
       req.flash('error', 'No se ha podido borrar la fila de recomendaciones.');
     } else {
@@ -291,7 +288,7 @@ router.post('/recommendations/:id/delete', ensureAdmin, async (req, res) => {
     );
   }
 
-  return res.redirect('/admin/club');
+  return res.redirect(`/admin/club${club ? `?club_id=${club.id}` : ''}`);
 });
 
 module.exports = router;

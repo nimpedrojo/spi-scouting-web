@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const {
   getAllUsers,
   updateUserRole,
@@ -6,9 +7,12 @@ const {
   findUserById,
   updateUserAccount,
   countAdminsByClub,
+  createUser,
+  findUserByEmail,
 } = require('../models/userModel');
-const { getPlayersByTeam } = require('../models/playerModel');
-const { getTeamsByClub } = require('../models/clubTeamModel');
+const { getAllClubs, getClubById } = require('../models/clubModel');
+const { findTeamById } = require('../models/teamModel');
+const { getDefaultTeamOptionsForClub } = require('../services/teamService');
 
 const router = express.Router();
 
@@ -36,6 +40,111 @@ router.get('/', ensureAdmin, async (req, res) => {
     console.error('Error al obtener usuarios:', err);
     req.flash('error', 'Ha ocurrido un error al cargar los usuarios.');
     return res.redirect('/');
+  }
+});
+
+router.get('/new', ensureAdmin, async (req, res) => {
+  try {
+    const isSuperAdmin = req.session.user.role === 'superadmin';
+    const clubs = isSuperAdmin
+      ? await getAllClubs()
+      : (req.session.user.default_club ? [{ id: req.session.clubId || null, name: req.session.user.default_club }] : []);
+    const requestedClubId = req.query.club_id ? String(req.query.club_id) : '';
+    const defaultClubId = isSuperAdmin
+      ? requestedClubId
+      : (req.session.clubId ? String(req.session.clubId) : '');
+    const teams = defaultClubId
+      ? await getDefaultTeamOptionsForClub(defaultClubId)
+      : [];
+
+    return res.render('users/form', {
+      pageTitle: 'Nuevo usuario',
+      user: null,
+      teams,
+      clubs,
+      selectedClubId: defaultClubId,
+      formAction: '/admin/users',
+      submitLabel: 'Crear usuario',
+      isSuperAdmin,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al cargar formulario de usuario:', err);
+    req.flash('error', 'Ha ocurrido un error al cargar el formulario.');
+    return res.redirect('/admin/users');
+  }
+});
+
+router.post('/', ensureAdmin, async (req, res) => {
+  const {
+    name,
+    email,
+    password,
+    role = 'user',
+    club_id,
+    default_team_id,
+  } = req.body;
+
+  if (!name || !email || !password) {
+    req.flash('error', 'Nombre, email y contraseña son obligatorios.');
+    return res.redirect('/admin/users/new');
+  }
+
+  try {
+    const isSuperAdmin = req.session.user.role === 'superadmin';
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      req.flash('error', 'Ya existe un usuario con ese email.');
+      return res.redirect('/admin/users/new');
+    }
+
+    const selectedClubId = club_id ? Number(club_id) : null;
+    let assignedClub = null;
+    if (selectedClubId) {
+      assignedClub = await getClubById(selectedClubId);
+      if (!assignedClub) {
+        req.flash('error', 'El club seleccionado no es válido.');
+        return res.redirect('/admin/users/new');
+      }
+      if (!isSuperAdmin && assignedClub.name !== req.session.user.default_club) {
+        req.flash('error', 'No puedes asignar usuarios a otro club.');
+        return res.redirect('/admin/users/new');
+      }
+    } else if (!isSuperAdmin && req.session.user.default_club) {
+      assignedClub = await getClubById(req.session.clubId);
+    }
+
+    const defaultClub = assignedClub ? assignedClub.name : null;
+    let defaultTeam = null;
+    let defaultTeamId = default_team_id && default_team_id.trim() ? default_team_id.trim() : null;
+    if (defaultTeamId) {
+      const selectedTeam = await findTeamById(defaultTeamId);
+      if (!selectedTeam || !assignedClub || selectedTeam.club_id !== assignedClub.id) {
+        req.flash('error', 'El equipo por defecto debe pertenecer a Plantillas del club seleccionado.');
+        return res.redirect('/admin/users/new');
+      }
+      defaultTeam = selectedTeam.name;
+      defaultTeamId = selectedTeam.id;
+    }
+
+    const userId = await createUser({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      role: isSuperAdmin ? role : 'user',
+      clubId: assignedClub ? assignedClub.id : null,
+      defaultClub,
+      defaultTeam,
+      defaultTeamId,
+    });
+
+    req.flash('success', 'Usuario creado correctamente.');
+    return res.redirect(`/admin/users/${userId}/edit`);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al crear usuario:', err);
+    req.flash('error', 'Ha ocurrido un error al crear el usuario.');
+    return res.redirect('/admin/users/new');
   }
 });
 
@@ -277,18 +386,27 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
         return res.redirect('/admin/users');
       }
     }
-    let uniqueTeams = [];
-    if (user.default_club) {
-      const clubTeams = await getTeamsByClub(user.default_club);
-      uniqueTeams = clubTeams.map((t) => t.name);
-    } else {
-      const players = await getPlayersByTeam(null, null);
-      uniqueTeams = Array.from(
-        new Set(players.map((p) => p.team).filter((t) => t && t.trim())),
-      ).sort();
-    }
+    const clubs = isSuperAdmin
+      ? await getAllClubs()
+      : (req.session.user.default_club ? [{ id: req.session.clubId || null, name: req.session.user.default_club }] : []);
+    const requestedClubId = req.query.club_id ? String(req.query.club_id) : '';
+    const effectiveClubId = isSuperAdmin
+      ? (requestedClubId || (user.club_id ? String(user.club_id) : ''))
+      : (user.club_id ? String(user.club_id) : '');
+    const uniqueTeams = effectiveClubId
+      ? await getDefaultTeamOptionsForClub(effectiveClubId)
+      : [];
 
-    return res.render('users/edit', { user, teams: uniqueTeams });
+    return res.render('users/form', {
+      pageTitle: 'Editar usuario',
+      user,
+      teams: uniqueTeams,
+      clubs,
+      selectedClubId: effectiveClubId,
+      formAction: `/admin/users/${user.id}/edit`,
+      submitLabel: 'Guardar cambios',
+      isSuperAdmin,
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al cargar usuario para edición:', err);
@@ -299,7 +417,14 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
 
 router.post('/:id/edit', ensureAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, email, default_club, default_team, new_password } = req.body;
+  const {
+    name,
+    email,
+    club_id,
+    default_club,
+    default_team_id,
+    new_password,
+  } = req.body;
 
   if (!name || !email) {
     req.flash('error', 'Nombre y email son obligatorios.');
@@ -307,28 +432,45 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
   }
 
   try {
-    let defaultClubValue = default_club && default_club.trim()
-      ? default_club.trim()
-      : null;
-    let defaultTeamValue = default_team && default_team.trim()
-      ? default_team.trim()
+    const isSuperAdmin = req.session.user.role === 'superadmin';
+    const targetUser = await findUserById(id);
+    if (!targetUser) {
+      req.flash('error', 'Usuario no encontrado.');
+      return res.redirect('/admin/users');
+    }
+
+    let selectedClub = null;
+    if (club_id) {
+      selectedClub = await getClubById(Number(club_id));
+      if (!selectedClub) {
+        req.flash('error', 'El club seleccionado no es válido.');
+        return res.redirect(`/admin/users/${id}/edit`);
+      }
+      if (!isSuperAdmin && selectedClub.name !== req.session.user.default_club) {
+        req.flash('error', 'No puedes asignar usuarios a otro club.');
+        return res.redirect(`/admin/users/${id}/edit`);
+      }
+    }
+
+    let defaultClubValue = selectedClub
+      ? selectedClub.name
+      : (default_club && default_club.trim() ? default_club.trim() : null);
+    let defaultTeamValue = null;
+    let defaultTeamIdValue = default_team_id && default_team_id.trim()
+      ? default_team_id.trim()
       : null;
 
-    if (defaultClubValue) {
-      const clubTeams = await getTeamsByClub(defaultClubValue);
-      const allowedTeams = clubTeams.map((t) => t.name);
-      if (defaultTeamValue && !allowedTeams.includes(defaultTeamValue)) {
+    if (selectedClub && defaultTeamIdValue) {
+      const selectedTeam = await findTeamById(defaultTeamIdValue);
+      if (!selectedTeam || selectedTeam.club_id !== selectedClub.id) {
         req.flash(
           'error',
-          'El equipo por defecto debe ser uno de los equipos configurados para el club.',
+          'El equipo por defecto debe ser uno de los equipos v2 del club seleccionado.',
         );
         return res.redirect(`/admin/users/${id}/edit`);
       }
-      if (!defaultTeamValue) {
-        defaultTeamValue = null;
-      }
-    } else if (!defaultTeamValue) {
-      defaultTeamValue = '-';
+      defaultTeamValue = selectedTeam.name;
+      defaultTeamIdValue = selectedTeam.id;
     }
 
     let passwordHash = null;
@@ -340,15 +482,16 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
         );
         return res.redirect(`/admin/users/${id}/edit`);
       }
-      const bcrypt = require('bcryptjs');
       passwordHash = await bcrypt.hash(new_password, 10);
     }
 
     const affected = await updateUserAccount(id, {
       name,
       email,
+      clubId: selectedClub ? selectedClub.id : null,
       defaultClub: defaultClubValue,
       defaultTeam: defaultTeamValue,
+      defaultTeamId: defaultTeamIdValue,
       passwordHash,
     });
     if (!affected) {

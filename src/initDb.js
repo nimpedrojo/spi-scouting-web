@@ -1,4 +1,4 @@
-const { createUsersTable, ensureAdminUser } = require('./models/userModel');
+const { createUsersTable, ensureAdminUser, syncUserClubAssignments } = require('./models/userModel');
 const { createReportsTable } = require('./models/reportModel');
 const { createPlayersTable } = require('./models/playerModel');
 const { createClubsTable } = require('./models/clubModel');
@@ -17,15 +17,15 @@ const { createEvaluationTemplateMetricsTable } = require('./models/evaluationTem
 let initializationPromise = null;
 
 async function initializeDatabase() {
-  await createUsersTable();
   await createClubsTable();
   await createClubTeamsTable();
   await createClubRecommendationsTable();
-  await createReportsTable();
   await createSeasonsTable();
   await createSectionsTable();
   await createCategoriesTable();
   await createTeamsTable();
+  await createUsersTable();
+  await createReportsTable();
   await createPlayersTable();
   await createTeamPlayersTable();
   await createEvaluationsTable();
@@ -34,6 +34,7 @@ async function initializeDatabase() {
   await createEvaluationTemplateMetricsTable();
   await seedDefaultSections();
   await seedDefaultCategories();
+  await syncUserClubAssignments();
   await ensureAdminUser();
 }
 

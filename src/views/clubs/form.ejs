@@ -1,0 +1,38 @@
+<h1 class="mb-4"><%= club ? 'Editar club' : 'Nuevo club' %></h1>
+
+<form method="POST" action="<%= formAction %>" class="col-md-6">
+  <div class="mb-3">
+    <label for="name" class="form-label">Nombre del club</label>
+    <input
+      type="text"
+      class="form-control"
+      id="name"
+      name="name"
+      value="<%= club ? club.name : '' %>"
+      required
+    />
+  </div>
+
+  <% if (!club) { %>
+    <div class="mb-3">
+      <label for="code" class="form-label">Código de registro</label>
+      <input
+        type="text"
+        class="form-control"
+        id="code"
+        name="code"
+        required
+      />
+      <div class="form-text">Comparte este código con el club para asociar usuarios durante el registro.</div>
+    </div>
+  <% } else { %>
+    <div class="mb-3">
+      <label class="form-label">Código de registro</label>
+      <input type="text" class="form-control" value="<%= club.code %>" disabled />
+      <div class="form-text">El código no se modifica desde esta pantalla.</div>
+    </div>
+  <% } %>
+
+  <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+  <a href="<%= basePath %>" class="btn btn-outline-secondary ms-2">Volver</a>
+</form>

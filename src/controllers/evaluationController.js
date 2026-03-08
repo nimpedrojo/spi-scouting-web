@@ -52,10 +52,12 @@ async function renderIndex(req, res) {
 
 async function renderNew(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.query.template_id || null,
       teamId: req.query.team_id || null,
       playerId: req.query.player_id || null,
+      seasonId: req.query.season_id || (activeSeason ? activeSeason.id : null),
     });
     if (!formData) {
       req.flash('error', 'Configura primero un club por defecto para crear evaluaciones.');
@@ -78,14 +80,16 @@ async function renderNew(req, res) {
 
 async function create(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.body.template_id || null,
       teamId: req.body.team_id || null,
       playerId: req.body.player_id || null,
+      seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
     });
     const groupedScores = buildGroupedScoresFromBody(req.body, formData.template);
     const payload = {
-      seasonId: req.body.season_id,
+      seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
       teamId: req.body.team_id,
       playerId: req.body.player_id,
       templateId: req.body.template_id,
@@ -194,8 +198,9 @@ async function importMany(req, res) {
 
 async function renderCompare(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const comparison = await buildComparison(req.session.user, {
-      seasonId: req.query.season_id || null,
+      seasonId: req.query.season_id || (activeSeason ? activeSeason.id : null),
       section: req.query.section || null,
       category: req.query.category || null,
       teamId: req.query.team_id || null,
@@ -220,8 +225,9 @@ async function renderCompare(req, res) {
 
 async function submitCompare(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const comparison = await buildComparison(req.session.user, {
-      seasonId: req.body.season_id || null,
+      seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
       section: req.body.section || null,
       category: req.body.category || null,
       teamId: req.body.team_id || null,

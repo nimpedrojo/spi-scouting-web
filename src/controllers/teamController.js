@@ -1,6 +1,4 @@
 const {
-  requireClubForUser,
-  getActiveSeasonByClub,
   getTeamsGroupedBySectionAndCategory,
   getTeamDetail,
   getTeamFormData,
@@ -13,7 +11,7 @@ const { findTeamById } = require('../models/teamModel');
 
 async function renderIndex(req, res) {
   try {
-    const club = await requireClubForUser(req.session.user);
+    const club = req.context ? req.context.club : null;
     if (!club) {
       req.flash('error', 'Configura primero un club por defecto para usar Plantillas.');
       return res.redirect('/dashboard');
@@ -21,13 +19,11 @@ async function renderIndex(req, res) {
 
     const activeSection = req.query.section || 'Masculina';
     const activeCategory = req.query.category || '';
-    const [activeSeason, groupedTeams] = await Promise.all([
-      getActiveSeasonByClub(club.id),
-      getTeamsGroupedBySectionAndCategory(club.id, {
-        section: activeSection,
-        category: activeCategory || null,
-      }),
-    ]);
+    const activeSeason = req.context ? req.context.activeSeason : null;
+    const groupedTeams = await getTeamsGroupedBySectionAndCategory(club.id, {
+      section: activeSection,
+      category: activeCategory || null,
+    });
 
     return res.render('teams/index', {
       pageTitle: 'Plantillas',
@@ -57,7 +53,7 @@ async function renderIndex(req, res) {
 
 async function renderShow(req, res) {
   try {
-    const club = await requireClubForUser(req.session.user);
+    const club = req.context ? req.context.club : null;
     const team = await getTeamDetail(req.params.id);
     if (!club || !team || team.club_id !== club.id) {
       req.flash('error', 'Equipo no encontrado.');

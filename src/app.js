@@ -6,7 +6,7 @@ const flash = require('connect-flash');
 const dotenv = require('dotenv');
 const expressLayouts = require('express-ejs-layouts');
 const { initDatabaseOnce } = require('./initDb');
-const { requireClubForUser, getActiveSeasonByClub } = require('./services/teamService');
+const { attachSessionContext } = require('./middleware/sessionContext');
 
 dotenv.config();
 
@@ -41,28 +41,18 @@ app.use(
   }),
 );
 app.use(flash());
+app.use(attachSessionContext);
 
-app.use(async (req, res, next) => {
+app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
   res.locals.success = req.flash('success');
   res.locals.error = req.flash('error');
   res.locals.activeRoute = req.path;
-  res.locals.activeClubName = req.session.user ? req.session.user.default_club : null;
-  res.locals.activeSeasonLabel = null;
+  res.locals.activeClubName = req.context && req.context.club ? req.context.club.name : null;
+  res.locals.activeSeasonLabel = req.context && req.context.activeSeason
+    ? req.context.activeSeason.name
+    : null;
   res.locals.pageTitle = 'SoccerReport';
-
-  if (req.session.user && req.session.user.default_club) {
-    try {
-      const club = await requireClubForUser(req.session.user);
-      if (club) {
-        const season = await getActiveSeasonByClub(club.id);
-        res.locals.activeSeasonLabel = season ? season.name : null;
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error resolving active season for layout', err);
-    }
-  }
 
   next();
 });
@@ -88,6 +78,7 @@ app.use('/reports', reportRoutes);
 app.use('/admin/users', userAdminRoutes);
 app.use('/admin/players', playerAdminRoutes);
 app.use('/admin/clubs', clubAdminRoutes);
+app.use('/clubs', clubAdminRoutes);
 app.use('/admin/club', clubConfigRoutes);
 app.use('/teams', teamRoutes);
 app.use('/', evaluationRoutes);

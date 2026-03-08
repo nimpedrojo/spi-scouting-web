@@ -1,4 +1,7 @@
-<h1 class="mb-4">Gestión de usuarios</h1>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="mb-0">Gestión de usuarios</h1>
+  <a href="/admin/users/new" class="btn btn-primary">Nuevo usuario</a>
+</div>
 
 <div class="table-responsive">
   <table class="table table-striped table-hover align-middle">
@@ -11,6 +14,7 @@
         <th>Nombre</th>
         <th>Email</th>
         <th>Rol</th>
+        <th>Club asignado</th>
         <th>Club por defecto</th>
         <th>Equipo por defecto</th>
         <th>Creado</th>
@@ -72,8 +76,9 @@
             <% } %>
           </div>
         </td>
+        <td><%= u.club_name || u.default_club || '' %></td>
         <td><%= u.default_club || '' %></td>
-        <td><%= u.default_team || '' %></td>
+        <td><%= u.default_team_name || u.default_team || '' %></td>
         <td>
           <%= u.created_at ? new Date(u.created_at).toISOString().slice(0, 10) : '' %>
         </td>

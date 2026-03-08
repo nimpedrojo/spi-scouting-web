@@ -16,6 +16,20 @@ async function cleanupTestData() {
     await connection.beginTransaction();
 
     await connection.query(
+      `UPDATE reports
+       SET created_by = NULL
+       WHERE created_by IN (
+         SELECT id FROM (
+           SELECT u.id
+           FROM users u
+           WHERE u.email LIKE '%@local'
+             AND u.email <> ?
+         ) AS test_users
+       )`,
+      [process.env.ADMIN_EMAIL || 'superadmin@local'],
+    );
+
+    await connection.query(
       `DELETE FROM team_players
        WHERE team_id IN (
          SELECT id FROM (
@@ -63,6 +77,14 @@ async function cleanupTestData() {
     await connection.query(
       `DELETE FROM clubs
        WHERE code LIKE 'club_%'`,
+    );
+
+    await connection.query(
+      `UPDATE users
+       SET club_id = NULL, default_club = NULL, default_team = NULL
+       WHERE email LIKE '%@local'
+         AND email <> ?`,
+      [process.env.ADMIN_EMAIL || 'superadmin@local'],
     );
 
     const [userResult] = await connection.query(

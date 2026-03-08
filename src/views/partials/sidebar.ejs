@@ -1,17 +1,23 @@
 <%
-  const navigationItems = [
+  const managementItems = [
     { label: 'Panel general', href: '/dashboard' },
     { label: 'Plantillas', href: '/teams' },
-    { label: 'Jugadores', href: '/admin/players', adminOnly: true },
     { label: 'Previsión 2026/27', href: '/season-forecast' },
     { label: 'Comparativa 26/27', href: '/season-comparison' },
     { label: 'Informes', href: '/reports' },
     { label: 'Evaluaciones', href: '/evaluations' },
-    { label: 'Plantillas eval.', href: '/evaluation-templates' },
     { label: 'Scouting', href: '/reports/new' },
+  ];
+  const adminItems = [
+    { label: 'Plantillas eval.', href: '/evaluation-templates' },
+    { label: 'Jugadores', href: '/admin/players', adminOnly: true },
+    { label: 'Admin. equipos', href: '/admin/club', adminOnly: true },
     { label: 'Usuarios', href: '/admin/users', adminOnly: true },
+    { label: 'Clubes', href: '/clubs', adminOnly: true },
   ];
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+  const visibleAdminItems = adminItems.filter((item) => !item.adminOnly || isAdminUser);
+  const isItemActive = (item) => item.href !== '#' && activeRoute && (activeRoute === item.href || activeRoute.startsWith(item.href + '/'));
 %>
 
 <aside class="app-sidebar">
@@ -33,10 +39,24 @@
   </div>
 
   <nav class="nav flex-column app-sidebar__nav">
-    <% navigationItems.forEach((item) => { %>
-      <% if (!item.adminOnly || isAdminUser) { %>
+    <div class="small text-uppercase text-muted mt-2 mb-1 px-3">Gestión</div>
+    <% managementItems.forEach((item) => { %>
+      <% const isDisabled = item.href === '#'; %>
+      <% const isActive = isItemActive(item); %>
+      <a
+        href="<%= item.href %>"
+        class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
+        <%= isDisabled ? 'tabindex="-1" aria-disabled="true"' : '' %>
+      >
+        <%= item.label %>
+      </a>
+    <% }) %>
+
+    <% if (visibleAdminItems.length) { %>
+      <div class="small text-uppercase text-muted mt-3 mb-1 px-3">Administración</div>
+      <% visibleAdminItems.forEach((item) => { %>
         <% const isDisabled = item.href === '#'; %>
-        <% const isActive = item.href !== '#' && activeRoute && (activeRoute === item.href || activeRoute.startsWith(item.href + '/')); %>
+        <% const isActive = isItemActive(item); %>
         <a
           href="<%= item.href %>"
           class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
@@ -44,8 +64,8 @@
         >
           <%= item.label %>
         </a>
-      <% } %>
-    <% }) %>
+      <% }) %>
+    <% } %>
   </nav>
 
   <div class="app-sidebar__footer">

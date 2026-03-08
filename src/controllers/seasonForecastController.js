@@ -6,8 +6,9 @@ const {
 
 async function renderIndex(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const selectedFilters = {
-      seasonId: req.query.season_id || null,
+      seasonId: req.query.season_id || (activeSeason ? activeSeason.id : null),
       section: req.query.section || null,
       category: req.query.category || null,
       teamId: req.query.team_id || null,
@@ -29,7 +30,9 @@ async function renderIndex(req, res) {
 
 async function renderPlayer(req, res) {
   try {
-    const seasonId = req.query.season_id || null;
+    const seasonId = req.query.season_id || (req.context && req.context.activeSeason
+      ? req.context.activeSeason.id
+      : null);
     const result = await getPlayerSeasonForecast(req.session.user, req.params.id, seasonId);
     return res.render('season-forecast/player', {
       pageTitle: 'Prevision jugador',
@@ -47,7 +50,9 @@ async function renderPlayer(req, res) {
 
 async function renderTeam(req, res) {
   try {
-    const seasonId = req.query.season_id || null;
+    const seasonId = req.query.season_id || (req.context && req.context.activeSeason
+      ? req.context.activeSeason.id
+      : null);
     const result = await getTeamSeasonForecast(req.session.user, req.params.id, seasonId);
     return res.render('season-forecast/team', {
       pageTitle: 'Prevision equipo',

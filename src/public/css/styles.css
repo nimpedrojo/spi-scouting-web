@@ -253,12 +253,14 @@ body {
   background: linear-gradient(180deg, #0f3d2e 0%, #14503c 100%);
   color: #fff;
   padding: 1.5rem;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow: hidden;
 }
 
 .app-sidebar__logo,
@@ -291,6 +293,14 @@ body {
   padding: 1rem;
 }
 
+.app-sidebar__nav {
+  flex-wrap: nowrap;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
 .app-sidebar__nav .nav-link {
   border-radius: 0.8rem;
   color: rgba(255, 255, 255, 0.82);
@@ -307,6 +317,10 @@ body {
 
 .app-sidebar__nav .nav-link.disabled {
   opacity: 0.55;
+}
+
+.app-sidebar__footer {
+  margin-top: auto;
 }
 
 .app-main {

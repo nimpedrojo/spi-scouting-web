@@ -1,4 +1,3 @@
-const { requireClubForUser, getActiveSeasonByClub } = require('../services/teamService');
 const { getPlayerAnalytics } = require('../services/playerAnalyticsService');
 const { getAreaLabel } = require('../services/evaluationAreaHelper');
 const { getReportsForPlayerProfile } = require('../models/reportModel');
@@ -28,17 +27,15 @@ function calculateAge(birthDate, birthYear) {
 
 async function renderProfile(req, res) {
   try {
-    const club = await requireClubForUser(req.session.user);
+    const club = req.context ? req.context.club : null;
     if (!club) {
       req.flash('error', 'Debes tener un club activo para ver perfiles.');
       return res.redirect('/dashboard');
     }
 
     const seasonId = req.query.season_id || null;
-    const [player, activeSeason] = await Promise.all([
-      getPlayerById(req.params.id, club.name),
-      getActiveSeasonByClub(club.id),
-    ]);
+    const activeSeason = req.context ? req.context.activeSeason : null;
+    const player = await getPlayerById(req.params.id, club.name);
 
     if (!player) {
       req.flash('error', 'Jugador no encontrado.');

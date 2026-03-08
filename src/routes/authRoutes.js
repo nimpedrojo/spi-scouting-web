@@ -6,11 +6,11 @@ const {
   findUserById,
   updateUserAccount,
 } = require('../models/userModel');
-const { getClubByCode } = require('../models/clubModel');
-const { getPlayersByTeam } = require('../models/playerModel');
-const { getTeamsByClub } = require('../models/clubTeamModel');
+const { getClubByCode, getClubByName } = require('../models/clubModel');
 const { ensureAuth } = require('../middleware/auth');
 const { renderDashboard } = require('../controllers/dashboardController');
+const { findTeamById } = require('../models/teamModel');
+const { getDefaultTeamOptionsForClub } = require('../services/teamService');
 
 const router = express.Router();
 
@@ -43,8 +43,10 @@ router.post('/login', ensureGuest, async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      club_id: user.club_id || null,
       default_club: user.default_club,
-      default_team: user.default_team,
+      default_team: user.default_team_name || user.default_team,
+      default_team_id: user.default_team_id || null,
     };
     req.flash('success', 'Has iniciado sesión correctamente.');
     return res.redirect('/dashboard');
@@ -115,18 +117,10 @@ router.post('/register', ensureGuest, async (req, res) => {
       name,
       email,
       password,
+      clubId: club.id,
+      defaultClub: club.name,
     });
 
-    // Actualizar el default_club del usuario recién creado
-    const createdUser = await findUserByEmail(email);
-    if (createdUser) {
-      await updateUserAccount(createdUser.id, {
-        name: createdUser.name,
-        email: createdUser.email,
-        defaultClub: club.name,
-        defaultTeam: createdUser.default_team || null,
-      });
-    }
     req.flash('success', 'Usuario creado. Ahora puedes iniciar sesión.');
     return res.redirect('/login');
   } catch (err) {
@@ -147,22 +141,17 @@ router.post('/logout', ensureAuth, (req, res) => {
 router.get('/account', ensureAuth, async (req, res) => {
   try {
     const user = await findUserById(req.session.user.id);
-    const clubFilter = user.default_club || null;
-
-    let uniqueTeams = [];
-    if (clubFilter) {
-      const clubTeams = await getTeamsByClub(clubFilter);
-      uniqueTeams = clubTeams.map((t) => t.name);
-    } else {
-      const players = await getPlayersByTeam(null, null);
-      uniqueTeams = Array.from(
-        new Set(players.map((p) => p.team).filter((t) => t && t.trim())),
-      ).sort();
-    }
+    const resolvedClub = user.club_id
+      ? { id: user.club_id, name: user.club_name || user.default_club }
+      : (user.default_club ? await getClubByName(user.default_club) : null);
+    const teamOptions = resolvedClub
+      ? await getDefaultTeamOptionsForClub(resolvedClub.id)
+      : [];
 
     return res.render('auth/account', {
       user,
-      teams: uniqueTeams,
+      teams: teamOptions,
+      resolvedClub,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -173,7 +162,7 @@ router.get('/account', ensureAuth, async (req, res) => {
 });
 
 router.post('/account', ensureAuth, async (req, res) => {
-  const { name, email, default_club, default_team } = req.body;
+  const { name, email, default_club, default_team_id } = req.body;
 
   if (!name || !email) {
     req.flash('error', 'Nombre y email son obligatorios.');
@@ -181,29 +170,34 @@ router.post('/account', ensureAuth, async (req, res) => {
   }
 
   try {
+    const currentUser = await findUserById(req.session.user.id);
     let defaultClubValue = default_club && default_club.trim()
       ? default_club.trim()
       : null;
-    let defaultTeamValue = default_team && default_team.trim()
-      ? default_team.trim()
+    let defaultTeamIdValue = default_team_id && default_team_id.trim()
+      ? default_team_id.trim()
       : null;
+    let defaultTeamValue = null;
 
-    if (defaultClubValue) {
-      const clubTeams = await getTeamsByClub(defaultClubValue);
-      const allowedTeams = clubTeams.map((t) => t.name);
-      if (defaultTeamValue && !allowedTeams.includes(defaultTeamValue)) {
+    const resolvedClub = currentUser && currentUser.club_id
+      ? { id: currentUser.club_id, name: currentUser.club_name || currentUser.default_club }
+      : (defaultClubValue ? await getClubByName(defaultClubValue) : null);
+
+    if (currentUser && currentUser.club_id && currentUser.club_name) {
+      defaultClubValue = currentUser.club_name;
+    }
+
+    if (defaultTeamIdValue) {
+      const selectedTeam = await findTeamById(defaultTeamIdValue);
+      if (!selectedTeam || !resolvedClub || selectedTeam.club_id !== resolvedClub.id) {
         req.flash(
           'error',
-          'El equipo por defecto debe ser uno de los equipos configurados para el club.',
+          'El equipo por defecto debe ser uno de los equipos v2 configurados para el club.',
         );
         return res.redirect('/account');
       }
-      if (!defaultTeamValue) {
-        defaultTeamValue = null;
-      }
-    } else if (!defaultTeamValue) {
-      // Sin club todavía: usar marcador "-" hasta que se escoja
-      defaultTeamValue = '-';
+      defaultTeamIdValue = selectedTeam.id;
+      defaultTeamValue = selectedTeam.name;
     }
 
     const affected = await updateUserAccount(req.session.user.id, {
@@ -211,6 +205,7 @@ router.post('/account', ensureAuth, async (req, res) => {
       email,
       defaultClub: defaultClubValue,
       defaultTeam: defaultTeamValue,
+      defaultTeamId: defaultTeamIdValue,
     });
     if (!affected) {
       req.flash('error', 'No se ha podido actualizar tu cuenta.');
@@ -222,6 +217,7 @@ router.post('/account', ensureAuth, async (req, res) => {
     req.session.user.email = email;
     req.session.user.default_club = defaultClubValue;
     req.session.user.default_team = defaultTeamValue;
+    req.session.user.default_team_id = defaultTeamIdValue;
 
     req.flash('success', 'Tu cuenta se ha actualizado correctamente.');
     return res.redirect('/account');

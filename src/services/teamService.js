@@ -93,6 +93,28 @@ async function getPlayerPreviewsPerTeam(teamId, limit = 6) {
   return players.slice(0, limit).map(normalizePlayerPreview);
 }
 
+async function getDefaultTeamOptionsForClub(clubId) {
+  if (!clubId) {
+    return [];
+  }
+
+  const teams = await getTeamsByClubId(clubId);
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    seasonName: team.season_name || '',
+    sectionName: team.section_name || '',
+    categoryName: team.category_name || '',
+    isActiveSeason: Boolean(team.season_is_active),
+    label: [
+      team.name,
+      team.season_name,
+      team.category_name,
+      team.section_name,
+    ].filter(Boolean).join(' · '),
+  }));
+}
+
 async function getTeamDetail(teamId) {
   const team = await findTeamById(teamId);
   if (!team) {
@@ -214,6 +236,7 @@ module.exports = {
   getTeamsGroupedBySectionAndCategory,
   countPlayersByTeam,
   getPlayerPreviewsPerTeam,
+  getDefaultTeamOptionsForClub,
   getTeamDetail,
   getTeamFormData,
   createTeamForUser,

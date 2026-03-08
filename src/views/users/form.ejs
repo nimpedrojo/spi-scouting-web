@@ -1,0 +1,105 @@
+<h1 class="mb-4"><%= user ? 'Editar usuario' : 'Nuevo usuario' %></h1>
+<% const selectedClubRecord = (clubs || []).find((club) => String(club.id) === String(selectedClubId || '')); %>
+<% const selectedClubName = selectedClubRecord ? selectedClubRecord.name : (user ? (user.club_name || user.default_club || '') : ''); %>
+
+<form method="POST" action="<%= formAction %>" class="col-md-7">
+  <div class="mb-3">
+    <label for="name" class="form-label">Nombre</label>
+    <input type="text" class="form-control" id="name" name="name" value="<%= user ? user.name : '' %>" required />
+  </div>
+
+  <div class="mb-3">
+    <label for="email" class="form-label">Email</label>
+    <input type="email" class="form-control" id="email" name="email" value="<%= user ? user.email : '' %>" required />
+  </div>
+
+  <% if (!user) { %>
+    <div class="mb-3">
+      <label for="password" class="form-label">Contraseña</label>
+      <input type="password" class="form-control" id="password" name="password" required />
+    </div>
+  <% } else { %>
+    <div class="mb-3">
+      <label for="new_password" class="form-label">Nueva contraseña</label>
+      <input type="password" class="form-control" id="new_password" name="new_password" autocomplete="new-password" placeholder="Dejar en blanco para no cambiarla" />
+      <div class="form-text">Mínimo 8 caracteres. Si se deja vacío, la contraseña actual se mantiene.</div>
+    </div>
+  <% } %>
+
+  <div class="card border-0 bg-light mb-4">
+    <div class="card-body">
+      <h5 class="mb-3">Asignación administrativa</h5>
+      <p class="text-muted small">Este club es la asignación administrativa del usuario. No depende del contexto operativo activo en sesión.</p>
+      <div class="mb-0">
+        <label for="club_id" class="form-label">Club asignado</label>
+        <select class="form-select" id="club_id" name="club_id">
+          <option value="">Sin club</option>
+          <% (clubs || []).forEach((club) => { %>
+            <option value="<%= club.id %>" <%= String(selectedClubId || '') === String(club.id) ? 'selected' : '' %>><%= club.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 bg-light mb-4">
+    <div class="card-body">
+      <h5 class="mb-3">Valores operativos por defecto</h5>
+      <p class="text-muted small">Se usan para abrir módulos operativos con un club/equipo preseleccionado. El equipo se toma de Plantillas v2.</p>
+
+      <div class="mb-3">
+        <label for="default_club" class="form-label">Club por defecto</label>
+        <input type="text" class="form-control" id="default_club" value="<%= selectedClubName %>" readonly />
+        <input type="hidden" name="default_club" value="<%= selectedClubName %>" />
+      </div>
+
+      <div class="mb-0">
+        <label for="default_team_id" class="form-label">Equipo por defecto</label>
+        <select class="form-select" id="default_team_id" name="default_team_id">
+          <% const currentTeamId = user ? (user.default_team_id || '') : ''; %>
+          <option value="">-- Selecciona equipo --</option>
+          <% if (teams && teams.length) { %>
+            <% teams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= String(team.id) === String(currentTeamId) ? 'selected' : '' %>><%= team.label || team.name %></option>
+            <% }) %>
+          <% } %>
+          <% if (user && user.default_team && !currentTeamId) { %>
+            <option value="" selected><%= user.default_team %> (legacy)</option>
+          <% } %>
+        </select>
+        <div class="form-text d-flex justify-content-between align-items-center">
+          <span>El equipo por defecto debe salir de Plantillas v2 del club asignado.</span>
+          <span>
+            <a href="/teams">Ver Plantillas</a>
+            <a href="/teams/new" class="ms-2">Crear equipo</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+  <a href="/admin/users" class="btn btn-outline-secondary ms-2">Volver</a>
+</form>
+
+<script>
+  (function () {
+    var clubSelect = document.getElementById('club_id');
+    if (!clubSelect) return;
+
+    clubSelect.addEventListener('change', function () {
+      var basePath = window.location.pathname;
+      var nextValue = clubSelect.value || '';
+      var url = new URL(window.location.href);
+      if (nextValue) {
+        url.searchParams.set('club_id', nextValue);
+      } else {
+        url.searchParams.delete('club_id');
+      }
+      if (url.pathname !== basePath) {
+        url.pathname = basePath;
+      }
+      window.location.href = url.toString();
+    });
+  })();
+</script>

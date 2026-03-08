@@ -1,0 +1,42 @@
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="mb-0">Gestión de clubes</h1>
+  <a href="<%= basePath %>/new" class="btn btn-primary">Nuevo club</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Código</th>
+            <th>Creado</th>
+            <th class="text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (clubs && clubs.length) { %>
+            <% clubs.forEach((club) => { %>
+              <tr>
+                <td><%= club.name %></td>
+                <td><code><%= club.code %></code></td>
+                <td><%= club.created_at ? club.created_at.toISOString().slice(0, 10) : '' %></td>
+                <td class="text-end">
+                  <a href="<%= basePath %>/<%= club.id %>/edit" class="btn btn-sm btn-outline-secondary me-2">Editar</a>
+                  <form method="POST" action="<%= basePath %>/<%= club.id %>/delete" class="d-inline" onsubmit="return confirm('¿Seguro que quieres borrar este club?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          <% } else { %>
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">No hay clubes dados de alta.</td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

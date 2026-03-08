@@ -349,10 +349,15 @@ describe('Aplicación SoccerReport', () => {
   });
 
   test('un usuario puede actualizar sus valores por defecto en cuenta', async () => {
+    const context = await createEvaluationContext('Cuenta Defaults');
     const { email } = await createTestUser({
       name: 'Config Tester',
       role: 'user',
     });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ? WHERE email = ?',
+      [context.club.id, context.club.name, email],
+    );
 
     const agent = request.agent(app);
     await agent.post('/login').send({ email, password: 'password123' });
@@ -360,15 +365,72 @@ describe('Aplicación SoccerReport', () => {
     const resPost = await agent.post('/account').send({
       name: 'Config Tester',
       email,
-      default_club: 'Cuenta Club',
-      default_team: 'Cuenta Equipo',
+      default_club: context.club.name,
+      default_team_id: context.teamId,
     });
     expect(resPost.status).toBe(302);
     expect(resPost.headers.location).toBe('/account');
 
+    const [rows] = await db.query(
+      'SELECT default_club, default_team, default_team_id FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].default_club).toBe(context.club.name);
+    expect(rows[0].default_team).toBe('Juvenil Eval');
+    expect(rows[0].default_team_id).toBe(context.teamId);
+
     const resAccount = await agent.get('/account');
     expect(resAccount.status).toBe(200);
     expect(resAccount.text).toContain('Mi cuenta');
+  });
+
+  test('mi cuenta muestra acceso a la configuración de equipos del club', async () => {
+    const { email } = await createTestUser({
+      name: 'Account Teams Link',
+      role: 'user',
+      defaultClub: 'Club Cuenta Link',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const res = await agent.get('/account');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('/teams');
+    expect(res.text).toContain('/teams/new');
+    expect(res.text).toContain('Crear equipo v2');
+  });
+
+  test('mi cuenta permite guardar sin equipo por defecto aunque el club aún no tenga plantillas v2', async () => {
+    const club = await createTestClub(`Club Cuenta Sin Equipos ${Date.now()}`);
+    const { email } = await createTestUser({
+      name: 'Config Club Sin Equipos',
+      role: 'user',
+      defaultClub: club.name,
+    });
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE email = ?',
+      [club.id, email],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const resPost = await agent.post('/account').send({
+      name: 'Config Club Sin Equipos',
+      email,
+      default_club: club.name,
+      default_team_id: '',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/account');
+
+    const [rows] = await db.query(
+      'SELECT default_team, default_team_id FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
   });
 
   test('los valores por defecto de club/equipo se usan al abrir nuevo informe', async () => {
@@ -427,6 +489,77 @@ describe('Aplicación SoccerReport', () => {
     const res = await agent.get('/admin/users');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Gestión de usuarios');
+  });
+
+  test('superadmin puede listar clubes en /clubs', async () => {
+    const club = await createTestClub(`Club List ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin Clubs',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const res = await agent.get('/clubs');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Gestión de clubes');
+    expect(res.text).toContain(club.name);
+  });
+
+  test('admin puede acceder al listado de clubes', async () => {
+    const admin = await createTestUser({
+      name: 'Admin Clubs Access',
+      role: 'admin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: admin.email, password: 'password123' });
+
+    const res = await agent.get('/clubs');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Gestión de clubes');
+  });
+
+  test('superadmin puede crear club en /clubs', async () => {
+    const superadmin = await createTestUser({
+      name: 'Superadmin Create Club',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const clubName = `Club Alta ${Date.now()}`;
+    const res = await agent.post('/clubs').send({
+      name: clubName,
+      code: `code_${Date.now()}`,
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/clubs');
+
+    const [rows] = await db.query('SELECT id FROM clubs WHERE name = ?', [clubName]);
+    expect(rows).toHaveLength(1);
+  });
+
+  test('superadmin puede editar club en /clubs', async () => {
+    const club = await createTestClub(`Club Edit ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin Edit Club',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const res = await agent.post(`/clubs/${club.id}/update`).send({
+      name: 'Club Editado',
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/clubs');
+
+    const [rows] = await db.query('SELECT name FROM clubs WHERE id = ?', [club.id]);
+    expect(rows[0].name).toBe('Club Editado');
   });
 
   test('dashboard para admin muestra opciones de admin', async () => {
@@ -512,7 +645,7 @@ describe('Aplicación SoccerReport', () => {
       name: 'User Edited',
       email: user.email,
       default_club: '',
-      default_team: '',
+      default_team_id: '',
     });
     expect(resPost.status).toBe(302);
     expect(resPost.headers.location).toBe('/admin/users');
@@ -524,6 +657,161 @@ describe('Aplicación SoccerReport', () => {
     expect(rows[0].name).toBe('User Edited');
     // El club/equipo por defecto se valida contra equipos configurados en el club,
     // así que aquí no comprobamos esos campos explícitamente.
+  });
+
+  test('superadmin puede crear usuario con asignación de club', async () => {
+    const club = await createTestClub(`Club User Create ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin Create User',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const email = `club_user_${Date.now()}@local`;
+    const resPost = await agent.post('/admin/users').send({
+      name: 'Usuario Club',
+      email,
+      password: 'password123',
+      club_id: String(club.id),
+      default_team_id: '',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toMatch(/^\/admin\/users\/\d+\/edit$/);
+
+    const [rows] = await db.query(
+      'SELECT club_id, default_club FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].club_id).toBe(club.id);
+    expect(rows[0].default_club).toBe(club.name);
+  });
+
+  test('formulario de usuario muestra enlace a Plantillas v2', async () => {
+    const club = await createTestClub(`Club User Form Link ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin User Form Link',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const [userResult] = await db.query(
+      'INSERT INTO users (name, email, password_hash, role, club_id, default_club) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        'User Form Link',
+        `user_form_link_${Date.now()}@local`,
+        '$2b$10$dqViRKNFig.H8Ewz7IcQf.eiq..3sKjdfT9lsbHPq1xHSnzM6Sjsi',
+        'user',
+        club.id,
+        club.name,
+      ],
+    );
+
+    const res = await agent.get(`/admin/users/${userResult.insertId}/edit`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('/teams');
+    expect(res.text).toContain('/teams/new');
+    expect(res.text).toContain('Crear equipo');
+  });
+
+  test('superadmin puede crear usuario con club aunque ese club aún no tenga plantillas v2', async () => {
+    const club = await createTestClub(`Club User No Teams ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin Create User No Teams',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const email = `club_user_no_teams_${Date.now()}@local`;
+    const resPost = await agent.post('/admin/users').send({
+      name: 'Usuario Sin Equipos Legacy',
+      email,
+      password: 'password123',
+      club_id: String(club.id),
+      default_team_id: '',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toMatch(/^\/admin\/users\/\d+\/edit$/);
+
+    const [rows] = await db.query(
+      'SELECT club_id, default_club, default_team, default_team_id FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].club_id).toBe(club.id);
+    expect(rows[0].default_club).toBe(club.name);
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
+  });
+
+  test('superadmin puede crear usuario con equipo por defecto de Plantillas v2', async () => {
+    const context = await createEvaluationContext('User Default Team V2');
+    const superadmin = await createTestUser({
+      name: 'Superadmin Create User With Team',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const email = `club_user_team_v2_${Date.now()}@local`;
+    const resPost = await agent.post('/admin/users').send({
+      name: 'Usuario Equipo V2',
+      email,
+      password: 'password123',
+      club_id: String(context.club.id),
+      default_team_id: context.teamId,
+    });
+    expect(resPost.status).toBe(302);
+
+    const [rows] = await db.query(
+      'SELECT club_id, default_club, default_team, default_team_id FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].club_id).toBe(context.club.id);
+    expect(rows[0].default_club).toBe(context.club.name);
+    expect(rows[0].default_team).toBe('Juvenil Eval');
+    expect(rows[0].default_team_id).toBe(context.teamId);
+  });
+
+  test('superadmin puede editar la asignación de club de un usuario', async () => {
+    const clubA = await createTestClub(`Club User Edit A ${Date.now()}`);
+    const clubB = await createTestClub(`Club User Edit B ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin Edit User Club',
+      role: 'superadmin',
+    });
+    const user = await createTestUser({
+      name: 'User Club Target',
+      role: 'user',
+      defaultClub: clubA.name,
+    });
+    await db.query('UPDATE users SET club_id = ? WHERE id = ?', [clubA.id, user.id]);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const resPost = await agent.post(`/admin/users/${user.id}/edit`).send({
+      name: 'User Club Target',
+      email: user.email,
+      club_id: String(clubB.id),
+      default_club: clubB.name,
+      default_team_id: '',
+      new_password: '',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/admin/users');
+
+    const [rows] = await db.query(
+      'SELECT club_id, default_club FROM users WHERE id = ?',
+      [user.id],
+    );
+    expect(rows[0].club_id).toBe(clubB.id);
+    expect(rows[0].default_club).toBe(clubB.name);
   });
 
   test('un admin puede cambiar la contraseña de un usuario', async () => {
@@ -545,7 +833,7 @@ describe('Aplicación SoccerReport', () => {
       name: 'User Change Pwd',
       email: user.email,
       default_club: '',
-      default_team: '',
+      default_team_id: '',
       new_password: 'newpassword123',
     });
     expect(resPost.status).toBe(302);
@@ -829,6 +1117,44 @@ describe('Aplicación SoccerReport', () => {
     const resConfig = await agent.get('/admin/club');
     expect(resConfig.status).toBe(200);
     expect(resConfig.text).toContain('Equipo A');
+  });
+
+  test('club config prioriza equipos v2 y deja visible la compatibilidad legacy', async () => {
+    const context = await createTeamContext('Club Config Compat');
+    await db.query('INSERT INTO club_teams (club, name) VALUES (?, ?)', [context.club.name, 'Legacy Team']);
+    const v2TeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [v2TeamId, context.club.id, context.season.id, context.masculina.id, context.juvenil.id, 'V2 Team'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/admin/club');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Equipos v2 del club (Plantillas)');
+    expect(res.text).toContain('V2 Team');
+    expect(res.text).toContain('Compatibilidad legacy');
+    expect(res.text).toContain('Legacy Team');
+  });
+
+  test('session-based operational context still works for /teams', async () => {
+    const context = await createTeamContext('Club Session Ops');
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), context.club.id, context.season.id, context.masculina.id, context.juvenil.id, 'Session Team'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/teams');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Plantillas');
+    expect(res.text).toContain('Session Team');
   });
 
   test('un admin puede configurar recomendaciones por año para su club', async () => {

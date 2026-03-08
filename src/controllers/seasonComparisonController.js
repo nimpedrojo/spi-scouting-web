@@ -6,9 +6,10 @@ const {
 
 async function renderIndex(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const selectedFilters = {
       sourceSeasonId: req.query.source_season_id || null,
-      targetSeasonId: req.query.target_season_id || null,
+      targetSeasonId: req.query.target_season_id || (activeSeason ? activeSeason.id : null),
       section: req.query.section || null,
       category: req.query.category || null,
       teamId: req.query.team_id || null,
@@ -31,9 +32,10 @@ async function renderIndex(req, res) {
 
 async function renderPlayer(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const selectedFilters = {
       sourceSeasonId: req.query.source_season_id || null,
-      targetSeasonId: req.query.target_season_id || null,
+      targetSeasonId: req.query.target_season_id || (activeSeason ? activeSeason.id : null),
       section: req.query.section || null,
       category: req.query.category || null,
       teamId: req.query.team_id || null,
@@ -67,9 +69,10 @@ async function renderPlayer(req, res) {
 
 async function renderTeam(req, res) {
   try {
+    const activeSeason = req.context ? req.context.activeSeason : null;
     const selectedFilters = {
       sourceSeasonId: req.query.source_season_id || null,
-      targetSeasonId: req.query.target_season_id || null,
+      targetSeasonId: req.query.target_season_id || (activeSeason ? activeSeason.id : null),
       section: req.query.section || null,
       category: req.query.category || null,
       teamId: req.params.id,

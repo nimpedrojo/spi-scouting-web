@@ -9,9 +9,13 @@ async function createUsersTable() {
       email VARCHAR(150) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       role VARCHAR(20) NOT NULL DEFAULT 'user',
+      club_id INT NULL,
       default_club VARCHAR(150),
       default_team VARCHAR(150),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_users_club
+        FOREIGN KEY (club_id) REFERENCES clubs(id)
+        ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
   await db.query(sql);
@@ -28,6 +32,14 @@ async function createUsersTable() {
 
   // Añadimos columnas de configuración por defecto si no existían
   try {
+    await db.query('ALTER TABLE users ADD COLUMN club_id INT NULL');
+  } catch (e) {
+    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding club_id column', e);
+    }
+  }
+  try {
     await db.query('ALTER TABLE users ADD COLUMN default_club VARCHAR(150)');
   } catch (e) {
     if (e && e.code !== 'ER_DUP_FIELDNAME') {
@@ -43,34 +55,131 @@ async function createUsersTable() {
       console.error('Error adding default_team column', e);
     }
   }
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN default_team_id CHAR(36) NULL');
+  } catch (e) {
+    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding default_team_id column', e);
+    }
+  }
+
+  try {
+    await db.query(
+      `ALTER TABLE users
+       ADD CONSTRAINT fk_users_club
+       FOREIGN KEY (club_id) REFERENCES clubs(id)
+       ON DELETE SET NULL`,
+    );
+  } catch (e) {
+    if (
+      e
+      && e.code !== 'ER_FK_DUP_NAME'
+      && e.code !== 'ER_DUP_KEYNAME'
+      && e.code !== 'ER_CANT_CREATE_TABLE'
+    ) {
+      // eslint-disable-next-line no-console
+      console.error('Error adding fk_users_club', e);
+    }
+  }
+
+  try {
+    await db.query(
+      `ALTER TABLE users
+       ADD CONSTRAINT fk_users_default_team
+       FOREIGN KEY (default_team_id) REFERENCES teams(id)
+       ON DELETE SET NULL`,
+    );
+  } catch (e) {
+    if (
+      e
+      && e.code !== 'ER_FK_DUP_NAME'
+      && e.code !== 'ER_DUP_KEYNAME'
+      && e.code !== 'ER_CANT_CREATE_TABLE'
+    ) {
+      // eslint-disable-next-line no-console
+      console.error('Error adding fk_users_default_team', e);
+    }
+  }
 }
 
-async function createUser({ name, email, password, role = 'user' }) {
+async function createUser({
+  name,
+  email,
+  password,
+  role = 'user',
+  clubId = null,
+  defaultClub = null,
+  defaultTeam = null,
+  defaultTeamId = null,
+}) {
   const passwordHash = await bcrypt.hash(password, 10);
   const [result] = await db.query(
-    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-    [name, email, passwordHash, role],
+    `INSERT INTO users (
+      name, email, password_hash, role, club_id, default_club, default_team, default_team_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, email, passwordHash, role, clubId, defaultClub, defaultTeam, defaultTeamId],
   );
   return result.insertId;
 }
 
 async function findUserByEmail(email) {
-  const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+  const [rows] = await db.query(
+    `SELECT
+      u.*,
+      c.name AS club_name,
+      dt.name AS default_team_name
+    FROM users u
+    LEFT JOIN clubs c ON c.id = u.club_id
+    LEFT JOIN teams dt ON dt.id = u.default_team_id
+    WHERE u.email = ?`,
+    [email],
+  );
   return rows[0];
 }
 
 async function findUserById(id) {
-  const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+  const [rows] = await db.query(
+    `SELECT
+      u.*,
+      c.name AS club_name,
+      dt.name AS default_team_name
+    FROM users u
+    LEFT JOIN clubs c ON c.id = u.club_id
+    LEFT JOIN teams dt ON dt.id = u.default_team_id
+    WHERE u.id = ?`,
+    [id],
+  );
   return rows[0];
 }
 
 async function updateUserAccount(
   id,
-  { name, email, defaultClub, defaultTeam, passwordHash = null },
+  {
+    name,
+    email,
+    clubId,
+    defaultClub,
+    defaultTeam,
+    defaultTeamId,
+    passwordHash = null,
+  },
 ) {
-  let sql =
-    'UPDATE users SET name = ?, email = ?, default_club = ?, default_team = ?';
-  const params = [name, email, defaultClub, defaultTeam];
+  let sql = 'UPDATE users SET name = ?, email = ?';
+  const params = [name, email];
+
+  if (clubId !== undefined) {
+    sql += ', club_id = ?';
+    params.push(clubId);
+  }
+
+  sql += ', default_club = ?, default_team = ?';
+  params.push(defaultClub, defaultTeam);
+
+  if (defaultTeamId !== undefined) {
+    sql += ', default_team_id = ?';
+    params.push(defaultTeamId);
+  }
 
   if (passwordHash) {
     sql += ', password_hash = ?';
@@ -86,15 +195,29 @@ async function updateUserAccount(
 
 async function getAllUsers(club = null) {
   let sql =
-    'SELECT id, name, email, role, default_club, default_team, created_at FROM users';
+    `SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.role,
+      u.club_id,
+      u.default_club,
+      u.default_team,
+      u.default_team_id,
+      u.created_at,
+      c.name AS club_name,
+      dt.name AS default_team_name
+    FROM users u
+    LEFT JOIN clubs c ON c.id = u.club_id
+    LEFT JOIN teams dt ON dt.id = u.default_team_id`;
   const params = [];
 
   if (club) {
-    sql += ' WHERE default_club = ?';
+    sql += ' WHERE u.default_club = ?';
     params.push(club);
   }
 
-  sql += ' ORDER BY created_at DESC';
+  sql += ' ORDER BY u.created_at DESC';
 
   const [rows] = await db.query(sql, params);
   return rows;
@@ -128,6 +251,15 @@ async function countAdminsByClub(club) {
   return rows[0] ? rows[0].total : 0;
 }
 
+async function syncUserClubAssignments() {
+  await db.query(
+    `UPDATE users u
+     INNER JOIN clubs c ON c.name = u.default_club
+     SET u.club_id = c.id
+     WHERE u.club_id IS NULL AND u.default_club IS NOT NULL`,
+  );
+}
+
 async function ensureAdminUser() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@local';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
@@ -155,4 +287,5 @@ module.exports = {
   deleteUser,
   ensureAdminUser,
   countAdminsByClub,
+  syncUserClubAssignments,
 };
