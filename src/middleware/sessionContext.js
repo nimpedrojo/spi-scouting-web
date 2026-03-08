@@ -1,4 +1,5 @@
 const { requireClubForUser, getActiveSeasonByClub } = require('../services/teamService');
+const logger = require('../services/logger');
 
 function shouldRefreshContext(user, storedContext) {
   if (!user || !user.default_club) {
@@ -62,8 +63,13 @@ async function attachSessionContext(req, res, next) {
       req.session.seasonId = storedContext ? storedContext.activeSeasonId : null;
     }
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('Error attaching session club context', err);
+    logger.error('Error attaching session club context', {
+      type: 'session_context',
+      action: 'attach_context_error',
+      userId: user ? user.id : null,
+      defaultClub: user ? user.default_club : null,
+      error: logger.formatError(err),
+    });
     req.session.clubContext = null;
     req.session.clubId = null;
     req.session.seasonId = null;

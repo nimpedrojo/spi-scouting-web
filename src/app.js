@@ -1,24 +1,24 @@
 const express = require('express');
 const path = require('path');
-const morgan = require('morgan');
 const session = require('express-session');
 const flash = require('connect-flash');
 const dotenv = require('dotenv');
 const expressLayouts = require('express-ejs-layouts');
 const { initDatabaseOnce } = require('./initDb');
 const { attachSessionContext } = require('./middleware/sessionContext');
+const logger = require('./services/logger');
+const { requestLogger } = require('./middleware/requestLogger');
 
 dotenv.config();
 
 initDatabaseOnce().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error('Error initializing database', err);
+  logger.error('Error initializing database', logger.formatError(err));
 });
 
 const app = express();
 app.set('trust proxy', 1);
 // Middlewares
-app.use(morgan('dev'));
+app.use(requestLogger);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 

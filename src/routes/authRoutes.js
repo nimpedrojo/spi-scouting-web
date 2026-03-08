@@ -11,6 +11,7 @@ const { ensureAuth } = require('../middleware/auth');
 const { renderDashboard } = require('../controllers/dashboardController');
 const { findTeamById } = require('../models/teamModel');
 const { getDefaultTeamOptionsForClub } = require('../services/teamService');
+const logger = require('../services/logger');
 
 const router = express.Router();
 
@@ -30,11 +31,24 @@ router.post('/login', ensureGuest, async (req, res) => {
   try {
     const user = await findUserByEmail(email);
     if (!user) {
+      logger.warn('Login failed: user not found', {
+        type: 'auth',
+        action: 'login_failed',
+        email,
+        ip: req.ip,
+      });
       req.flash('error', 'Usuario o contraseña incorrectos.');
       return res.redirect('/login');
     }
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
+      logger.warn('Login failed: invalid password', {
+        type: 'auth',
+        action: 'login_failed',
+        email,
+        userId: user.id,
+        ip: req.ip,
+      });
       req.flash('error', 'Usuario o contraseña incorrectos.');
       return res.redirect('/login');
     }
@@ -48,11 +62,25 @@ router.post('/login', ensureGuest, async (req, res) => {
       default_team: user.default_team_name || user.default_team,
       default_team_id: user.default_team_id || null,
     };
+    logger.info('Login successful', {
+      type: 'auth',
+      action: 'login_success',
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      clubId: user.club_id || null,
+      ip: req.ip,
+    });
     req.flash('success', 'Has iniciado sesión correctamente.');
     return res.redirect('/dashboard');
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    logger.error('Login error', {
+      type: 'auth',
+      action: 'login_error',
+      email,
+      ip: req.ip,
+      error: logger.formatError(err),
+    });
     req.flash('error', 'Ha ocurrido un error al iniciar sesión.');
     return res.redirect('/login');
   }
@@ -121,17 +149,38 @@ router.post('/register', ensureGuest, async (req, res) => {
       defaultClub: club.name,
     });
 
+    logger.info('User registered', {
+      type: 'auth',
+      action: 'register_success',
+      email,
+      clubId: club.id,
+      ip: req.ip,
+    });
+
     req.flash('success', 'Usuario creado. Ahora puedes iniciar sesión.');
     return res.redirect('/login');
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    logger.error('Register error', {
+      type: 'auth',
+      action: 'register_error',
+      email,
+      ip: req.ip,
+      error: logger.formatError(err),
+    });
     req.flash('error', 'Ha ocurrido un error al registrar usuario.');
     return res.redirect('/register');
   }
 });
 
 router.post('/logout', ensureAuth, (req, res) => {
+  const user = req.session.user;
+  logger.info('Logout successful', {
+    type: 'auth',
+    action: 'logout',
+    userId: user ? user.id : null,
+    email: user ? user.email : null,
+    ip: req.ip,
+  });
   req.session.destroy(() => {
     res.redirect('/login');
   });
@@ -154,8 +203,12 @@ router.get('/account', ensureAuth, async (req, res) => {
       resolvedClub,
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('Error al cargar cuenta:', err);
+    logger.error('Error loading account page', {
+      type: 'account',
+      action: 'account_view_error',
+      userId: req.session.user ? req.session.user.id : null,
+      error: logger.formatError(err),
+    });
     req.flash('error', 'Ha ocurrido un error al cargar tu cuenta.');
     return res.redirect('/reports/new');
   }
@@ -219,11 +272,26 @@ router.post('/account', ensureAuth, async (req, res) => {
     req.session.user.default_team = defaultTeamValue;
     req.session.user.default_team_id = defaultTeamIdValue;
 
+    logger.info('Account updated', {
+      type: 'account',
+      action: 'account_update',
+      userId: req.session.user.id,
+      email,
+      defaultClub: defaultClubValue,
+      defaultTeamId: defaultTeamIdValue,
+      ip: req.ip,
+    });
+
     req.flash('success', 'Tu cuenta se ha actualizado correctamente.');
     return res.redirect('/account');
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('Error al actualizar cuenta:', err);
+    logger.error('Error updating account', {
+      type: 'account',
+      action: 'account_update_error',
+      userId: req.session.user ? req.session.user.id : null,
+      email,
+      error: logger.formatError(err),
+    });
     req.flash('error', 'Ha ocurrido un error al actualizar tu cuenta.');
     return res.redirect('/account');
   }
