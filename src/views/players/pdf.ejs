@@ -188,7 +188,7 @@
 
           var reportCanvas = document.getElementById('playerPdfReportRadarChart');
           if (reportCanvas) {
-            var reportChartData = <%- JSON.stringify(report.reports.latestRadar ? JSON.parse(report.reports.latestRadar.chartJson) : null) %>;
+            var reportChartData = <%- report.reports.latestRadar ? report.reports.latestRadar.chartJson : 'null' %>;
             new Chart(reportCanvas, {
               type: 'radar',
               data: reportChartData,
@@ -208,7 +208,7 @@
                   }
                 }
               }
-            }
+            });
           }
         })();
       </script>
