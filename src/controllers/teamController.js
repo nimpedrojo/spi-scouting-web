@@ -8,6 +8,7 @@ const {
   validateTeamPayload,
 } = require('../services/teamService');
 const { findTeamById } = require('../models/teamModel');
+const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 async function renderIndex(req, res) {
   try {
@@ -23,6 +24,11 @@ async function renderIndex(req, res) {
     const groupedTeams = await getTeamsGroupedBySectionAndCategory(club.id, {
       section: activeSection,
       category: activeCategory || null,
+    });
+    logPageView(req, 'teams_index', {
+      section: activeSection,
+      category: activeCategory || null,
+      teamGroupCount: Object.keys(groupedTeams || {}).length,
     });
 
     return res.render('teams/index', {
@@ -60,6 +66,12 @@ async function renderShow(req, res) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
     }
+
+    logPageView(req, 'team_detail', {
+      teamId: team.id,
+      viewMode,
+      playerCount: team.players.length,
+    });
 
     return res.render('teams/show', {
       pageTitle: team.name,
@@ -112,6 +124,13 @@ async function create(req, res) {
     }
 
     const team = await createTeamForUser(req.session.user, payload);
+    logAuditEvent(req, 'create', 'team', {
+      teamId: team.id,
+      teamName: team.name,
+      seasonId: payload.seasonId,
+      sectionId: payload.sectionId,
+      categoryId: payload.categoryId,
+    });
     req.flash('success', 'Plantilla creada correctamente.');
     return res.redirect(`/teams/${team.id}`);
   } catch (err) {
@@ -168,6 +187,13 @@ async function update(req, res) {
       return res.redirect('/teams');
     }
 
+    logAuditEvent(req, 'update', 'team', {
+      teamId: req.params.id,
+      teamName: payload.name,
+      seasonId: payload.seasonId,
+      sectionId: payload.sectionId,
+      categoryId: payload.categoryId,
+    });
     req.flash('success', 'Plantilla actualizada correctamente.');
     return res.redirect(`/teams/${req.params.id}`);
   } catch (err) {
@@ -185,6 +211,9 @@ async function remove(req, res) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
     }
+    logAuditEvent(req, 'delete', 'team', {
+      teamId: req.params.id,
+    });
     req.flash('success', 'Plantilla eliminada correctamente.');
     return res.redirect('/teams');
   } catch (err) {

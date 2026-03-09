@@ -127,37 +127,19 @@
     var ctx = document.getElementById('ratingsRadarChart');
     if (!ctx) return;
 
-    var tech = <%= report.tech_total != null ? Number(report.tech_total).toFixed(2) : 'null' %>;
-    var tact = <%= report.tact_total != null ? Number(report.tact_total).toFixed(2) : 'null' %>;
-    var phys = <%= report.phys_total != null ? Number(report.phys_total).toFixed(2) : 'null' %>;
-    var psych = <%= report.psych_total != null ? Number(report.psych_total).toFixed(2) : 'null' %>;
-    var pers = <%= report.pers_total != null ? Number(report.pers_total).toFixed(2) : 'null' %>;
-
-    var dataValues = [tech, tact, phys, psych, pers].map(function (v) {
-      return (v === null || isNaN(v)) ? 0 : v;
+    var chartData = <%- radarChartJson %>;
+    var hasAnyData = chartData && Array.isArray(chartData.datasets) && chartData.datasets.some(function (dataset) {
+      return Array.isArray(dataset.data) && dataset.data.some(function (value) { return Number(value) > 0; });
     });
 
-    // Si todos son 0 (no hay datos), no dibujamos nada
-    if (dataValues.every(function (v) { return v === 0; })) {
+    if (!hasAnyData) {
       ctx.parentNode.innerHTML = '<p class="text-muted mb-0">No hay datos suficientes para mostrar el gráfico.</p>';
       return;
     }
 
     new Chart(ctx, {
       type: 'radar',
-      data: {
-        labels: ['Técnica', 'Táctica', 'Física', 'Psicológica', 'Personalidad'],
-        datasets: [
-          {
-            label: 'Valoración media',
-            data: dataValues,
-            backgroundColor: 'rgba(220, 53, 69, 0.2)',
-            borderColor: 'rgba(220, 53, 69, 1)',
-            pointBackgroundColor: 'rgba(220, 53, 69, 1)',
-            pointBorderColor: '#fff',
-          },
-        ],
-      },
+      data: chartData,
       options: {
         responsive: true,
         scales: {
@@ -171,7 +153,7 @@
         },
         plugins: {
           legend: {
-            display: false,
+            display: true,
           },
         },
       },

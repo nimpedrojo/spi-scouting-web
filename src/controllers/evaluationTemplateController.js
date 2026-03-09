@@ -7,6 +7,7 @@ const {
   deleteTemplateForUser,
 } = require('../services/evaluationTemplateService');
 const { EVALUATION_TEMPLATE } = require('../services/evaluationTemplate');
+const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 function parseTemplateMetrics(body) {
   const metrics = [];
@@ -32,6 +33,9 @@ function parseTemplateMetrics(body) {
 async function renderIndex(req, res) {
   try {
     const templates = await listTemplates(req.session.user);
+    logPageView(req, 'evaluation_templates_list', {
+      templateCount: templates ? templates.length : 0,
+    });
     return res.render('evaluation-templates/index', {
       pageTitle: 'Plantillas de evaluación',
       activeRoute: '/evaluation-templates',
@@ -51,6 +55,7 @@ async function renderNew(req, res) {
     req.flash('error', 'Debes tener un club activo para gestionar plantillas.');
     return res.redirect('/dashboard');
   }
+  logPageView(req, 'evaluation_template_new_form');
   return res.render('evaluation-templates/form', {
     pageTitle: 'Nueva plantilla',
     activeRoute: '/evaluation-templates',
@@ -88,6 +93,13 @@ async function create(req, res) {
     });
   }
 
+  logAuditEvent(req, 'create', 'evaluation_template', {
+    templateId: result.template.id,
+    name: result.template.name,
+    metricCount: payload.metrics.length,
+    isActive: payload.isActive,
+  });
+
   req.flash('success', 'Plantilla creada correctamente.');
   return res.redirect(`/evaluation-templates/${result.template.id}`);
 }
@@ -98,6 +110,10 @@ async function renderShow(req, res) {
     req.flash('error', 'Plantilla no encontrada.');
     return res.redirect('/evaluation-templates');
   }
+  logPageView(req, 'evaluation_template_detail', {
+    templateId: template.id,
+    metricCount: template.metrics ? template.metrics.length : 0,
+  });
   return res.render('evaluation-templates/show', {
     pageTitle: template.name,
     activeRoute: '/evaluation-templates',
@@ -114,6 +130,9 @@ async function renderEdit(req, res) {
     req.flash('error', 'Plantilla no encontrada.');
     return res.redirect('/evaluation-templates');
   }
+  logPageView(req, 'evaluation_template_edit_form', {
+    templateId: template.id,
+  });
   return res.render('evaluation-templates/form', {
     pageTitle: `Editar ${template.name}`,
     activeRoute: '/evaluation-templates',
@@ -158,6 +177,13 @@ async function update(req, res) {
     });
   }
 
+  logAuditEvent(req, 'update', 'evaluation_template', {
+    templateId: req.params.id,
+    name: payload.name,
+    metricCount: payload.metrics.length,
+    isActive: payload.isActive,
+  });
+
   req.flash('success', 'Plantilla actualizada correctamente.');
   return res.redirect(`/evaluation-templates/${req.params.id}`);
 }
@@ -167,6 +193,9 @@ async function remove(req, res) {
   if (!affected) {
     req.flash('error', 'Plantilla no encontrada.');
   } else {
+    logAuditEvent(req, 'delete', 'evaluation_template', {
+      templateId: req.params.id,
+    });
     req.flash('success', 'Plantilla eliminada correctamente.');
   }
   return res.redirect('/evaluation-templates');

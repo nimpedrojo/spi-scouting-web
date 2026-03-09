@@ -14,6 +14,7 @@ const {
   createPlayerWithAssignment,
   updatePlayerWithAssignment,
 } = require('../services/playerAdminService');
+const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -55,6 +56,10 @@ router.get('/', ensureAdmin, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const players = await getAllPlayers(clubFilter);
+    logPageView(req, 'players_list', {
+      playerCount: players.length,
+      scopeClub: clubFilter,
+    });
     return res.render('players/list', { players });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -88,6 +93,7 @@ router.get('/template', ensureAdmin, (req, res) => {
 
 // Formulario de importación masiva
 router.get('/import', ensureAdmin, (req, res) => {
+  logPageView(req, 'players_import_form');
   res.render('players/import');
 });
 
@@ -199,6 +205,12 @@ router.post(
         );
       }
 
+      logAuditEvent(req, 'import', 'player', {
+        importedCount: imported,
+        source: 'excel',
+        scopeClub: club,
+      });
+
       return res.redirect('/admin/players');
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -218,6 +230,10 @@ router.get('/new', ensureAdmin, async (req, res) => {
   const isSuperAdmin = user && user.role === 'superadmin';
   const clubName = !isSuperAdmin && user ? user.default_club || null : null;
   const teamOptions = await getTeamOptionsForClubName(clubName);
+  logPageView(req, 'player_new_form', {
+    teamOptionsCount: teamOptions.length,
+    scopeClub: clubName,
+  });
   res.render('players/new', {
     isSuperAdmin,
     teamOptions,
@@ -271,6 +287,13 @@ router.post('/new', ensureAdmin, async (req, res) => {
       preferredFoot: preferred_foot || null,
     });
 
+    logAuditEvent(req, 'create', 'player', {
+      firstName: first_name,
+      lastName: last_name,
+      teamId: team_id || null,
+      scopeClub: clubValue,
+    });
+
     req.flash('success', 'Jugador creado correctamente.');
     return res.redirect('/admin/players');
   } catch (err) {
@@ -293,6 +316,11 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
       return res.redirect('/admin/players');
     }
     const teamOptions = await getTeamOptionsForClubName(player.club || null);
+    logPageView(req, 'player_edit_form', {
+      playerId: Number(id),
+      scopeClub: player.club || null,
+      teamOptionsCount: teamOptions.length,
+    });
     return res.render('players/edit', { player, teamOptions });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -354,6 +382,14 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
       return res.redirect(`/admin/players/${id}/edit`);
     }
 
+    logAuditEvent(req, 'update', 'player', {
+      playerId: Number(id),
+      firstName: first_name,
+      lastName: last_name,
+      teamId: team_id || null,
+      scopeClub: player.club || null,
+    });
+
     req.flash('success', 'Jugador actualizado correctamente.');
     return res.redirect('/admin/players');
   } catch (err) {
@@ -383,6 +419,9 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el jugador.');
     } else {
+      logAuditEvent(req, 'delete', 'player', {
+        playerId: Number(id),
+      });
       req.flash('success', 'Jugador borrado correctamente.');
     }
     return res.redirect('/admin/players');
@@ -429,6 +468,11 @@ router.post('/bulk-delete', ensureAdmin, async (req, res) => {
       // eslint-disable-next-line no-await-in-loop
       await deletePlayer(id);
     }
+
+    logAuditEvent(req, 'bulk_delete', 'player', {
+      playerIds: idsToDelete,
+      deletedCount: idsToDelete.length,
+    });
 
     if (idsToDelete.length) {
       req.flash('success', 'Jugadores seleccionados borrados correctamente.');

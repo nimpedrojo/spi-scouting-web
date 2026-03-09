@@ -8,6 +8,7 @@ const {
 } = require('../services/evaluationService');
 const { importEvaluationsFromWorkbook } = require('../services/importEvaluationService');
 const { buildComparison } = require('../services/comparisonService');
+const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -35,6 +36,12 @@ async function renderIndex(req, res) {
       dateTo: req.query.date_to || null,
     };
     const result = await listEvaluations(req.session.user, filters);
+    logPageView(req, 'evaluations_list', {
+      teamId: filters.teamId,
+      playerId: filters.playerId,
+      authorId: filters.authorId,
+      groupCount: result.groupedByTeam.length,
+    });
     return res.render('evaluations/index', {
       pageTitle: 'Evaluaciones',
       activeRoute: '/evaluations',
@@ -63,6 +70,11 @@ async function renderNew(req, res) {
       req.flash('error', 'Configura primero un club por defecto para crear evaluaciones.');
       return res.redirect('/dashboard');
     }
+    logPageView(req, 'evaluation_new_form', {
+      teamId: req.query.team_id || null,
+      playerId: req.query.player_id || null,
+      templateId: req.query.template_id || null,
+    });
     return res.render('evaluations/new', {
       pageTitle: 'Nueva evaluacion',
       activeRoute: '/evaluations',
@@ -111,6 +123,15 @@ async function create(req, res) {
       });
     }
 
+    logAuditEvent(req, 'create', 'evaluation', {
+      evaluationId: result.evaluation.id,
+      playerId: payload.playerId,
+      teamId: payload.teamId,
+      seasonId: payload.seasonId,
+      templateId: payload.templateId,
+      source: payload.source,
+    });
+
     req.flash('success', 'Evaluacion creada correctamente.');
     return res.redirect(`/evaluations/${result.evaluation.id}`);
   } catch (err) {
@@ -128,6 +149,11 @@ async function renderShow(req, res) {
       req.flash('error', 'Evaluacion no encontrada.');
       return res.redirect('/evaluations');
     }
+    logPageView(req, 'evaluation_detail', {
+      evaluationId: Number(req.params.id),
+      playerId: evaluation.player_id || null,
+      teamId: evaluation.team_id || null,
+    });
     return res.render('evaluations/show', {
       pageTitle: evaluation.title || 'Detalle evaluacion',
       activeRoute: '/evaluations',
@@ -148,6 +174,10 @@ async function renderPlayerHistory(req, res) {
       req.flash('error', 'Jugador no encontrado.');
       return res.redirect('/evaluations');
     }
+    logPageView(req, 'evaluation_player_history', {
+      playerId: Number(req.params.id),
+      evaluationCount: history.items.length,
+    });
     return res.render('evaluations/index', {
       pageTitle: `Historial ${history.player.full_name}`,
       activeRoute: '/evaluations',
@@ -187,6 +217,12 @@ async function importMany(req, res) {
     } else {
       req.flash('success', `Importacion completada. Creadas: ${summary.created}.`);
     }
+    logAuditEvent(req, 'import', 'evaluation', {
+      createdCount: summary.created,
+      skippedCount: summary.skipped,
+      errorCount: summary.errors.length,
+      source: 'excel',
+    });
     return res.redirect('/evaluations');
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -205,6 +241,9 @@ async function renderCompare(req, res) {
       category: req.query.category || null,
       teamId: req.query.team_id || null,
       playerIds: req.query.player_ids || [],
+    });
+    logPageView(req, 'evaluations_compare', {
+      selectedPlayers: comparison && comparison.selectedPlayers ? comparison.selectedPlayers.length : 0,
     });
 
     return res.render('evaluations/compare', {
@@ -232,6 +271,11 @@ async function submitCompare(req, res) {
       category: req.body.category || null,
       teamId: req.body.team_id || null,
       playerIds: req.body.player_ids || [],
+    });
+    logAuditEvent(req, 'compare', 'evaluation', {
+      selectedPlayers: comparison && comparison.selectedPlayers ? comparison.selectedPlayers.map((player) => player.summary.id) : [],
+      seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
+      teamId: req.body.team_id || null,
     });
 
     return res.render('evaluations/compare', {

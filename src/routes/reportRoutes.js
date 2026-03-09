@@ -12,6 +12,8 @@ const {
 } = require('../models/reportModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getPlayersByTeam } = require('../models/playerModel');
+const { buildReportRadarComparison } = require('../services/reportComparisonService');
+const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -77,6 +79,11 @@ router.get('/new', ensureAuth, async (req, res) => {
     validationErrors: {},
     players,
     recommendationConfig,
+  });
+  logPageView(req, 'report_new_form', {
+    playerCount: players.length,
+    scopeClub: defaultClub,
+    defaultTeam,
   });
 });
 
@@ -288,6 +295,12 @@ router.post('/new', ensureAuth, async (req, res) => {
       info_reliability: info_reliability || null,
       created_by: req.session.user.id,
     });
+    logAuditEvent(req, 'create', 'report', {
+      playerName: `${player_name} ${player_surname}`.trim(),
+      team: finalTeam,
+      club: finalClub,
+      overallRating: overallRating != null ? Number(overallRating.toFixed(2)) : null,
+    });
     req.flash('success', 'Informe creado correctamente.');
     return res.redirect('/reports/new');
   } catch (err) {
@@ -313,6 +326,10 @@ router.get('/', ensureAdmin, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const reports = await getAllReports(clubFilter);
+    logPageView(req, 'reports_list', {
+      reportCount: reports.length,
+      scopeClub: clubFilter,
+    });
     res.render('reports/list', { reports });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -472,7 +489,17 @@ router.get('/:id', ensureAdmin, async (req, res) => {
       req.flash('error', 'Informe no encontrado.');
       return res.redirect('/reports');
     }
-    return res.render('reports/detail', { report });
+    const radarChartData = await buildReportRadarComparison(report);
+    logPageView(req, 'report_detail', {
+      reportId: Number(id),
+      club: report.club || null,
+      team: report.team || null,
+      playerName: `${report.player_name} ${report.player_surname}`.trim(),
+    });
+    return res.render('reports/detail', {
+      report,
+      radarChartJson: JSON.stringify(radarChartData),
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener informe:', err);
@@ -492,6 +519,11 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
       req.flash('error', 'Informe no encontrado.');
       return res.redirect('/reports');
     }
+    logPageView(req, 'report_edit_form', {
+      reportId: Number(id),
+      club: report.club || null,
+      team: report.team || null,
+    });
     return res.render('reports/edit', { report });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -526,6 +558,12 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
     if (!affected) {
       req.flash('error', 'No se ha podido actualizar el informe.');
     } else {
+      logAuditEvent(req, 'update', 'report', {
+        reportId: Number(id),
+        playerName: `${data.player_name} ${data.player_surname}`.trim(),
+        team: data.team || null,
+        club: data.club || null,
+      });
       req.flash('success', 'Informe actualizado correctamente.');
     }
     return res.redirect(`/reports/${id}`);
@@ -545,6 +583,9 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el informe.');
     } else {
+      logAuditEvent(req, 'delete', 'report', {
+        reportId: Number(id),
+      });
       req.flash('success', 'Informe borrado correctamente.');
     }
     return res.redirect('/reports');
@@ -579,6 +620,11 @@ router.post('/bulk-delete', ensureAdmin, async (req, res) => {
       // eslint-disable-next-line no-await-in-loop
       await deleteReport(id);
     }
+
+    logAuditEvent(req, 'bulk_delete', 'report', {
+      reportIds: idsToDelete,
+      deletedCount: idsToDelete.length,
+    });
 
     if (idsToDelete.length) {
       req.flash('success', 'Informes seleccionados borrados correctamente.');

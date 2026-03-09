@@ -25,9 +25,24 @@ function requestLogger(req, res, next) {
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1000000;
     const meta = buildRequestMeta(req, res, Number(durationMs.toFixed(2)));
+    const acceptsHtml = (req.get('accept') || '').includes('text/html');
+    const isPageView = req.method === 'GET'
+      && acceptsHtml
+      && !req.path.startsWith('/css/')
+      && !req.path.startsWith('/js/')
+      && !req.path.startsWith('/img/')
+      && !req.path.startsWith('/api/');
 
     if (res.statusCode >= 500) {
       logger.error('HTTP request failed', meta);
+      return;
+    }
+
+    if (isPageView && res.statusCode < 400) {
+      logger.info('Page request completed', {
+        ...meta,
+        type: 'page_view',
+      });
       return;
     }
 

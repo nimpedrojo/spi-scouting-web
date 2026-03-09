@@ -204,6 +204,67 @@ async function getReportsForPlayerProfile({ clubName, firstName, lastName }) {
   return rows;
 }
 
+async function getReportBenchmarkAverages(report) {
+  const [teamRows] = await db.query(
+    `SELECT
+        COUNT(*) AS sample_size,
+        ROUND(AVG(tech_total), 2) AS tech_total,
+        ROUND(AVG(tact_total), 2) AS tact_total,
+        ROUND(AVG(phys_total), 2) AS phys_total,
+        ROUND(AVG(psych_total), 2) AS psych_total,
+        ROUND(AVG(pers_total), 2) AS pers_total
+      FROM reports
+      WHERE club = ? AND team = ?`,
+    [report.club, report.team],
+  );
+
+  const [clubRows] = await db.query(
+    `SELECT
+        COUNT(*) AS sample_size,
+        ROUND(AVG(tech_total), 2) AS tech_total,
+        ROUND(AVG(tact_total), 2) AS tact_total,
+        ROUND(AVG(phys_total), 2) AS phys_total,
+        ROUND(AVG(psych_total), 2) AS psych_total,
+        ROUND(AVG(pers_total), 2) AS pers_total
+      FROM reports
+      WHERE club = ?`,
+    [report.club],
+  );
+
+  return {
+    teamAverage: teamRows[0]
+      ? {
+        sampleSize: Number(teamRows[0].sample_size || 0),
+        ...teamRows[0],
+      }
+      : null,
+    clubAverage: clubRows[0]
+      ? {
+        sampleSize: Number(clubRows[0].sample_size || 0),
+        ...clubRows[0],
+      }
+      : null,
+  };
+}
+
+async function getReportsForPlayerEvolution(report) {
+  const [rows] = await db.query(
+    `SELECT
+        id,
+        created_at,
+        tech_total,
+        tact_total,
+        phys_total,
+        psych_total,
+        pers_total
+      FROM reports
+      WHERE club = ? AND player_name = ? AND player_surname = ?
+      ORDER BY created_at ASC`,
+    [report.club, report.player_name, report.player_surname],
+  );
+  return rows;
+}
+
 module.exports = {
   createReportsTable,
   createReport,
@@ -213,4 +274,6 @@ module.exports = {
   updateReport,
   deleteReport,
   getReportsForPlayerProfile,
+  getReportBenchmarkAverages,
+  getReportsForPlayerEvolution,
 };
