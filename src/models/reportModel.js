@@ -193,6 +193,11 @@ async function getReportsForPlayerProfile({ clubName, firstName, lastName }) {
         r.club,
         r.team,
         r.overall_rating,
+        r.tech_total,
+        r.tact_total,
+        r.phys_total,
+        r.psych_total,
+        r.pers_total,
         r.created_at,
         u.name AS created_by_name
       FROM reports r

@@ -202,6 +202,36 @@ body.player-pdf-body {
   gap: 8px;
 }
 
+.pdf-report-radar-block {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(24, 49, 38, 0.1);
+}
+
+.pdf-report-radar-header {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pdf-report-radar-header > div {
+  padding: 10px 12px;
+  background: rgba(237, 244, 236, 0.85);
+  border-radius: 14px;
+}
+
+.pdf-report-radar-header span {
+  display: block;
+  color: #5d786a;
+  font-size: 0.82rem;
+}
+
+.pdf-radar-wrap--report {
+  height: 210px;
+  margin-bottom: 0;
+}
+
 .pdf-area-row {
   display: flex;
   justify-content: space-between;

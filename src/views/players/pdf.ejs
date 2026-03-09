@@ -95,6 +95,23 @@
               <% }) %>
             </div>
           <% } %>
+          <% if (report.reports.latestRadar) { %>
+            <div class="pdf-report-radar-block">
+              <div class="pdf-report-radar-header">
+                <div>
+                  <span>Último informe</span>
+                  <strong><%= report.reports.latestRadar.dateLabel %></strong>
+                </div>
+                <div>
+                  <span>Equipo</span>
+                  <strong><%= report.reports.latestRadar.teamLabel %></strong>
+                </div>
+              </div>
+              <div class="pdf-radar-wrap pdf-radar-wrap--report">
+                <canvas id="playerPdfReportRadarChart" height="220"></canvas>
+              </div>
+            </div>
+          <% } %>
         </article>
       </section>
 
@@ -138,33 +155,61 @@
       </footer>
     </main>
 
-    <% if (report.analytics.history.totalEvaluations) { %>
+    <% if (report.analytics.history.totalEvaluations || report.reports.latestRadar) { %>
       <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
       <script>
         (function () {
-          var canvas = document.getElementById('playerPdfRadarChart');
-          if (!canvas || typeof Chart === 'undefined') return;
-          var chartData = <%- report.analytics.radarChartJson %>;
-          new Chart(canvas, {
-            type: 'radar',
-            data: chartData,
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              animation: false,
-              plugins: {
-                legend: { display: false }
-              },
-              scales: {
-                r: {
-                  min: 0,
-                  max: 10,
-                  ticks: { stepSize: 2, backdropColor: 'transparent' },
-                  pointLabels: { font: { size: 11 } }
+          if (typeof Chart === 'undefined') return;
+
+          var evaluationCanvas = document.getElementById('playerPdfRadarChart');
+          if (evaluationCanvas) {
+            var evaluationChartData = <%- report.analytics.radarChartJson %>;
+            new Chart(evaluationCanvas, {
+              type: 'radar',
+              data: evaluationChartData,
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                  legend: { display: false }
+                },
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 10,
+                    ticks: { stepSize: 2, backdropColor: 'transparent' },
+                    pointLabels: { font: { size: 11 } }
+                  }
+                }
+              }
+            });
+          }
+
+          var reportCanvas = document.getElementById('playerPdfReportRadarChart');
+          if (reportCanvas) {
+            var reportChartData = <%- JSON.stringify(report.reports.latestRadar ? JSON.parse(report.reports.latestRadar.chartJson) : null) %>;
+            new Chart(reportCanvas, {
+              type: 'radar',
+              data: reportChartData,
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                  legend: { display: false }
+                },
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 10,
+                    ticks: { stepSize: 2, backdropColor: 'transparent' },
+                    pointLabels: { font: { size: 11 } }
+                  }
                 }
               }
             }
-          });
+          }
         })();
       </script>
     <% } %>

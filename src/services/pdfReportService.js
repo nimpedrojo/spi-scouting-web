@@ -4,6 +4,14 @@ const { getPlayerAnalytics } = require('./playerAnalyticsService');
 const { getReportsForPlayerProfile } = require('../models/reportModel');
 const { getPlayerById } = require('../models/playerModel');
 
+const REPORT_RADAR_AREAS = [
+  { key: 'tech_total', label: 'Técnica' },
+  { key: 'tact_total', label: 'Táctica' },
+  { key: 'phys_total', label: 'Física' },
+  { key: 'psych_total', label: 'Psicológica' },
+  { key: 'pers_total', label: 'Personalidad' },
+];
+
 function formatDate(value) {
   if (!value) {
     return '-';
@@ -53,6 +61,42 @@ function buildProgressItems(analytics, reportsCount) {
       tone: 'info',
     },
   ];
+}
+
+function buildLatestReportRadar(reports) {
+  if (!Array.isArray(reports) || !reports.length) {
+    return null;
+  }
+
+  const latestReport = reports[0];
+  const hasRadarData = REPORT_RADAR_AREAS.some(
+    (area) => latestReport[area.key] != null && latestReport[area.key] !== '',
+  );
+
+  if (!hasRadarData) {
+    return null;
+  }
+
+  return {
+    dateLabel: formatDate(latestReport.created_at),
+    teamLabel: latestReport.team || '-',
+    chartJson: JSON.stringify({
+      labels: REPORT_RADAR_AREAS.map((area) => area.label),
+      datasets: [
+        {
+          label: 'Último informe',
+          data: REPORT_RADAR_AREAS.map((area) => {
+            const value = latestReport[area.key] != null ? Number(latestReport[area.key]) : 0;
+            return Number.isNaN(value) ? 0 : Number(value.toFixed(2));
+          }),
+          borderColor: '#0b3b8c',
+          backgroundColor: 'rgba(11, 59, 140, 0.14)',
+          pointBackgroundColor: '#0b3b8c',
+          pointBorderColor: '#ffffff',
+        },
+      ],
+    }),
+  };
 }
 
 async function getLatestCoachNote(playerId, clubName, player) {
@@ -114,6 +158,7 @@ async function buildPlayerPdfReport(user, playerId, seasonId = null) {
     lastName: player.last_name,
   });
   const coachNote = await getLatestCoachNote(player.id, club.name, player);
+  const latestReportRadar = buildLatestReportRadar(reports);
 
   const summary = analytics.summary || {
     ...player,
@@ -150,6 +195,7 @@ async function buildPlayerPdfReport(user, playerId, seasonId = null) {
     reports: {
       items: reports,
       count: reports.length,
+      latestRadar: latestReportRadar,
     },
     coachNote,
     progressItems: buildProgressItems(analytics, reports.length),

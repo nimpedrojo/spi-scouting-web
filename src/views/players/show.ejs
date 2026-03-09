@@ -56,17 +56,41 @@
           <div><span class="text-muted">Posicion principal</span><strong><%= player.primary_position || '-' %></strong></div>
           <div><span class="text-muted">Posiciones</span><strong><%= player.positions || '-' %></strong></div>
         </div>
-        <div class="pitch-container pitch-container--compact">
-          <div class="pitch pitch--compact">
-            <% if (player.positions_list && player.positions_list.length) { %>
-              <% player.positions_list.forEach((position, index) => { %>
-                <div class="pitch-position <%= index === 0 ? 'selected' : 'secondary' %> pos-<%= position.toLowerCase() %>">
-                  <%= position %>
-                </div>
-              <% }) %>
-            <% } else { %>
-              <div class="pitch-position selected pos-mc">MC</div>
-            <% } %>
+        <div class="report-pitch-panel report-pitch-panel--compact">
+          <div class="report-pitch report-pitch--compact">
+            <div class="report-pitch__field">
+              <svg class="report-pitch__svg" viewBox="0 0 320 440" aria-hidden="true">
+                <defs>
+                  <linearGradient id="playerPitchGrass" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#1d7a3f" />
+                    <stop offset="100%" stop-color="#166236" />
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="0" width="320" height="440" rx="16" fill="url(#playerPitchGrass)" />
+                <rect x="14" y="14" width="292" height="412" rx="10" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="3" />
+                <line x1="160" y1="14" x2="160" y2="426" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <line x1="14" y1="220" x2="306" y2="220" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <circle cx="160" cy="220" r="34" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <circle cx="160" cy="220" r="2.5" fill="rgba(255,255,255,0.92)" />
+                <rect x="72" y="14" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <rect x="112" y="14" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <circle cx="160" cy="88" r="2.5" fill="rgba(255,255,255,0.92)" />
+                <path d="M128 88a32 32 0 0 0 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <rect x="72" y="352" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <rect x="112" y="398" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                <circle cx="160" cy="352" r="2.5" fill="rgba(255,255,255,0.92)" />
+                <path d="M128 352a32 32 0 0 1 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+              </svg>
+              <% if (player.positions_list && player.positions_list.length) { %>
+                <% player.positions_list.forEach((position, index) => { %>
+                  <div class="report-pitch__marker <%= index === 0 ? 'selected' : 'secondary' %> pos-<%= position.toLowerCase() %>">
+                    <%= position %>
+                  </div>
+                <% }) %>
+              <% } else { %>
+                <div class="report-pitch__marker selected pos-mc">MC</div>
+              <% } %>
+            </div>
           </div>
         </div>
       </div>
