@@ -55,6 +55,7 @@ async function renderShow(req, res) {
   try {
     const club = req.context ? req.context.club : null;
     const team = await getTeamDetail(req.params.id);
+    const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
     if (!club || !team || team.club_id !== club.id) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
@@ -63,6 +64,7 @@ async function renderShow(req, res) {
     return res.render('teams/show', {
       pageTitle: team.name,
       team,
+      viewMode,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

@@ -39,7 +39,7 @@
           <div><span class="text-muted">Nacionalidad</span><strong><%= player.nationality || '-' %></strong></div>
           <div><span class="text-muted">Telefono</span><strong><%= player.phone || '-' %></strong></div>
           <div><span class="text-muted">Email</span><strong><%= player.email || '-' %></strong></div>
-          <div><span class="text-muted">Pie preferente</span><strong><%= player.preferred_foot || '-' %></strong></div>
+          <div><span class="text-muted">Lateralidad</span><strong><%= player.laterality || '-' %></strong></div>
         </div>
       </div>
     </div>
@@ -52,13 +52,21 @@
           <div><span class="text-muted">Temporada</span><strong><%= player.season_name || (activeSeason ? activeSeason.name : '-') %></strong></div>
           <div><span class="text-muted">Equipo</span><strong><%= player.team_name || '-' %></strong></div>
           <div><span class="text-muted">Categoria</span><strong><%= player.category_name || '-' %></strong></div>
+          <div><span class="text-muted">Dorsal</span><strong><%= player.dorsal || '-' %></strong></div>
           <div><span class="text-muted">Posicion principal</span><strong><%= player.primary_position || '-' %></strong></div>
+          <div><span class="text-muted">Posiciones</span><strong><%= player.positions || '-' %></strong></div>
         </div>
-        <div class="pitch-container">
-          <div class="pitch">
-            <div class="pitch-position selected pos-<%= (player.primary_position || 'mc').toLowerCase() %>">
-              <%= player.primary_position || 'MC' %>
-            </div>
+        <div class="pitch-container pitch-container--compact">
+          <div class="pitch pitch--compact">
+            <% if (player.positions_list && player.positions_list.length) { %>
+              <% player.positions_list.forEach((position, index) => { %>
+                <div class="pitch-position <%= index === 0 ? 'selected' : 'secondary' %> pos-<%= position.toLowerCase() %>">
+                  <%= position %>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="pitch-position selected pos-mc">MC</div>
+            <% } %>
           </div>
         </div>
       </div>

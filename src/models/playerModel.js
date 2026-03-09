@@ -72,17 +72,37 @@ async function insertPlayer({
   firstName,
   lastName,
   club = null,
+  clubId = null,
   team,
   currentTeamId = null,
   birthDate,
   birthYear,
   laterality,
+  phone = null,
+  email = null,
+  nationality = null,
+  preferredFoot = null,
 }) {
   const [result] = await db.query(
     `INSERT INTO players (
-      first_name, last_name, club, team, current_team_id, birth_date, birth_year, laterality
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [firstName, lastName, club, team, currentTeamId, birthDate, birthYear, laterality],
+      first_name, last_name, club, club_id, team, current_team_id, birth_date, birth_year, laterality,
+      phone, email, nationality, preferred_foot
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      firstName,
+      lastName,
+      club,
+      clubId,
+      team,
+      currentTeamId,
+      birthDate,
+      birthYear,
+      laterality,
+      phone,
+      email,
+      nationality,
+      preferredFoot,
+    ],
   );
   return result.insertId;
 }
@@ -118,10 +138,16 @@ async function getPlayersByTeam(team, club = null) {
       p.*,
       tp.dorsal,
       tp.positions,
+      sec.name AS section_name,
+      cat.name AS category_name,
+      s.name AS season_name,
       t.name AS relational_team_name
     FROM players p
     LEFT JOIN teams t ON t.id = p.current_team_id
     LEFT JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = p.current_team_id
+    LEFT JOIN sections sec ON sec.id = t.section_id
+    LEFT JOIN categories cat ON cat.id = t.category_id
+    LEFT JOIN seasons s ON s.id = t.season_id
   `;
   const params = [];
 
@@ -142,10 +168,16 @@ async function getAllPlayers(club = null) {
       p.*,
       tp.dorsal,
       tp.positions,
+      sec.name AS section_name,
+      cat.name AS category_name,
+      s.name AS season_name,
       t.name AS relational_team_name
     FROM players p
     LEFT JOIN teams t ON t.id = p.current_team_id
     LEFT JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = p.current_team_id
+    LEFT JOIN sections sec ON sec.id = t.section_id
+    LEFT JOIN categories cat ON cat.id = t.category_id
+    LEFT JOIN seasons s ON s.id = t.season_id
   `;
   const params = [];
 
@@ -166,10 +198,16 @@ async function getPlayerById(id, club = null) {
       p.*,
       tp.dorsal,
       tp.positions,
+      sec.name AS section_name,
+      cat.name AS category_name,
+      s.name AS season_name,
       t.name AS relational_team_name
     FROM players p
     LEFT JOIN teams t ON t.id = p.current_team_id
     LEFT JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = p.current_team_id
+    LEFT JOIN sections sec ON sec.id = t.section_id
+    LEFT JOIN categories cat ON cat.id = t.category_id
+    LEFT JOIN seasons s ON s.id = t.season_id
     WHERE p.id = ?
   `;
   const params = [id];
@@ -186,17 +224,39 @@ async function getPlayerById(id, club = null) {
 async function updatePlayer(id, {
   firstName,
   lastName,
+  club = null,
+  clubId = null,
   team,
   currentTeamId = null,
   birthDate,
   birthYear,
   laterality,
+  phone = null,
+  email = null,
+  nationality = null,
+  preferredFoot = null,
 }) {
   const [result] = await db.query(
     `UPDATE players
-     SET first_name = ?, last_name = ?, team = ?, current_team_id = ?, birth_date = ?, birth_year = ?, laterality = ?
+     SET first_name = ?, last_name = ?, team = ?, current_team_id = ?, birth_date = ?, birth_year = ?, laterality = ?,
+         phone = ?, email = ?, nationality = ?, preferred_foot = ?, club = ?, club_id = ?
      WHERE id = ?`,
-    [firstName, lastName, team, currentTeamId, birthDate, birthYear, laterality, id],
+    [
+      firstName,
+      lastName,
+      team,
+      currentTeamId,
+      birthDate,
+      birthYear,
+      laterality,
+      phone,
+      email,
+      nationality,
+      preferredFoot,
+      club,
+      clubId,
+      id,
+    ],
   );
   return result.affectedRows;
 }

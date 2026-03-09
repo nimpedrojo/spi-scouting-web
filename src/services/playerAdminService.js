@@ -5,6 +5,7 @@ const {
 } = require('../models/playerModel');
 const {
   getTeamsByClubId,
+  findTeamById,
 } = require('../models/teamModel');
 const {
   upsertTeamPlayer,
@@ -19,7 +20,17 @@ function matchesTeamName(team, teamName) {
   return team.name.trim().toLowerCase() === teamName.trim().toLowerCase();
 }
 
-async function resolveTeamAssignment(clubName, teamName) {
+async function resolveTeamAssignment(clubName, teamName, teamId = null) {
+  if (teamId) {
+    const selectedTeam = await findTeamById(teamId);
+    if (selectedTeam && (!clubName || selectedTeam.club_name === clubName)) {
+      return {
+        teamName: selectedTeam.name,
+        teamId: selectedTeam.id,
+      };
+    }
+  }
+
   const normalizedTeamName = normalizeTeamName(teamName);
   if (!clubName || !normalizedTeamName) {
     return {
@@ -63,9 +74,11 @@ async function resolveTeamAssignment(clubName, teamName) {
 }
 
 async function createPlayerWithAssignment(payload) {
-  const assignment = await resolveTeamAssignment(payload.club, payload.team);
+  const clubRecord = payload.club ? await getClubByName(payload.club) : null;
+  const assignment = await resolveTeamAssignment(payload.club, payload.team, payload.teamId || null);
   const playerId = await insertPlayer({
     ...payload,
+    clubId: clubRecord ? clubRecord.id : null,
     team: assignment.teamName,
     currentTeamId: assignment.teamId,
   });
@@ -75,6 +88,7 @@ async function createPlayerWithAssignment(payload) {
       teamId: assignment.teamId,
       playerId,
       dorsal: payload.dorsal || null,
+      positions: payload.positions || null,
     });
   }
 
@@ -85,10 +99,12 @@ async function createPlayerWithAssignment(payload) {
 }
 
 async function updatePlayerWithAssignment(playerId, payload) {
-  const assignment = await resolveTeamAssignment(payload.club, payload.team);
+  const clubRecord = payload.club ? await getClubByName(payload.club) : null;
+  const assignment = await resolveTeamAssignment(payload.club, payload.team, payload.teamId || null);
 
   const affected = await updatePlayer(playerId, {
     ...payload,
+    clubId: clubRecord ? clubRecord.id : null,
     team: assignment.teamName,
     currentTeamId: assignment.teamId,
   });
@@ -107,6 +123,7 @@ async function updatePlayerWithAssignment(playerId, payload) {
       teamId: assignment.teamId,
       playerId,
       dorsal: payload.dorsal || null,
+      positions: payload.positions || null,
     });
   }
 

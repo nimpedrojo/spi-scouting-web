@@ -130,6 +130,8 @@ async function getTeamDetail(teamId) {
       last_name: player.last_name,
       full_name: `${player.first_name} ${player.last_name}`.trim(),
       positions: player.positions || '',
+      laterality: player.laterality || '',
+      birth_year: player.birth_year || null,
     })),
   };
 }

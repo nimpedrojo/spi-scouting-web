@@ -7,6 +7,8 @@ const {
   getPlayerById,
   deletePlayer,
 } = require('../models/playerModel');
+const { getClubByName } = require('../models/clubModel');
+const { getTeamsByClubId } = require('../models/teamModel');
 const { ensureAdmin } = require('../middleware/auth');
 const {
   createPlayerWithAssignment,
@@ -19,6 +21,33 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
+
+async function getTeamOptionsForClubName(clubName) {
+  if (!clubName) {
+    return [];
+  }
+
+  const club = await getClubByName(clubName);
+  if (!club) {
+    return [];
+  }
+
+  const teams = await getTeamsByClubId(club.id);
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    categoryName: team.category_name || '',
+    sectionName: team.section_name || '',
+    seasonName: team.season_name || '',
+    isActiveSeason: Boolean(team.season_is_active),
+    label: [
+      team.name,
+      team.category_name,
+      team.section_name,
+      team.season_name,
+    ].filter(Boolean).join(' · '),
+  }));
+}
 
 // Listado de jugadores
 router.get('/', ensureAdmin, async (req, res) => {
@@ -184,10 +213,15 @@ router.post(
 );
 
 // Formulario de nuevo jugador
-router.get('/new', ensureAdmin, (req, res) => {
+router.get('/new', ensureAdmin, async (req, res) => {
   const { user } = req.session;
   const isSuperAdmin = user && user.role === 'superadmin';
-  res.render('players/new', { isSuperAdmin });
+  const clubName = !isSuperAdmin && user ? user.default_club || null : null;
+  const teamOptions = await getTeamOptionsForClubName(clubName);
+  res.render('players/new', {
+    isSuperAdmin,
+    teamOptions,
+  });
 });
 
 router.post('/new', ensureAdmin, async (req, res) => {
@@ -195,11 +229,16 @@ router.post('/new', ensureAdmin, async (req, res) => {
     first_name,
     last_name,
     club,
-    team,
+    team_id,
     dorsal,
+    positions,
     birth_date,
     birth_year,
     laterality,
+    phone,
+    email,
+    nationality,
+    preferred_foot,
   } = req.body;
 
   if (!first_name || !last_name) {
@@ -220,11 +259,16 @@ router.post('/new', ensureAdmin, async (req, res) => {
       firstName: first_name,
       lastName: last_name,
       club: clubValue,
-      team: team || null,
+      teamId: team_id || null,
       dorsal: dorsal || null,
+      positions: positions || null,
       birthDate: birth_date || null,
       birthYear: birth_year || null,
       laterality: laterality || null,
+      phone: phone || null,
+      email: email || null,
+      nationality: nationality || null,
+      preferredFoot: preferred_foot || null,
     });
 
     req.flash('success', 'Jugador creado correctamente.');
@@ -248,7 +292,8 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
       req.flash('error', 'Jugador no encontrado.');
       return res.redirect('/admin/players');
     }
-    return res.render('players/edit', { player });
+    const teamOptions = await getTeamOptionsForClubName(player.club || null);
+    return res.render('players/edit', { player, teamOptions });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al cargar jugador para edición:', err);
@@ -262,11 +307,16 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
   const {
     first_name,
     last_name,
-    team,
+    team_id,
     dorsal,
+    positions,
     birth_date,
     birth_year,
     laterality,
+    phone,
+    email,
+    nationality,
+    preferred_foot,
   } = req.body;
 
   if (!first_name || !last_name) {
@@ -287,11 +337,16 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
       firstName: first_name,
       lastName: last_name,
       club: player.club || null,
-      team: team || null,
+      teamId: team_id || null,
       dorsal: dorsal || null,
+      positions: positions || null,
       birthDate: birth_date || null,
       birthYear: birth_year || null,
       laterality: laterality || null,
+      phone: phone || null,
+      email: email || null,
+      nationality: nationality || null,
+      preferredFoot: preferred_foot || null,
     });
 
     if (!affected) {

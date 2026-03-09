@@ -1,95 +1,115 @@
 <h1 class="mb-4">Nuevo jugador</h1>
 
-<form method="POST" action="/admin/players/new" class="col-md-6">
-  <div class="mb-3">
-    <label for="club" class="form-label">Club</label>
-    <input
-      type="text"
-      class="form-control"
-      id="club"
-      name="club"
-      value="<%= isSuperAdmin ? '' : (currentUser && currentUser.default_club ? currentUser.default_club : '') %>"
-      <%= isSuperAdmin ? '' : 'readonly' %>
-    />
-  </div>
-
-  <div class="mb-3">
-    <label for="first_name" class="form-label">Nombre</label>
-    <input
-      type="text"
-      class="form-control"
-      id="first_name"
-      name="first_name"
-      required
-    />
-  </div>
-
-  <div class="mb-3">
-    <label for="last_name" class="form-label">Apellidos</label>
-    <input
-      type="text"
-      class="form-control"
-      id="last_name"
-      name="last_name"
-      required
-    />
-  </div>
-
-  <div class="mb-3">
-    <label for="team" class="form-label">Equipo</label>
-    <input
-      type="text"
-      class="form-control"
-      id="team"
-      name="team"
-    />
-  </div>
-
-  <div class="mb-3">
-    <label for="dorsal" class="form-label">Dorsal</label>
-    <input
-      type="text"
-      class="form-control"
-      id="dorsal"
-      name="dorsal"
-      maxlength="10"
-    />
-  </div>
-
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      <label for="birth_date" class="form-label">Fecha de nacimiento</label>
-      <input
-        type="date"
-        class="form-control"
-        id="birth_date"
-        name="birth_date"
-      />
-    </div>
-    <div class="col-md-6 mb-3">
-      <label for="birth_year" class="form-label">Año de nacimiento</label>
-      <input
-        type="number"
-        class="form-control"
-        id="birth_year"
-        name="birth_year"
-        min="1900"
-        max="2100"
-      />
+<form method="POST" action="/admin/players/new">
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Informacion personal</h2>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="first_name" class="form-label">Nombre</label>
+          <input type="text" class="form-control" id="first_name" name="first_name" required />
+        </div>
+        <div class="col-md-6">
+          <label for="last_name" class="form-label">Apellidos</label>
+          <input type="text" class="form-control" id="last_name" name="last_name" required />
+        </div>
+        <div class="col-md-4">
+          <label for="birth_date" class="form-label">Fecha de nacimiento</label>
+          <input type="date" class="form-control" id="birth_date" name="birth_date" />
+        </div>
+        <div class="col-md-4">
+          <label for="birth_year" class="form-label">Año de nacimiento</label>
+          <input type="number" class="form-control" id="birth_year" name="birth_year" min="1900" max="2100" />
+        </div>
+        <div class="col-md-4">
+          <label for="nationality" class="form-label">Nacionalidad</label>
+          <input type="text" class="form-control" id="nationality" name="nationality" />
+        </div>
+        <div class="col-md-4">
+          <label for="phone" class="form-label">Telefono</label>
+          <input type="text" class="form-control" id="phone" name="phone" />
+        </div>
+        <div class="col-md-4">
+          <label for="email" class="form-label">Email</label>
+          <input type="email" class="form-control" id="email" name="email" />
+        </div>
+        <div class="col-md-4">
+          <label for="preferred_foot" class="form-label">Pie preferente</label>
+          <input type="text" class="form-control" id="preferred_foot" name="preferred_foot" placeholder="Ej. Derecho, Izquierdo" />
+        </div>
+        <div class="col-md-4">
+          <label for="laterality" class="form-label">Lateralidad</label>
+          <input type="text" class="form-control" id="laterality" name="laterality" placeholder="Diestro, zurdo, ambidiestro..." />
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="mb-3">
-    <label for="laterality" class="form-label">Lateralidad</label>
-    <input
-      type="text"
-      class="form-control"
-      id="laterality"
-      name="laterality"
-      placeholder="Diestro, zurdo, ambidiestro..."
-    />
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Contexto futbolistico</h2>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label for="club" class="form-label">Club</label>
+          <input
+            type="text"
+            class="form-control"
+            id="club"
+            name="club"
+            value="<%= isSuperAdmin ? '' : (currentUser && currentUser.default_club ? currentUser.default_club : '') %>"
+            <%= isSuperAdmin ? '' : 'readonly' %>
+          />
+        </div>
+        <div class="col-md-5">
+          <label for="team_id" class="form-label">Equipo</label>
+          <select class="form-select" id="team_id" name="team_id">
+            <option value="">Sin asignar</option>
+            <% teamOptions.forEach((team) => { %>
+              <option
+                value="<%= team.id %>"
+                data-category="<%= team.categoryName %>"
+              >
+                <%= team.label %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="category_display" class="form-label">Categoria</label>
+          <input type="text" class="form-control" id="category_display" value="" readonly />
+          <div class="form-text">La categoria se toma de la plantilla seleccionada.</div>
+        </div>
+        <div class="col-md-2">
+          <label for="dorsal" class="form-label">Dorsal</label>
+          <input type="text" class="form-control" id="dorsal" name="dorsal" maxlength="10" />
+        </div>
+        <div class="col-md-5">
+          <label for="positions" class="form-label">Posiciones</label>
+          <input type="text" class="form-control" id="positions" name="positions" placeholder="Ej. MC, MP, EI" />
+          <div class="form-text">Puedes indicar varias posiciones separadas por comas.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <button type="submit" class="btn btn-sr-primary">Guardar jugador</button>
-  <a href="/admin/players" class="btn btn-link">Cancelar</a>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-sr-primary">Guardar jugador</button>
+    <a href="/admin/players" class="btn btn-link">Cancelar</a>
+  </div>
 </form>
+
+<script>
+  (function () {
+    var teamSelect = document.getElementById('team_id');
+    var categoryField = document.getElementById('category_display');
+    if (!teamSelect || !categoryField) return;
+
+    function syncCategory() {
+      var option = teamSelect.options[teamSelect.selectedIndex];
+      categoryField.value = option ? (option.getAttribute('data-category') || '') : '';
+    }
+
+    teamSelect.addEventListener('change', syncCategory);
+    syncCategory();
+  })();
+</script>

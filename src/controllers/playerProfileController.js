@@ -25,6 +25,43 @@ function calculateAge(birthDate, birthYear) {
   return null;
 }
 
+function normalizePositions(positionsValue) {
+  const aliasMap = {
+    PORTERO: 'POR',
+    POR: 'POR',
+    DC: 'CENTRAL',
+    DFC: 'CENTRAL',
+    CENTRAL: 'CENTRAL',
+    LD: 'LD',
+    LI: 'LI',
+    MC: 'MC',
+    MCD: 'MC',
+    MCO: 'MP',
+    MP: 'MP',
+    MEDIAPUNTA: 'MP',
+    ID: 'ID',
+    II: 'II',
+    ED: 'ED',
+    EI: 'EI',
+    'EXTREMO DERECHO': 'ED',
+    'EXTREMO IZQUIERDO': 'EI',
+    DEL: 'DEL',
+    DCN: 'DEL',
+    DELANTERO: 'DEL',
+  };
+  const supportedPositions = new Set(['POR', 'CENTRAL', 'LD', 'LI', 'MC', 'ID', 'II', 'MP', 'ED', 'EI', 'DEL']);
+
+  if (!positionsValue) {
+    return [];
+  }
+
+  return Array.from(new Set(String(positionsValue)
+    .split(',')
+    .map((position) => position.trim().toUpperCase())
+    .map((position) => aliasMap[position] || position)
+    .filter((position) => supportedPositions.has(position))));
+}
+
 async function renderProfile(req, res) {
   try {
     const club = req.context ? req.context.club : null;
@@ -49,15 +86,18 @@ async function renderProfile(req, res) {
       lastName: player.last_name,
     });
 
-    const playerSummary = analytics.summary || {
+    const playerSummary = {
+      ...analytics.summary,
       ...player,
-      team_name: player.relational_team_name || player.team || '',
-      section_name: '',
-      category_name: '',
-      season_name: activeSeason ? activeSeason.name : '',
-      dorsal: '',
-      positions: '',
+      team_name: (analytics.summary && analytics.summary.team_name) || player.relational_team_name || player.team || '',
+      section_name: (analytics.summary && analytics.summary.section_name) || '',
+      category_name: (analytics.summary && analytics.summary.category_name) || '',
+      season_name: (analytics.summary && analytics.summary.season_name) || (activeSeason ? activeSeason.name : ''),
+      dorsal: player.dorsal || (analytics.summary && analytics.summary.dorsal) || '',
+      positions: player.positions || (analytics.summary && analytics.summary.positions) || '',
     };
+
+    const positionsList = normalizePositions(playerSummary.positions);
 
     return res.render('players/show', {
       pageTitle: `${player.first_name} ${player.last_name}`,
@@ -66,10 +106,9 @@ async function renderProfile(req, res) {
         full_name: `${player.first_name} ${player.last_name}`.trim(),
         initials: buildInitials(player),
         age: calculateAge(player.birth_date, player.birth_year),
-        preferred_foot: player.preferred_foot || player.laterality || '',
-        primary_position: playerSummary.positions
-          ? String(playerSummary.positions).split(',')[0].trim()
-          : '',
+        primary_position: positionsList.length ? positionsList[0] : '',
+        secondary_positions: positionsList.slice(1),
+        positions_list: positionsList,
       },
       reports,
       analytics: {
