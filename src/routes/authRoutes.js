@@ -61,6 +61,7 @@ router.post('/login', ensureGuest, async (req, res) => {
       default_club: user.default_club,
       default_team: user.default_team_name || user.default_team,
       default_team_id: user.default_team_id || null,
+      processiq_username: user.processiq_username || null,
     };
     logger.info('Login successful', {
       type: 'auth',
@@ -215,7 +216,14 @@ router.get('/account', ensureAuth, async (req, res) => {
 });
 
 router.post('/account', ensureAuth, async (req, res) => {
-  const { name, email, default_club, default_team_id } = req.body;
+  const {
+    name,
+    email,
+    default_club,
+    default_team_id,
+    processiq_username,
+    processiq_password,
+  } = req.body;
 
   if (!name || !email) {
     req.flash('error', 'Nombre y email son obligatorios.');
@@ -231,6 +239,12 @@ router.post('/account', ensureAuth, async (req, res) => {
       ? default_team_id.trim()
       : null;
     let defaultTeamValue = null;
+    const processIqUsernameValue = processiq_username && processiq_username.trim()
+      ? processiq_username.trim()
+      : null;
+    const processIqPasswordValue = processiq_password && processiq_password.trim()
+      ? processiq_password.trim()
+      : (currentUser.processiq_password || null);
 
     const resolvedClub = currentUser && currentUser.club_id
       ? { id: currentUser.club_id, name: currentUser.club_name || currentUser.default_club }
@@ -259,6 +273,8 @@ router.post('/account', ensureAuth, async (req, res) => {
       defaultClub: defaultClubValue,
       defaultTeam: defaultTeamValue,
       defaultTeamId: defaultTeamIdValue,
+      processIqUsername: processIqUsernameValue,
+      processIqPassword: processIqPasswordValue,
     });
     if (!affected) {
       req.flash('error', 'No se ha podido actualizar tu cuenta.');
@@ -271,6 +287,7 @@ router.post('/account', ensureAuth, async (req, res) => {
     req.session.user.default_club = defaultClubValue;
     req.session.user.default_team = defaultTeamValue;
     req.session.user.default_team_id = defaultTeamIdValue;
+    req.session.user.processiq_username = processIqUsernameValue;
 
     logger.info('Account updated', {
       type: 'account',
@@ -279,6 +296,7 @@ router.post('/account', ensureAuth, async (req, res) => {
       email,
       defaultClub: defaultClubValue,
       defaultTeamId: defaultTeamIdValue,
+      processIqUsername: processIqUsernameValue,
       ip: req.ip,
     });
 

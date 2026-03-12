@@ -384,6 +384,38 @@ describe('Aplicación SoccerReport', () => {
     expect(resAccount.text).toContain('Mi cuenta');
   });
 
+  test('un usuario puede guardar credenciales de ProcessIQ en su cuenta', async () => {
+    const context = await createEvaluationContext('Cuenta ProcessIQ');
+    const { email } = await createTestUser({
+      name: 'Cuenta ProcessIQ',
+      role: 'user',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ? WHERE email = ?',
+      [context.club.id, context.club.name, email],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const resPost = await agent.post('/account').send({
+      name: 'Cuenta ProcessIQ',
+      email,
+      default_club: context.club.name,
+      default_team_id: context.teamId,
+      processiq_username: 'processiq-user',
+      processiq_password: 'processiq-pass',
+    });
+    expect(resPost.status).toBe(302);
+
+    const [rows] = await db.query(
+      'SELECT processiq_username, processiq_password FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].processiq_username).toBe('processiq-user');
+    expect(rows[0].processiq_password).toBe('processiq-pass');
+  });
+
   test('mi cuenta muestra acceso a la configuración de equipos del club', async () => {
     const { email } = await createTestUser({
       name: 'Account Teams Link',
@@ -560,6 +592,74 @@ describe('Aplicación SoccerReport', () => {
 
     const [rows] = await db.query('SELECT name FROM clubs WHERE id = ?', [club.id]);
     expect(rows[0].name).toBe('Club Editado');
+  });
+
+  test('admin puede borrar varios clubes de una vez en /clubs', async () => {
+    const admin = await createTestUser({
+      name: 'Admin Bulk Clubs',
+      role: 'admin',
+    });
+    const clubA = await createTestClub(`Bulk Club A ${Date.now()}`);
+    const clubB = await createTestClub(`Bulk Club B ${Date.now()}`);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: admin.email, password: 'password123' });
+
+    const res = await agent.post('/clubs/bulk-delete').send({
+      clubIds: [String(clubA.id), String(clubB.id)],
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/clubs');
+
+    const [rows] = await db.query(
+      'SELECT id FROM clubs WHERE id IN (?, ?)',
+      [clubA.id, clubB.id],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('el borrado múltiple de clubes elimina antes equipos y temporadas asociadas', async () => {
+    const admin = await createTestUser({
+      name: 'Admin Bulk Clubs Dependencies',
+      role: 'admin',
+    });
+    const club = await createTestClub(`Bulk Club Dependencies ${Date.now()}`);
+    const [sectionRows] = await db.query(
+      'SELECT id, name FROM sections WHERE name IN ("Masculina")',
+    );
+    const [categoryRows] = await db.query(
+      'SELECT id, name FROM categories WHERE name IN ("Juvenil")',
+    );
+    const seasonId = randomUUID();
+    const teamId = randomUUID();
+
+    await db.query(
+      'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 1)',
+      [seasonId, club.id, '2026/27', 1],
+    );
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [teamId, club.id, seasonId, sectionRows[0].id, categoryRows[0].id, 'Juvenil Dependencias'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: admin.email, password: 'password123' });
+
+    const res = await agent.post('/clubs/bulk-delete').send({
+      clubIds: [String(club.id)],
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/clubs');
+
+    const [clubRows] = await db.query('SELECT id FROM clubs WHERE id = ?', [club.id]);
+    const [seasonRowsAfter] = await db.query('SELECT id FROM seasons WHERE id = ?', [seasonId]);
+    const [teamRowsAfter] = await db.query('SELECT id FROM teams WHERE id = ?', [teamId]);
+    expect(clubRows).toHaveLength(0);
+    expect(seasonRowsAfter).toHaveLength(0);
+    expect(teamRowsAfter).toHaveLength(0);
   });
 
   test('dashboard para admin muestra opciones de admin', async () => {
@@ -1117,6 +1217,435 @@ describe('Aplicación SoccerReport', () => {
     const resConfig = await agent.get('/admin/club');
     expect(resConfig.status).toBe(200);
     expect(resConfig.text).toContain('Equipo A');
+  });
+
+  test('un admin puede previsualizar e importar equipos desde ProcessIQ', async () => {
+    const context = await createTeamContext('Club Import ProcessIQ');
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-123' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'team-1',
+              name: 'Juvenil Importado',
+              section: 'Masculina',
+              category: 'Juvenil',
+              season: '2026/2027',
+            },
+            {
+              id: 'team-2',
+              name: 'Cadete Importado',
+              section: 'Femenina',
+              category: 'Cadete',
+              season: '2026/27',
+            },
+          ],
+        }),
+      });
+
+    const previewRes = await agent.post('/teams/import/processiq/preview').send();
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.text).toContain('Juvenil Importado');
+    expect(previewRes.text).toContain('Cadete Importado');
+
+    const res = await agent.post('/teams/import/processiq/confirm').send({
+      preview_id: ['0', '1'],
+      selected_ids: ['0', '1'],
+      name: ['Juvenil Importado', 'Cadete Importado'],
+      season_id: [context.season.id, context.season.id],
+      section_id: [context.masculina.id, context.femenina.id],
+      category_id: [context.juvenil.id, context.cadete.id],
+    });
+
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/teams');
+
+    const [rows] = await db.query(
+      'SELECT name, source, external_id FROM teams WHERE club_id = ? AND name IN (?, ?) ORDER BY name ASC',
+      [context.club.id, 'Juvenil Importado', 'Cadete Importado'],
+    );
+    expect(rows.map((row) => row.name)).toEqual(['Cadete Importado', 'Juvenil Importado']);
+    expect(rows.map((row) => row.source)).toEqual(['processiq', 'processiq']);
+    expect(rows.map((row) => row.external_id)).toEqual(['team-2', 'team-1']);
+  });
+
+  test('la importación de ProcessIQ omite duplicados existentes', async () => {
+    const context = await createTeamContext('Club Import ProcessIQ Duplicate');
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Duplicado',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-123' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ([
+          {
+            name: 'Juvenil Duplicado',
+            section: 'Masculina',
+            category: 'Juvenil',
+            season: context.season.name,
+          },
+        ]),
+      });
+
+    const previewRes = await agent.post('/teams/import/processiq/preview').send();
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.text).toContain('Duplicado');
+
+    const res = await agent.post('/teams/import/processiq/confirm').send({
+      preview_id: ['0'],
+      name: ['Juvenil Duplicado'],
+      season_id: [context.season.id],
+      section_id: [context.masculina.id],
+      category_id: [context.juvenil.id],
+    });
+
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(302);
+
+    const [rows] = await db.query(
+      'SELECT id FROM teams WHERE club_id = ? AND name = ?',
+      [context.club.id, 'Juvenil Duplicado'],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  test('la importación de ProcessIQ redirige a cuenta si faltan credenciales', async () => {
+    const context = await createTeamContext('Club Import Missing Credentials');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.post('/teams/import/processiq/preview').send();
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/account');
+  });
+
+  test('la importación de ProcessIQ acepta token en accessToken', async () => {
+    const context = await createTeamContext('Club Import accessToken');
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ accessToken: 'token-123' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
+      });
+
+    const res = await agent.post('/teams/import/processiq/preview').send();
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(200);
+  });
+
+  test('la importación de ProcessIQ acepta token anidado en data.token', async () => {
+    const context = await createTeamContext('Club Import nested token');
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ data: { token: 'token-123' } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
+      });
+
+    const res = await agent.post('/teams/import/processiq/preview').send();
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(200);
+  });
+
+  test('la importación de ProcessIQ acepta token como texto plano', async () => {
+    const context = await createTeamContext('Club Import text token');
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'text/plain' },
+        text: async () => 'token-123',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
+      });
+
+    const res = await agent.post('/teams/import/processiq/preview').send();
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(200);
+  });
+
+  test('permite cargar jugadores de un equipo importado desde ProcessIQ', async () => {
+    const context = await createTeamContext('Club Import ProcessIQ Players');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name, source, external_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil API',
+        'processiq',
+        'ext-team-1',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ accessToken: 'token-123' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: 'ext-team-1',
+              name: 'Juvenil API',
+              players: [
+                { id: 'player-1', dorsal: '9', positions: 'DEL' },
+              ],
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: 'player-1',
+          firstName: 'Pablo',
+          lastName: 'García',
+          birthYear: 2010,
+          preferredFoot: 'Derecha',
+          nationality: 'España',
+        }),
+      });
+
+    const res = await agent.post(`/teams/${teamId}/import-players/processiq`).send();
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/teams/${teamId}`);
+
+    const [players] = await db.query(
+      'SELECT id, first_name, last_name, source, external_id, current_team_id FROM players WHERE club_id = ? AND external_id = ?',
+      [context.club.id, 'player-1'],
+    );
+    expect(players).toHaveLength(1);
+    expect(players[0].first_name).toBe('Pablo');
+    expect(players[0].last_name).toBe('García');
+    expect(players[0].source).toBe('processiq');
+    expect(players[0].current_team_id).toBe(teamId);
+
+    const [links] = await db.query(
+      'SELECT dorsal, positions FROM team_players WHERE team_id = ? AND player_id = ?',
+      [teamId, players[0].id],
+    );
+    expect(links).toHaveLength(1);
+    expect(links[0].dorsal).toBe('9');
+    expect(links[0].positions).toBe('DEL');
+  });
+
+  test('el listado de plantillas muestra acción de importar jugadores para equipos ProcessIQ', async () => {
+    const context = await createTeamContext('Club Teams ProcessIQ Button');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name, source, external_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Sync',
+        'processiq',
+        'sync-team-1',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/teams');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Cargar jugadores visibles');
+    expect(res.text).toContain(`/teams/${teamId}/import-players/processiq`);
+    expect(res.text).toContain('Cargar jugadores');
+  });
+
+  test('permite cargar jugadores de forma masiva para los equipos ProcessIQ visibles', async () => {
+    const context = await createTeamContext('Club Import ProcessIQ Bulk Players');
+    const teamAId = randomUUID();
+    const teamBId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name, source, external_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        teamAId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil A API',
+        'processiq',
+        'bulk-team-1',
+        teamBId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil B API',
+        'processiq',
+        'bulk-team-2',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await db.query(
+      'UPDATE users SET processiq_username = ?, processiq_password = ? WHERE id = ?',
+      ['processiq-user', 'processiq-pass', context.admin.id],
+    );
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ accessToken: 'token-1' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            { id: 'bulk-team-1', players: [{ id: 'bulk-player-1', dorsal: '7', positions: 'EI' }] },
+            { id: 'bulk-team-2', players: [{ id: 'bulk-player-2', dorsal: '5', positions: 'MC' }] },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'bulk-player-1', firstName: 'Luis', lastName: 'Pérez', birthYear: 2011 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ accessToken: 'token-2' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            { id: 'bulk-team-1', players: [{ id: 'bulk-player-1', dorsal: '7', positions: 'EI' }] },
+            { id: 'bulk-team-2', players: [{ id: 'bulk-player-2', dorsal: '5', positions: 'MC' }] },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'bulk-player-2', firstName: 'Mario', lastName: 'Sanz', birthYear: 2010 }),
+      });
+
+    const res = await agent.post('/teams/import-players/processiq').send({
+      section: 'Masculina',
+      category: 'Juvenil',
+    });
+    global.fetch = originalFetch;
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/teams?section=Masculina&category=Juvenil');
+
+    const [players] = await db.query(
+      'SELECT first_name, last_name, current_team_id, external_id FROM players WHERE club_id = ? AND external_id IN (?, ?) ORDER BY external_id ASC',
+      [context.club.id, 'bulk-player-1', 'bulk-player-2'],
+    );
+    expect(players).toHaveLength(2);
+    expect(players.map((player) => player.external_id)).toEqual(['bulk-player-1', 'bulk-player-2']);
   });
 
   test('club config prioriza equipos v2 y deja visible la compatibilidad legacy', async () => {

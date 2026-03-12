@@ -9,6 +9,9 @@
       <table class="table table-striped align-middle mb-0">
         <thead>
           <tr>
+            <th style="width: 48px;">
+              <input type="checkbox" id="selectAllClubs" class="form-check-input" aria-label="Seleccionar todos los clubes">
+            </th>
             <th>Nombre</th>
             <th>Código</th>
             <th>Creado</th>
@@ -19,6 +22,14 @@
           <% if (clubs && clubs.length) { %>
             <% clubs.forEach((club) => { %>
               <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    class="form-check-input club-select"
+                    value="<%= club.id %>"
+                    aria-label="Seleccionar <%= club.name %>"
+                  >
+                </td>
                 <td><%= club.name %></td>
                 <td><code><%= club.code %></code></td>
                 <td><%= club.created_at ? club.created_at.toISOString().slice(0, 10) : '' %></td>
@@ -32,7 +43,7 @@
             <% }) %>
           <% } else { %>
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">No hay clubes dados de alta.</td>
+              <td colspan="5" class="text-center text-muted py-4">No hay clubes dados de alta.</td>
             </tr>
           <% } %>
         </tbody>
@@ -40,3 +51,54 @@
     </div>
   </div>
 </div>
+
+<div class="mt-3">
+  <form id="bulkDeleteClubsForm" method="POST" action="<%= basePath %>/bulk-delete">
+    <button type="submit" class="btn btn-danger btn-sm">Borrar seleccionados</button>
+  </form>
+</div>
+
+<script>
+  (function () {
+    var selectAll = document.getElementById('selectAllClubs');
+    var bulkForm = document.getElementById('bulkDeleteClubsForm');
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        var checks = document.querySelectorAll('input.club-select');
+        checks.forEach(function (check) {
+          check.checked = selectAll.checked;
+        });
+      });
+    }
+
+    if (!bulkForm) return;
+
+    bulkForm.addEventListener('submit', function (e) {
+      var oldHidden = bulkForm.querySelectorAll('input[type="hidden"][name="clubIds"]');
+      oldHidden.forEach(function (node) {
+        node.remove();
+      });
+
+      var checks = document.querySelectorAll('input.club-select:checked');
+      if (!checks.length) {
+        e.preventDefault();
+        alert('No has seleccionado ningún club para borrar.');
+        return;
+      }
+
+      if (!window.confirm('¿Seguro que quieres borrar los clubes seleccionados?')) {
+        e.preventDefault();
+        return;
+      }
+
+      checks.forEach(function (check) {
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'clubIds';
+        hidden.value = check.value;
+        bulkForm.appendChild(hidden);
+      });
+    });
+  }());
+</script>

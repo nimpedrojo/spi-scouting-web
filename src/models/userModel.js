@@ -12,6 +12,8 @@ async function createUsersTable() {
       club_id INT NULL,
       default_club VARCHAR(150),
       default_team VARCHAR(150),
+      processiq_username VARCHAR(150),
+      processiq_password VARCHAR(255),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_users_club
         FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -63,6 +65,22 @@ async function createUsersTable() {
       console.error('Error adding default_team_id column', e);
     }
   }
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN processiq_username VARCHAR(150)');
+  } catch (e) {
+    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding processiq_username column', e);
+    }
+  }
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN processiq_password VARCHAR(255)');
+  } catch (e) {
+    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding processiq_password column', e);
+    }
+  }
 
   try {
     await db.query(
@@ -112,13 +130,16 @@ async function createUser({
   defaultClub = null,
   defaultTeam = null,
   defaultTeamId = null,
+  processIqUsername = null,
+  processIqPassword = null,
 }) {
   const passwordHash = await bcrypt.hash(password, 10);
   const [result] = await db.query(
     `INSERT INTO users (
       name, email, password_hash, role, club_id, default_club, default_team, default_team_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, email, passwordHash, role, clubId, defaultClub, defaultTeam, defaultTeamId],
+      , processiq_username, processiq_password
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, email, passwordHash, role, clubId, defaultClub, defaultTeam, defaultTeamId, processIqUsername, processIqPassword],
   );
   return result.insertId;
 }
@@ -162,6 +183,8 @@ async function updateUserAccount(
     defaultClub,
     defaultTeam,
     defaultTeamId,
+    processIqUsername,
+    processIqPassword,
     passwordHash = null,
   },
 ) {
@@ -179,6 +202,16 @@ async function updateUserAccount(
   if (defaultTeamId !== undefined) {
     sql += ', default_team_id = ?';
     params.push(defaultTeamId);
+  }
+
+  if (processIqUsername !== undefined) {
+    sql += ', processiq_username = ?';
+    params.push(processIqUsername);
+  }
+
+  if (processIqPassword !== undefined) {
+    sql += ', processiq_password = ?';
+    params.push(processIqPassword);
   }
 
   if (passwordHash) {

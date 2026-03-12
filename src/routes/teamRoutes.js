@@ -6,6 +6,11 @@ const router = express.Router();
 
 router.get('/', ensureAdmin, teamController.renderIndex);
 router.get('/new', ensureAdmin, teamController.renderNew);
+router.get('/import/processiq', ensureAdmin, teamController.renderProcessIqImport);
+router.post('/import/processiq/preview', ensureAdmin, teamController.previewProcessIqImport);
+router.post('/import/processiq/confirm', ensureAdmin, teamController.confirmProcessIqImport);
+router.post('/import-players/processiq', ensureAdmin, teamController.importProcessIqPlayersBulk);
+router.post('/:id/import-players/processiq', ensureAdmin, teamController.importProcessIqPlayers);
 router.post('/', ensureAdmin, teamController.create);
 router.get('/:id', ensureAdmin, teamController.renderShow);
 router.get('/:id/edit', ensureAdmin, teamController.renderEdit);

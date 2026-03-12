@@ -92,5 +92,43 @@
     <% } %>
   </div>
 
+  <hr class="my-4" />
+
+  <h5>Integración ProcessIQ</h5>
+  <p class="text-muted">
+    Estas credenciales se usarán para obtener el token en <code>/auth/token</code> antes de cargar la previsualización de equipos.
+  </p>
+
+  <div class="mb-3">
+    <label for="processiq_username" class="form-label">Usuario ProcessIQ</label>
+    <input
+      type="text"
+      class="form-control"
+      id="processiq_username"
+      name="processiq_username"
+      value="<%= user.processiq_username || '' %>"
+      placeholder="Usuario de api.processiq.es"
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="processiq_password" class="form-label">Contraseña ProcessIQ</label>
+    <input
+      type="password"
+      class="form-control"
+      id="processiq_password"
+      name="processiq_password"
+      value=""
+      placeholder="<%= user.processiq_password ? 'Dejar vacío para conservar la actual' : 'Contraseña de api.processiq.es' %>"
+    />
+    <div class="form-text">
+      <% if (user.processiq_password) { %>
+        Ya hay una contraseña guardada. Si dejas este campo vacío, se mantiene la actual.
+      <% } else { %>
+        Guarda aquí la contraseña que se usará para autenticar contra ProcessIQ.
+      <% } %>
+    </div>
+  </div>
+
   <button type="submit" class="btn btn-sr-primary">Guardar cambios</button>
 </form>

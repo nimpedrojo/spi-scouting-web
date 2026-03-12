@@ -3,12 +3,58 @@ const {
   getTeamDetail,
   getTeamFormData,
   createTeamForUser,
+  requireClubForUser,
   updateTeamForUser,
   deleteTeamForUser,
   validateTeamPayload,
 } = require('../services/teamService');
-const { findTeamById } = require('../models/teamModel');
+const { findTeamById, getTeamsByClubId } = require('../models/teamModel');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
+const logger = require('../services/logger');
+const {
+  buildImportPreview,
+  importSelectedTeams,
+} = require('../services/processIqTeamImportService');
+const { importPlayersFromProcessIq } = require('../services/processIqPlayerImportService');
+const { findUserById } = require('../models/userModel');
+
+function summarizeProcessIqError(err) {
+  if (!err) {
+    return null;
+  }
+
+  if (err.bodyText) {
+    return String(err.bodyText).slice(0, 300);
+  }
+
+  if (err.payload) {
+    try {
+      return JSON.stringify(err.payload).slice(0, 300);
+    } catch (jsonError) {
+      return String(err.payload).slice(0, 300);
+    }
+  }
+
+  return err.message || null;
+}
+
+async function runProcessIqPlayerImport(team, user, req) {
+  const result = await importPlayersFromProcessIq(team, {
+    username: user.processiq_username,
+    password: user.processiq_password,
+  });
+
+  logAuditEvent(req, 'import_players', 'team', {
+    source: 'processiq',
+    teamId: team.id,
+    rosterCount: result.rosterCount,
+    createdCount: result.created,
+    updatedCount: result.updated,
+    errorCount: result.errors.length,
+  });
+
+  return result;
+}
 
 async function renderIndex(req, res) {
   try {
@@ -224,6 +270,268 @@ async function remove(req, res) {
   }
 }
 
+async function renderProcessIqImport(req, res) {
+  return res.render('teams/import-processiq', {
+    pageTitle: 'Importar desde ProcessIQ',
+    preview: req.session.processIqTeamImportPreview || null,
+    processIqStatus: req.session.processIqImportStatus || null,
+  });
+}
+
+async function previewProcessIqImport(req, res) {
+  try {
+    const club = await requireClubForUser(req.session.user);
+    if (!club) {
+      req.flash('error', 'Configura primero un club por defecto para importar plantillas.');
+      return res.redirect('/teams');
+    }
+
+    const user = await findUserById(req.session.user.id);
+    const preview = await buildImportPreview(club, {
+      username: user.processiq_username,
+      password: user.processiq_password,
+    });
+    req.session.processIqTeamImportPreview = preview;
+    req.session.processIqImportStatus = {
+      level: preview.items.length ? 'success' : 'warning',
+      title: preview.items.length
+        ? 'Respuesta recibida de ProcessIQ'
+        : 'ProcessIQ respondió sin equipos',
+      detail: preview.items.length
+        ? `Se recibieron ${preview.diagnostics ? preview.diagnostics.receivedCount : preview.items.length} equipos para revisar.`
+        : 'La llamada fue correcta, pero la API no devolvió equipos en este momento.',
+    };
+    return res.render('teams/import-processiq', {
+      pageTitle: 'Importar desde ProcessIQ',
+      preview,
+      processIqStatus: req.session.processIqImportStatus,
+    });
+  } catch (err) {
+    logger.error('ProcessIQ preview failed', {
+      type: 'processiq',
+      action: 'preview_failed',
+      userId: req.session.user ? req.session.user.id : null,
+      email: req.session.user ? req.session.user.email : null,
+      error: logger.formatError(err),
+      detail: summarizeProcessIqError(err),
+    });
+
+    if (err.message === 'PROCESSIQ_CREDENTIALS_MISSING') {
+      req.session.processIqImportStatus = {
+        level: 'danger',
+        title: 'Faltan credenciales de ProcessIQ',
+        detail: 'Configura usuario y contraseña en Mi cuenta.',
+      };
+      req.flash('error', 'Configura usuario y contraseña de ProcessIQ en Mi cuenta.');
+      return res.redirect('/account');
+    }
+
+    if (err.message === 'PROCESSIQ_AUTH_FAILED') {
+      req.session.processIqImportStatus = {
+        level: 'danger',
+        title: `Error al obtener token (${err.status})`,
+        detail: summarizeProcessIqError(err) || 'Sin detalle devuelto por la API.',
+      };
+      req.flash(
+        'error',
+        `No se pudo obtener el token de ProcessIQ (${err.status}). Detalle: ${summarizeProcessIqError(err) || 'sin detalle'}`,
+      );
+      return res.redirect('/account');
+    }
+
+    if (err.message === 'PROCESSIQ_FETCH_FAILED') {
+      req.session.processIqImportStatus = {
+        level: 'danger',
+        title: `Error al cargar equipos (${err.status})`,
+        detail: summarizeProcessIqError(err) || 'Sin detalle devuelto por la API.',
+      };
+      req.flash(
+        'error',
+        `La API de ProcessIQ devolvió un error al cargar equipos (${err.status}). Detalle: ${summarizeProcessIqError(err) || 'sin detalle'}`,
+      );
+      return res.redirect('/teams/import/processiq');
+    }
+
+    if (err.message === 'PROCESSIQ_TOKEN_INVALID') {
+      req.session.processIqImportStatus = {
+        level: 'danger',
+        title: 'Token inválido o ausente en la respuesta',
+        detail: summarizeProcessIqError(err) || 'La API autenticó pero no devolvió un token reconocible.',
+      };
+      req.flash(
+        'error',
+        `La autenticación de ProcessIQ no devolvió un token válido. Respuesta: ${summarizeProcessIqError(err) || 'vacía'}`,
+      );
+      return res.redirect('/account');
+    }
+
+    // eslint-disable-next-line no-console
+    console.error('Error previewing teams from ProcessIQ', err);
+    req.session.processIqImportStatus = {
+      level: 'danger',
+      title: 'Error inesperado al cargar la previsualización',
+      detail: summarizeProcessIqError(err) || 'Sin detalle adicional.',
+    };
+    req.flash('error', 'Ha ocurrido un error al cargar la previsualización desde ProcessIQ.');
+    return res.redirect('/teams');
+  }
+}
+
+async function confirmProcessIqImport(req, res) {
+  try {
+    const club = await requireClubForUser(req.session.user);
+    const preview = req.session.processIqTeamImportPreview || null;
+    if (!club || !preview) {
+      req.flash('error', 'Primero debes cargar la previsualización de ProcessIQ.');
+      return res.redirect('/teams/import/processiq');
+    }
+
+    const result = await importSelectedTeams(club, preview.items, req.body);
+    logAuditEvent(req, 'import', 'team', {
+      source: 'processiq',
+      createdCount: result.created,
+      skippedCount: result.skipped,
+      errorCount: result.errors.length,
+    });
+    req.session.processIqTeamImportPreview = null;
+
+    req.flash('success', `Importación completada. ${result.created} equipos creados y ${result.skipped} omitidos.`);
+    if (result.errors.length) {
+      req.flash('error', result.errors.slice(0, 3).join(' | '));
+    }
+    return res.redirect('/teams');
+  } catch (err) {
+    logger.error('ProcessIQ import confirm failed', {
+      type: 'processiq',
+      action: 'confirm_failed',
+      userId: req.session.user ? req.session.user.id : null,
+      email: req.session.user ? req.session.user.email : null,
+      error: logger.formatError(err),
+      detail: summarizeProcessIqError(err),
+    });
+    // eslint-disable-next-line no-console
+    console.error('Error confirming teams import from ProcessIQ', err);
+    req.flash('error', 'Ha ocurrido un error al importar las plantillas desde ProcessIQ.');
+    return res.redirect('/teams/import/processiq');
+  }
+}
+
+async function importProcessIqPlayers(req, res) {
+  try {
+    const club = req.context ? req.context.club : null;
+    const team = await findTeamById(req.params.id);
+    if (!club || !team || team.club_id !== club.id) {
+      req.flash('error', 'Equipo no encontrado.');
+      return res.redirect('/teams');
+    }
+
+    if (team.source !== 'processiq' || !team.external_id) {
+      req.flash('error', 'Solo se pueden cargar jugadores en equipos importados desde ProcessIQ.');
+      return res.redirect(`/teams/${req.params.id}`);
+    }
+
+    const user = await findUserById(req.session.user.id);
+    const result = await runProcessIqPlayerImport(team, user, req);
+
+    if (!result.rosterCount) {
+      req.flash('warning', 'ProcessIQ respondió el equipo sin jugadores asociados.');
+      return res.redirect(`/teams/${req.params.id}`);
+    }
+
+    if (result.errors.length) {
+      req.flash('warning', `Carga parcial completada. Altas: ${result.created}, actualizados: ${result.updated}, errores: ${result.errors.length}.`);
+      return res.redirect(`/teams/${req.params.id}`);
+    }
+
+    req.flash('success', `Jugadores cargados desde ProcessIQ. Altas: ${result.created}, actualizados: ${result.updated}.`);
+    return res.redirect(`/teams/${req.params.id}`);
+  } catch (err) {
+    logger.error('ProcessIQ player import failed', {
+      type: 'processiq',
+      action: 'player_import_failed',
+      userId: req.session.user ? req.session.user.id : null,
+      teamId: req.params.id,
+      error: logger.formatError(err),
+      detail: summarizeProcessIqError(err),
+    });
+    req.flash('error', `No se pudieron cargar los jugadores desde ProcessIQ. ${summarizeProcessIqError(err) || ''}`.trim());
+    return res.redirect(`/teams/${req.params.id}`);
+  }
+}
+
+async function importProcessIqPlayersBulk(req, res) {
+  try {
+    const club = req.context ? req.context.club : null;
+    if (!club) {
+      req.flash('error', 'Configura primero un club por defecto para usar Plantillas.');
+      return res.redirect('/dashboard');
+    }
+
+    const activeSection = req.body.section || req.query.section || 'Masculina';
+    const activeCategory = req.body.category || req.query.category || '';
+    const teams = await getTeamsByClubId(club.id);
+    const eligibleTeams = teams.filter((team) => (
+      team.source === 'processiq'
+      && team.external_id
+      && (!activeSection || team.section_name === activeSection)
+      && (!activeCategory || team.category_name === activeCategory)
+    ));
+
+    if (!eligibleTeams.length) {
+      req.flash('warning', 'No hay equipos ProcessIQ enlazados en la vista actual.');
+      return res.redirect(`/teams?section=${encodeURIComponent(activeSection)}${activeCategory ? `&category=${encodeURIComponent(activeCategory)}` : ''}`);
+    }
+
+    const user = await findUserById(req.session.user.id);
+    const summary = {
+      teams: eligibleTeams.length,
+      rosterCount: 0,
+      created: 0,
+      updated: 0,
+      emptyTeams: 0,
+      errors: [],
+    };
+
+    for (const team of eligibleTeams) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await runProcessIqPlayerImport(team, user, req);
+        summary.rosterCount += result.rosterCount;
+        summary.created += result.created;
+        summary.updated += result.updated;
+        if (!result.rosterCount) {
+          summary.emptyTeams += 1;
+        }
+        if (result.errors.length) {
+          summary.errors.push(`${team.name}: ${result.errors[0]}`);
+        }
+      } catch (error) {
+        summary.errors.push(`${team.name}: ${summarizeProcessIqError(error) || error.message}`);
+      }
+    }
+
+    if (summary.errors.length) {
+      req.flash('warning', `Carga masiva parcial. Equipos: ${summary.teams}, altas: ${summary.created}, actualizados: ${summary.updated}, errores: ${summary.errors.length}.`);
+    } else if (summary.rosterCount === 0) {
+      req.flash('warning', 'La carga masiva terminó sin jugadores asociados en los equipos visibles.');
+    } else {
+      req.flash('success', `Carga masiva completada. Equipos: ${summary.teams}, altas: ${summary.created}, actualizados: ${summary.updated}.`);
+    }
+
+    return res.redirect(`/teams?section=${encodeURIComponent(activeSection)}${activeCategory ? `&category=${encodeURIComponent(activeCategory)}` : ''}`);
+  } catch (err) {
+    logger.error('ProcessIQ bulk player import failed', {
+      type: 'processiq',
+      action: 'bulk_player_import_failed',
+      userId: req.session.user ? req.session.user.id : null,
+      error: logger.formatError(err),
+      detail: summarizeProcessIqError(err),
+    });
+    req.flash('error', 'No se pudieron cargar los jugadores de ProcessIQ de forma masiva.');
+    return res.redirect('/teams');
+  }
+}
+
 module.exports = {
   renderIndex,
   renderShow,
@@ -232,4 +540,9 @@ module.exports = {
   renderEdit,
   update,
   remove,
+  renderProcessIqImport,
+  previewProcessIqImport,
+  confirmProcessIqImport,
+  importProcessIqPlayers,
+  importProcessIqPlayersBulk,
 };
