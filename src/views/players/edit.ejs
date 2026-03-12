@@ -82,6 +82,42 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Estadisticas</h2>
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label" for="stats_callups">Convocados</label>
+          <input type="number" class="form-control" id="stats_callups" name="stats_callups" value="<%= player.stats && player.stats.callups != null ? player.stats.callups : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_starts">Titular</label>
+          <input type="number" class="form-control" id="stats_starts" name="stats_starts" value="<%= player.stats && player.stats.starts != null ? player.stats.starts : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_substitute_appearances">Suplente</label>
+          <input type="number" class="form-control" id="stats_substitute_appearances" name="stats_substitute_appearances" value="<%= player.stats && player.stats.substituteAppearances != null ? player.stats.substituteAppearances : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_unused_callups">S/Jugar</label>
+          <input type="number" class="form-control" id="stats_unused_callups" name="stats_unused_callups" value="<%= player.stats && player.stats.unusedCallups != null ? player.stats.unusedCallups : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_not_called_up">No convocado</label>
+          <input type="number" class="form-control" id="stats_not_called_up" name="stats_not_called_up" value="<%= player.stats && player.stats.notCalledUp != null ? player.stats.notCalledUp : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_minutes">Minutos</label>
+          <input type="number" class="form-control" id="stats_minutes" name="stats_minutes" value="<%= player.stats && player.stats.minutes != null ? player.stats.minutes : '' %>" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="stats_goals">Goles</label>
+          <input type="number" class="form-control" id="stats_goals" name="stats_goals" value="<%= player.stats && player.stats.goals != null ? player.stats.goals : '' %>" min="0" />
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="mt-4 d-flex gap-2">
     <button type="submit" class="btn btn-sr-primary">Guardar cambios</button>
     <a href="/admin/players" class="btn btn-secondary">Cancelar</a>

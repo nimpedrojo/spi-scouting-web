@@ -132,6 +132,32 @@ function normalizeBirthDate(value) {
   return raw;
 }
 
+function parseStatNumber(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const normalized = String(value).replace(',', '.').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function extractPlayerStats(detail) {
+  return {
+    callups: parseStatNumber(extractText(detail, ['estadistica_conv.', 'estadistica_convocados', 'convocatorias'])),
+    starts: parseStatNumber(extractText(detail, ['estadistica_tit.', 'estadistica_titulares', 'titularidades'])),
+    substituteAppearances: parseStatNumber(extractText(detail, ['estadistica_supl.', 'estadistica_suplentes'])),
+    unusedCallups: parseStatNumber(extractText(detail, ['estadistica_s/jug.', 'estadistica_sin_jugar'])),
+    notCalledUp: parseStatNumber(extractText(detail, ['estadistica_no_conv.', 'estadistica_no_convocados'])),
+    minutes: parseStatNumber(extractText(detail, ['estadistica_minutos', 'minutos'])),
+    goals: parseStatNumber(extractText(detail, ['estadistica_goles', 'goles'])),
+  };
+}
+
 function mapPlayerDetail(detail, playerRef, team) {
   const normalizedDetail = normalizePlayerDetailPayload(detail);
   const fullName = extractText(normalizedDetail, ['name', 'fullName', 'full_name', 'displayName'])
@@ -176,6 +202,7 @@ function mapPlayerDetail(detail, playerRef, team) {
     nationality: extractText(normalizedDetail, ['nationality', 'country', 'nacionalidad']) || null,
     dorsal,
     positions,
+    stats: extractPlayerStats(normalizedDetail),
   };
 }
 

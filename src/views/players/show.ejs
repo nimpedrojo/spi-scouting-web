@@ -98,6 +98,21 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h3 class="h5 mb-3">Estadisticas</h3>
+    <div class="profile-info-grid">
+      <div><span class="text-muted">Convocados</span><strong><%= player.stats && player.stats.callups != null ? player.stats.callups : '-' %></strong></div>
+      <div><span class="text-muted">Titular</span><strong><%= player.stats && player.stats.starts != null ? player.stats.starts : '-' %></strong></div>
+      <div><span class="text-muted">Suplente</span><strong><%= player.stats && player.stats.substituteAppearances != null ? player.stats.substituteAppearances : '-' %></strong></div>
+      <div><span class="text-muted">S/Jugar</span><strong><%= player.stats && player.stats.unusedCallups != null ? player.stats.unusedCallups : '-' %></strong></div>
+      <div><span class="text-muted">No convocado</span><strong><%= player.stats && player.stats.notCalledUp != null ? player.stats.notCalledUp : '-' %></strong></div>
+      <div><span class="text-muted">Minutos</span><strong><%= player.stats && player.stats.minutes != null ? player.stats.minutes : '-' %></strong></div>
+      <div><span class="text-muted">Goles</span><strong><%= player.stats && player.stats.goals != null ? player.stats.goals : '-' %></strong></div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4">
   <div class="col-xl-5">
     <div class="card shadow-sm h-100">

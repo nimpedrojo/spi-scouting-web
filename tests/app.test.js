@@ -1594,6 +1594,13 @@ describe('Aplicación SoccerReport', () => {
               nacionalidad: 'Española',
               teléfonos: '600123123',
               posiciones: 'MC, MP',
+              'estadistica_conv.': '24',
+              'estadistica_tit.': '18',
+              'estadistica_supl.': '5',
+              'estadistica_s/jug.': '1',
+              'estadistica_no_conv.': '2',
+              estadistica_minutos: '1460',
+              estadistica_goles: '9',
             },
           },
           meta: {
@@ -1609,7 +1616,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.headers.location).toBe(`/teams/${teamId}`);
 
     const [players] = await db.query(
-      `SELECT first_name, last_name, birth_year, laterality, nationality, phone, external_id
+      `SELECT first_name, last_name, birth_year, laterality, nationality, phone, external_id, stats_json
        FROM players
        WHERE club_id = ? AND external_id = ?`,
       [context.club.id, 'player-middleware-1'],
@@ -1621,6 +1628,67 @@ describe('Aplicación SoccerReport', () => {
     expect(players[0].laterality).toBe('DER');
     expect(players[0].nationality).toBe('Española');
     expect(players[0].phone).toBe('600123123');
+    expect(JSON.parse(players[0].stats_json)).toEqual({
+      callups: 24,
+      starts: 18,
+      substituteAppearances: 5,
+      unusedCallups: 1,
+      notCalledUp: 2,
+      minutes: 1460,
+      goals: 9,
+    });
+  });
+
+  test('permite editar manualmente las estadisticas de un jugador', async () => {
+    const context = await createTeamContext('Club Player Stats Manual');
+    const [playerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Mario', 'Manual', context.club.name, context.club.id, context.teamId, 'Juvenil Eval', 2011],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.post(`/admin/players/${playerResult.insertId}/edit`).send({
+      first_name: 'Mario',
+      last_name: 'Manual',
+      team_id: context.teamId,
+      dorsal: '6',
+      positions: 'MC',
+      birth_date: '',
+      birth_year: 2011,
+      laterality: 'DER',
+      phone: '',
+      email: '',
+      nationality: 'España',
+      preferred_foot: 'DER',
+      stats_callups: 20,
+      stats_starts: 15,
+      stats_substitute_appearances: 4,
+      stats_unused_callups: 1,
+      stats_not_called_up: 2,
+      stats_minutes: 1234,
+      stats_goals: 7,
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/admin/players');
+
+    const [rows] = await db.query(
+      'SELECT stats_json FROM players WHERE id = ?',
+      [playerResult.insertId],
+    );
+    expect(JSON.parse(rows[0].stats_json)).toEqual({
+      callups: 20,
+      starts: 15,
+      substituteAppearances: 4,
+      unusedCallups: 1,
+      notCalledUp: 2,
+      minutes: 1234,
+      goals: 7,
+    });
   });
 
   test('el listado de plantillas muestra acción de importar jugadores para equipos ProcessIQ', async () => {
