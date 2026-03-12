@@ -1,0 +1,208 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Previsualización ProcessIQ</h1>
+    <p class="text-muted mb-0">
+      Revisa, corrige y selecciona qué equipos quieres importar al club activo.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/account" class="btn btn-outline-secondary">Configurar credenciales</a>
+    <a href="/teams" class="btn btn-outline-secondary">Volver</a>
+  </div>
+</div>
+
+<div
+  id="processiq-loading-state"
+  class="alert alert-info d-none align-items-center gap-3"
+  role="status"
+  aria-live="polite"
+>
+  <div class="spinner-border spinner-border-sm" aria-hidden="true"></div>
+  <div>
+    <div class="fw-semibold">Esperando respuesta de ProcessIQ</div>
+    <div class="small">La importación puede tardar unos segundos.</div>
+  </div>
+</div>
+
+<% if (processIqStatus) { %>
+  <div class="alert alert-<%= processIqStatus.level || 'secondary' %> mb-4">
+    <div class="fw-semibold"><%= processIqStatus.title %></div>
+    <% if (processIqStatus.detail) { %>
+      <div class="small mt-1"><%= processIqStatus.detail %></div>
+    <% } %>
+  </div>
+<% } %>
+
+<% if (!preview || !preview.items || !preview.items.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-3">No se han recibido equipos desde ProcessIQ.</p>
+      <% if (preview && preview.diagnostics) { %>
+        <div class="small text-muted mb-3">
+          Respuesta recibida: <strong><%= preview.diagnostics.receivedCount %></strong> equipos.
+        </div>
+      <% } %>
+      <form method="POST" action="/teams/import/processiq/preview" data-processiq-loading-form>
+        <button type="submit" class="btn btn-primary" data-loading-button>
+          <span class="spinner-border spinner-border-sm d-none me-2" aria-hidden="true"></span>
+          <span class="js-button-label">Cargar equipos</span>
+        </button>
+      </form>
+    </div>
+  </div>
+<% } else { %>
+  <% if (preview.diagnostics) { %>
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Recibidos</div>
+            <div class="h4 mb-0"><%= preview.diagnostics.receivedCount %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Listos para importar</div>
+            <div class="h4 mb-0"><%= preview.diagnostics.importableCount %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Duplicados</div>
+            <div class="h4 mb-0"><%= preview.diagnostics.duplicateCount %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Requieren revisión</div>
+            <div class="h4 mb-0"><%= preview.diagnostics.reviewCount %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+  <form method="POST" action="/teams/import/processiq/confirm" data-processiq-loading-form>
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Importar</th>
+                <th>Origen</th>
+                <th>Nombre final</th>
+                <th>Temporada</th>
+                <th>Sección</th>
+                <th>Categoría</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% preview.items.forEach((item) => { %>
+                <tr>
+                  <td>
+                    <input type="hidden" name="preview_id" value="<%= item.id %>" />
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      name="selected_ids"
+                      value="<%= item.id %>"
+                      <%= item.importable && !item.duplicate ? 'checked' : '' %>
+                      <%= item.duplicate ? 'disabled' : '' %>
+                    />
+                  </td>
+                  <td>
+                    <div class="fw-semibold"><%= item.sourceName || '-' %></div>
+                    <div class="small text-muted">
+                      <%= item.sourceSeasonName || '-' %> · <%= item.sourceSectionName || '-' %> · <%= item.sourceCategoryName || '-' %>
+                    </div>
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm" name="name" value="<%= item.name %>" />
+                  </td>
+                  <td>
+                    <select class="form-select form-select-sm" name="season_id">
+                      <option value="">Selecciona</option>
+                      <% preview.options.seasons.forEach((season) => { %>
+                        <option value="<%= season.id %>" <%= season.id === item.seasonId ? 'selected' : '' %>><%= season.name %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                  <td>
+                    <select class="form-select form-select-sm" name="section_id">
+                      <option value="">Selecciona</option>
+                      <% preview.options.sections.forEach((section) => { %>
+                        <option value="<%= section.id %>" <%= section.id === item.sectionId ? 'selected' : '' %>><%= section.name %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                  <td>
+                    <select class="form-select form-select-sm" name="category_id">
+                      <option value="">Selecciona</option>
+                      <% preview.options.categories.forEach((category) => { %>
+                        <option value="<%= category.id %>" <%= category.id === item.categoryId ? 'selected' : '' %>><%= category.name %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                  <td>
+                    <% if (item.duplicate) { %>
+                      <span class="badge text-bg-secondary">Duplicado</span>
+                    <% } else if (item.issues.length) { %>
+                      <span class="badge text-bg-warning">Revisar</span>
+                      <div class="small text-muted mt-1"><%= item.issues.join(' · ') %></div>
+                    <% } else { %>
+                      <span class="badge text-bg-success">Listo</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-primary" data-loading-button>
+        <span class="spinner-border spinner-border-sm d-none me-2" aria-hidden="true"></span>
+        <span class="js-button-label">Importar seleccionados</span>
+      </button>
+      <a href="/teams" class="btn btn-outline-secondary">Cancelar</a>
+    </div>
+  </form>
+<% } %>
+
+<script>
+  (function () {
+    const loadingState = document.getElementById('processiq-loading-state');
+    const forms = document.querySelectorAll('[data-processiq-loading-form]');
+
+    forms.forEach((form) => {
+      form.addEventListener('submit', () => {
+        if (loadingState) {
+          loadingState.classList.remove('d-none');
+          loadingState.classList.add('d-flex');
+        }
+
+        const button = form.querySelector('[data-loading-button]');
+        if (button) {
+          button.disabled = true;
+          const spinner = button.querySelector('.spinner-border');
+          const label = button.querySelector('.js-button-label');
+          if (spinner) {
+            spinner.classList.remove('d-none');
+          }
+          if (label) {
+            label.textContent = 'Procesando...';
+          }
+        }
+      });
+    });
+  }());
+</script>

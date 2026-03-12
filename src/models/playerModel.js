@@ -1,5 +1,32 @@
 const db = require('../db');
 
+function parseStatsJson(value) {
+  if (!value) {
+    return {};
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return {};
+  }
+}
+
+function normalizePlayerRow(row) {
+  if (!row) {
+    return row;
+  }
+
+  return {
+    ...row,
+    stats: parseStatsJson(row.stats_json),
+  };
+}
+
 async function createPlayersTable() {
   const sql = `
     CREATE TABLE IF NOT EXISTS players (
@@ -18,6 +45,9 @@ async function createPlayersTable() {
       nationality VARCHAR(100),
       preferred_foot VARCHAR(20),
       avatar_color VARCHAR(20),
+      stats_json TEXT,
+      source VARCHAR(50),
+      external_id VARCHAR(100),
       is_active TINYINT(1) NOT NULL DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -33,6 +63,9 @@ async function createPlayersTable() {
     'ALTER TABLE players ADD COLUMN nationality VARCHAR(100)',
     'ALTER TABLE players ADD COLUMN preferred_foot VARCHAR(20)',
     'ALTER TABLE players ADD COLUMN avatar_color VARCHAR(20)',
+    'ALTER TABLE players ADD COLUMN stats_json TEXT',
+    'ALTER TABLE players ADD COLUMN source VARCHAR(50)',
+    'ALTER TABLE players ADD COLUMN external_id VARCHAR(100)',
     'ALTER TABLE players ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1',
   ];
 
@@ -82,12 +115,15 @@ async function insertPlayer({
   email = null,
   nationality = null,
   preferredFoot = null,
+  stats = null,
+  source = null,
+  externalId = null,
 }) {
   const [result] = await db.query(
     `INSERT INTO players (
       first_name, last_name, club, club_id, team, current_team_id, birth_date, birth_year, laterality,
-      phone, email, nationality, preferred_foot
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      phone, email, nationality, preferred_foot, stats_json, source, external_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       firstName,
       lastName,
@@ -102,9 +138,20 @@ async function insertPlayer({
       email,
       nationality,
       preferredFoot,
+      stats ? JSON.stringify(stats) : null,
+      source,
+      externalId,
     ],
   );
   return result.insertId;
+}
+
+async function findPlayerBySourceExternalId(source, externalId) {
+  const [rows] = await db.query(
+    'SELECT * FROM players WHERE source = ? AND external_id = ? LIMIT 1',
+    [source, externalId],
+  );
+  return normalizePlayerRow(rows[0] || null);
 }
 
 async function getPlayersByTeam(team, club = null) {
@@ -130,7 +177,7 @@ async function getPlayersByTeam(team, club = null) {
     sql += ' ORDER BY p.last_name, p.first_name';
 
     const [rows] = await db.query(sql, params);
-    return rows;
+    return rows.map(normalizePlayerRow);
   }
 
   let sql = `
@@ -159,7 +206,7 @@ async function getPlayersByTeam(team, club = null) {
   sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
-  return rows;
+  return rows.map(normalizePlayerRow);
 }
 
 async function getAllPlayers(club = null) {
@@ -189,7 +236,7 @@ async function getAllPlayers(club = null) {
   sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
-  return rows;
+  return rows.map(normalizePlayerRow);
 }
 
 async function getPlayerById(id, club = null) {
@@ -218,7 +265,7 @@ async function getPlayerById(id, club = null) {
   }
 
   const [rows] = await db.query(sql, params);
-  return rows[0];
+  return normalizePlayerRow(rows[0]);
 }
 
 async function updatePlayer(id, {
@@ -235,11 +282,14 @@ async function updatePlayer(id, {
   email = null,
   nationality = null,
   preferredFoot = null,
+  stats = null,
+  source = null,
+  externalId = null,
 }) {
   const [result] = await db.query(
     `UPDATE players
      SET first_name = ?, last_name = ?, team = ?, current_team_id = ?, birth_date = ?, birth_year = ?, laterality = ?,
-         phone = ?, email = ?, nationality = ?, preferred_foot = ?, club = ?, club_id = ?
+         phone = ?, email = ?, nationality = ?, preferred_foot = ?, stats_json = ?, club = ?, club_id = ?, source = ?, external_id = ?
      WHERE id = ?`,
     [
       firstName,
@@ -253,8 +303,11 @@ async function updatePlayer(id, {
       email,
       nationality,
       preferredFoot,
+      stats ? JSON.stringify(stats) : null,
       club,
       clubId,
+      source,
+      externalId,
       id,
     ],
   );
@@ -272,6 +325,7 @@ module.exports = {
   getPlayersByTeam,
   getAllPlayers,
   getPlayerById,
+  findPlayerBySourceExternalId,
   updatePlayer,
   deletePlayer,
 };

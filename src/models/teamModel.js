@@ -10,6 +10,8 @@ async function createTeamsTable() {
       section_id CHAR(36) NOT NULL,
       category_id CHAR(36) NOT NULL,
       name VARCHAR(150) NOT NULL,
+      source VARCHAR(50) NULL,
+      external_id VARCHAR(100) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_teams_club
         FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -27,6 +29,23 @@ async function createTeamsTable() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
   await db.query(sql);
+
+  const alterStatements = [
+    'ALTER TABLE teams ADD COLUMN source VARCHAR(50) NULL',
+    'ALTER TABLE teams ADD COLUMN external_id VARCHAR(100) NULL',
+  ];
+
+  for (const statement of alterStatements) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await db.query(statement);
+    } catch (e) {
+      if (e && e.code !== 'ER_DUP_FIELDNAME') {
+        // eslint-disable-next-line no-console
+        console.error('Error altering teams table', e);
+      }
+    }
+  }
 }
 
 async function createTeam({
@@ -35,12 +54,14 @@ async function createTeam({
   sectionId,
   categoryId,
   name,
+  source = null,
+  externalId = null,
 }) {
   const id = randomUUID();
   await db.query(
-    `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, clubId, seasonId, sectionId, categoryId, name],
+    `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name, source, external_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, clubId, seasonId, sectionId, categoryId, name, source, externalId],
   );
   return findTeamById(id);
 }
@@ -54,6 +75,8 @@ async function findTeamById(id) {
         t.season_id,
         t.section_id,
         t.category_id,
+        t.source,
+        t.external_id,
         t.created_at,
         c.name AS club_name,
         s.name AS season_name,
@@ -76,12 +99,14 @@ async function updateTeam(id, {
   sectionId,
   categoryId,
   name,
+  source = null,
+  externalId = null,
 }) {
   const [result] = await db.query(
     `UPDATE teams
-     SET season_id = ?, section_id = ?, category_id = ?, name = ?
+     SET season_id = ?, section_id = ?, category_id = ?, name = ?, source = ?, external_id = ?
      WHERE id = ?`,
-    [seasonId, sectionId, categoryId, name, id],
+    [seasonId, sectionId, categoryId, name, source, externalId, id],
   );
   return result.affectedRows;
 }
@@ -100,6 +125,8 @@ async function getTeamsByClubId(clubId) {
         t.season_id,
         t.section_id,
         t.category_id,
+        t.source,
+        t.external_id,
         s.name AS season_name,
         s.is_active AS season_is_active,
         sec.name AS section_name,

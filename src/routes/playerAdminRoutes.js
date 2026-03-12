@@ -23,6 +23,27 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
+function parseOptionalNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildPlayerStatsFromBody(body) {
+  return {
+    callups: parseOptionalNumber(body.stats_callups),
+    starts: parseOptionalNumber(body.stats_starts),
+    substituteAppearances: parseOptionalNumber(body.stats_substitute_appearances),
+    unusedCallups: parseOptionalNumber(body.stats_unused_callups),
+    notCalledUp: parseOptionalNumber(body.stats_not_called_up),
+    minutes: parseOptionalNumber(body.stats_minutes),
+    goals: parseOptionalNumber(body.stats_goals),
+  };
+}
+
 async function getTeamOptionsForClubName(clubName) {
   if (!clubName) {
     return [];
@@ -285,6 +306,7 @@ router.post('/new', ensureAdmin, async (req, res) => {
       email: email || null,
       nationality: nationality || null,
       preferredFoot: preferred_foot || null,
+      stats: buildPlayerStatsFromBody(req.body),
     });
 
     logAuditEvent(req, 'create', 'player', {
@@ -375,6 +397,7 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
       email: email || null,
       nationality: nationality || null,
       preferredFoot: preferred_foot || null,
+      stats: buildPlayerStatsFromBody(req.body),
     });
 
     if (!affected) {

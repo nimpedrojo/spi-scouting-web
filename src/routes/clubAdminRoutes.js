@@ -4,9 +4,11 @@ const {
   createClub,
   getClubById,
   updateClub,
+  deleteClubDependencies,
   deleteClub,
 } = require('../models/clubModel');
 const { getAllUsers, deleteUser } = require('../models/userModel');
+const { logAuditEvent } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -127,12 +129,12 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
       return res.redirect(getBasePath(req));
     }
 
+    await deleteClubDependencies({ clubId: club.id, clubName: club.name });
     const users = await getAllUsers(club.name);
     for (const user of users) {
       // eslint-disable-next-line no-await-in-loop
       await deleteUser(user.id);
     }
-
     const affected = await deleteClub(req.params.id);
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el club.');
@@ -144,6 +146,62 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     // eslint-disable-next-line no-console
     console.error('Error al borrar club:', err);
     req.flash('error', 'Ha ocurrido un error al borrar el club.');
+    return res.redirect(getBasePath(req));
+  }
+});
+
+router.post('/bulk-delete', ensureAdmin, async (req, res) => {
+  let { clubIds } = req.body;
+
+  if (!clubIds) {
+    req.flash('error', 'No has seleccionado ningún club para borrar.');
+    return res.redirect(getBasePath(req));
+  }
+
+  if (!Array.isArray(clubIds)) {
+    clubIds = [clubIds];
+  }
+
+  try {
+    const idsToDelete = clubIds
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const deletedClubIds = [];
+
+    for (const clubId of idsToDelete) {
+      // eslint-disable-next-line no-await-in-loop
+      const club = await getClubById(clubId);
+      if (!club) {
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await deleteClubDependencies({ clubId: club.id, clubName: club.name });
+      // eslint-disable-next-line no-await-in-loop
+      const users = await getAllUsers(club.name);
+      for (const user of users) {
+        // eslint-disable-next-line no-await-in-loop
+        await deleteUser(user.id);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await deleteClub(clubId);
+      deletedClubIds.push(clubId);
+    }
+
+    if (deletedClubIds.length) {
+      logAuditEvent(req, 'bulk_delete', 'club', {
+        clubIds: deletedClubIds,
+        deletedCount: deletedClubIds.length,
+      });
+      req.flash('success', 'Clubes seleccionados borrados correctamente.');
+    } else {
+      req.flash('error', 'No se ha borrado ningún club.');
+    }
+    return res.redirect(getBasePath(req));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error en borrado múltiple de clubes:', err);
+    req.flash('error', 'Ha ocurrido un error al borrar los clubes seleccionados.');
     return res.redirect(getBasePath(req));
   }
 });

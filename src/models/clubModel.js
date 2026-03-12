@@ -55,6 +55,17 @@ async function deleteClub(id) {
   return result.affectedRows;
 }
 
+async function deleteClubDependencies({ clubId, clubName }) {
+  await db.query('DELETE FROM evaluations WHERE club_id = ?', [clubId]);
+  await db.query('DELETE FROM club_recommendations WHERE club = ?', [clubName]);
+  await db.query('DELETE FROM club_teams WHERE club = ?', [clubName]);
+  await db.query('DELETE FROM reports WHERE club = ?', [clubName]);
+  await db.query('DELETE FROM evaluation_templates WHERE club_id = ?', [clubId]);
+  await db.query('DELETE FROM players WHERE club_id = ? OR club = ?', [clubId, clubName]);
+  await db.query('DELETE FROM teams WHERE club_id = ?', [clubId]);
+  await db.query('DELETE FROM seasons WHERE club_id = ?', [clubId]);
+}
+
 module.exports = {
   createClubsTable,
   createClub,
@@ -63,5 +74,6 @@ module.exports = {
   getClubByName,
   getClubById,
   updateClub,
+  deleteClubDependencies,
   deleteClub,
 };

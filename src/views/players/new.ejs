@@ -92,6 +92,42 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Estadisticas</h2>
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label for="stats_callups" class="form-label">Convocados</label>
+          <input type="number" class="form-control" id="stats_callups" name="stats_callups" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_starts" class="form-label">Titular</label>
+          <input type="number" class="form-control" id="stats_starts" name="stats_starts" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_substitute_appearances" class="form-label">Suplente</label>
+          <input type="number" class="form-control" id="stats_substitute_appearances" name="stats_substitute_appearances" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_unused_callups" class="form-label">S/Jugar</label>
+          <input type="number" class="form-control" id="stats_unused_callups" name="stats_unused_callups" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_not_called_up" class="form-label">No convocado</label>
+          <input type="number" class="form-control" id="stats_not_called_up" name="stats_not_called_up" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_minutes" class="form-label">Minutos</label>
+          <input type="number" class="form-control" id="stats_minutes" name="stats_minutes" min="0" />
+        </div>
+        <div class="col-md-3">
+          <label for="stats_goals" class="form-label">Goles</label>
+          <input type="number" class="form-control" id="stats_goals" name="stats_goals" min="0" />
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-sr-primary">Guardar jugador</button>
     <a href="/admin/players" class="btn btn-link">Cancelar</a>
