@@ -32,11 +32,7 @@ function sanitizeMeta(meta) {
   }
 
   if (meta instanceof Error) {
-    return {
-      name: meta.name,
-      message: meta.message,
-      stack: meta.stack,
-    };
+    return formatError(meta);
   }
 
   return meta;
@@ -115,11 +111,20 @@ function formatError(err) {
   }
 
   if (err instanceof Error) {
-    return {
+    const payload = {
       name: err.name,
       message: err.message,
       stack: err.stack,
     };
+
+    const errorFields = ['code', 'errno', 'sqlState', 'sqlMessage', 'sql', 'address', 'port', 'syscall'];
+    for (const field of errorFields) {
+      if (err[field] !== undefined) {
+        payload[field] = err[field];
+      }
+    }
+
+    return payload;
   }
 
   return {

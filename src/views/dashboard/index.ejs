@@ -9,7 +9,8 @@
     </p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    <a href="/reports/new" class="btn btn-primary">Nuevo informe</a>
+    <a href="/assessments" class="btn btn-primary">Abrir valoraciones</a>
+    <a href="/reports/new" class="btn btn-outline-secondary">Nuevo informe</a>
     <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
       <a href="/evaluations/new" class="btn btn-outline-secondary">Nueva evaluación</a>
     <% } %>
@@ -122,12 +123,12 @@
 
 <div class="row g-4">
   <div class="col-md-6 col-xl-3">
-    <a href="/reports" class="text-decoration-none text-reset">
+    <a href="/assessments" class="text-decoration-none text-reset">
       <div class="card h-100 shadow-sm">
         <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Listado de informes" />
         <div class="card-body">
-          <h5 class="card-title">Listado de informes</h5>
-          <p class="card-text">Ver todos los informes registrados.</p>
+          <h5 class="card-title">Valoraciones</h5>
+          <p class="card-text">Entrar al módulo unificado de scouting y seguimiento.</p>
         </div>
       </div>
     </a>

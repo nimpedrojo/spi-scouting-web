@@ -72,6 +72,7 @@ const playerProfileRoutes = require('./routes/playerProfileRoutes');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplateRoutes');
 const seasonComparisonRoutes = require('./routes/seasonComparisonRoutes');
 const seasonForecastRoutes = require('./routes/seasonForecastRoutes');
+const assessmentRoutes = require('./routes/assessmentRoutes');
 
 app.use('/', authRoutes);
 app.use('/reports', reportRoutes);
@@ -81,6 +82,7 @@ app.use('/admin/clubs', clubAdminRoutes);
 app.use('/clubs', clubAdminRoutes);
 app.use('/admin/club', clubConfigRoutes);
 app.use('/teams', teamRoutes);
+app.use('/', assessmentRoutes);
 app.use('/', evaluationRoutes);
 app.use('/', playerProfileRoutes);
 app.use('/', evaluationTemplateRoutes);

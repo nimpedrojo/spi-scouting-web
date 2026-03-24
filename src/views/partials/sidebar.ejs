@@ -4,9 +4,7 @@
     { label: 'Plantillas', href: '/teams' },
     { label: 'Previsión 2026/27', href: '/season-forecast' },
     { label: 'Comparativa 26/27', href: '/season-comparison' },
-    { label: 'Informes', href: '/reports' },
-    { label: 'Evaluaciones', href: '/evaluations' },
-    { label: 'Scouting', href: '/reports/new' },
+    { label: 'Valoraciones', href: '/assessments' },
   ];
   const adminItems = [
     { label: 'Plantillas eval.', href: '/evaluation-templates' },
@@ -17,7 +15,19 @@
   ];
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   const visibleAdminItems = adminItems.filter((item) => !item.adminOnly || isAdminUser);
-  const isItemActive = (item) => item.href !== '#' && activeRoute && (activeRoute === item.href || activeRoute.startsWith(item.href + '/'));
+  const isItemActive = (item) => {
+    if (item.href === '#' || !activeRoute) {
+      return false;
+    }
+
+    if (item.href === '/assessments') {
+      return activeRoute === '/assessments'
+        || activeRoute.startsWith('/reports')
+        || activeRoute.startsWith('/evaluations');
+    }
+
+    return activeRoute === item.href || activeRoute.startsWith(item.href + '/');
+  };
 %>
 
 <aside class="app-sidebar">

@@ -341,11 +341,32 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
+    expect(res.text).toContain('Abrir valoraciones');
+    expect(res.text).toContain('/assessments');
     expect(res.text).toContain('Nuevo informe');
     expect(res.text).toContain('/reports/new');
     expect(res.text).toContain('Mi cuenta');
     expect(res.text).toContain('/account');
     expect(res.text).not.toContain('Gestión de usuarios');
+  });
+
+  test('un usuario autenticado puede ver la landing unificada de valoraciones', async () => {
+    const { email } = await createTestUser({
+      name: 'Valoraciones User',
+      role: 'user',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const res = await agent.get('/assessments');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Valoraciones');
+    expect(res.text).toContain('Informes de observacion');
+    expect(res.text).toContain('Evaluaciones estructuradas');
+    expect(res.text).toContain('/reports');
+    expect(res.text).toContain('/evaluations');
+    expect(res.text).not.toContain('Crear evaluacion');
   });
 
   test('un usuario puede actualizar sus valores por defecto en cuenta', async () => {
@@ -673,17 +694,35 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
+    expect(res.text).toContain('Abrir valoraciones');
+    expect(res.text).toContain('/assessments');
     expect(res.text).toContain('Nuevo informe');
     expect(res.text).toContain('/reports/new');
     expect(res.text).toContain('Mi cuenta');
     expect(res.text).toContain('/account');
-    expect(res.text).toContain('Listado de informes');
-    expect(res.text).toContain('/reports');
+    expect(res.text).toContain('Valoraciones');
     expect(res.text).toContain('Gestión de usuarios');
     expect(res.text).toContain('/admin/users');
     expect(res.text).toContain('/admin/players');
     expect(res.text).toContain('Jugadores');
     expect(res.text).toContain('/img/report.svg');
+  });
+
+  test('un admin ve acciones completas en la landing unificada de valoraciones', async () => {
+    const { email } = await createTestUser({
+      name: 'Valoraciones Admin',
+      role: 'admin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const res = await agent.get('/assessments');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Valoraciones');
+    expect(res.text).toContain('Crear informe');
+    expect(res.text).toContain('Crear evaluacion');
+    expect(res.text).toContain('Comparar jugadores');
   });
 
   test('un admin puede ver la página de gestión de jugadores', async () => {
@@ -2553,6 +2592,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('1.00');
     expect(res.text).toContain('Informes emitidos');
     expect(res.text).toContain('Equipos activos');
+    expect(res.text).toContain('Entrar al módulo unificado de scouting y seguimiento.');
   });
 
   test('pending evaluations table renders correctly', async () => {

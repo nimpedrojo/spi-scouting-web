@@ -13,10 +13,12 @@ const { createEvaluationsTable } = require('./models/evaluationModel');
 const { createEvaluationScoresTable } = require('./models/evaluationScoreModel');
 const { createEvaluationTemplatesTable } = require('./models/evaluationTemplateModel');
 const { createEvaluationTemplateMetricsTable } = require('./models/evaluationTemplateMetricModel');
+const { ensureDatabaseExists } = require('./db');
 
 let initializationPromise = null;
 
 async function initializeDatabase() {
+  await ensureDatabaseExists();
   await createClubsTable();
   await createClubTeamsTable();
   await createClubRecommendationsTable();

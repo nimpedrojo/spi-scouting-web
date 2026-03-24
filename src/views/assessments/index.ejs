@@ -1,0 +1,79 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Valoraciones</h1>
+    <p class="text-muted mb-0">Una sola puerta de entrada para scouting e evaluacion continua del jugador.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="<%= assessmentHub.actions.scouting.createHref %>" class="btn btn-primary">Nuevo informe scouting</a>
+    <% if (assessmentHub.actions.evaluations.createHref) { %>
+      <a href="<%= assessmentHub.actions.evaluations.createHref %>" class="btn btn-outline-secondary">Nueva evaluacion</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="mb-3">
+          <span class="badge text-bg-light mb-2">Scouting</span>
+          <h2 class="h4 mb-2">Informes de observacion</h2>
+          <p class="text-muted mb-0">
+            Para registrar una observacion completa con contexto del jugador, posiciones, comentarios y valoracion global.
+          </p>
+        </div>
+        <div class="mt-auto d-flex gap-2 flex-wrap">
+          <a href="<%= assessmentHub.actions.scouting.listHref %>" class="btn btn-outline-secondary">Ver informes</a>
+          <a href="<%= assessmentHub.actions.scouting.createHref %>" class="btn btn-primary">Crear informe</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="mb-3">
+          <span class="badge text-bg-primary mb-2">Seguimiento</span>
+          <h2 class="h4 mb-2">Evaluaciones estructuradas</h2>
+          <p class="text-muted mb-0">
+            Para hacer seguimiento por temporada, equipo y jugador con metricas flexibles, historial y comparativas.
+          </p>
+        </div>
+        <div class="mt-auto d-flex gap-2 flex-wrap">
+          <a href="<%= assessmentHub.actions.evaluations.listHref %>" class="btn btn-outline-secondary">Ver evaluaciones</a>
+          <% if (assessmentHub.actions.evaluations.createHref) { %>
+            <a href="<%= assessmentHub.actions.evaluations.createHref %>" class="btn btn-primary">Crear evaluacion</a>
+          <% } %>
+          <% if (assessmentHub.actions.evaluations.compareHref) { %>
+            <a href="<%= assessmentHub.actions.evaluations.compareHref %>" class="btn btn-outline-secondary">Comparar jugadores</a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Cuando usar cada flujo</h2>
+    <div class="row g-4">
+      <div class="col-md-6">
+        <h3 class="h6">Usa informes cuando necesites</h3>
+        <ul class="mb-0">
+          <li>una ficha de scouting completa</li>
+          <li>registrar posiciones, contacto y contexto libre</li>
+          <li>emitir una valoracion puntual de observacion</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <h3 class="h6">Usa evaluaciones cuando necesites</h3>
+        <ul class="mb-0">
+          <li>seguimiento recurrente por temporada</li>
+          <li>comparar jugadores o equipos</li>
+          <li>analitica e historico sobre metricas</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
