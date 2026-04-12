@@ -705,7 +705,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('/admin/users');
     expect(res.text).toContain('/admin/players');
     expect(res.text).toContain('Jugadores');
-    expect(res.text).toContain('/img/report.svg');
+    expect(res.text).toContain('informes scouting y evaluaciones estructuradas');
   });
 
   test('un admin ve acciones completas en la landing unificada de valoraciones', async () => {

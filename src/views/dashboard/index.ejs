@@ -121,73 +121,86 @@
 
 <% } %>
 
-<div class="row g-4">
-  <div class="col-md-6 col-xl-3">
-    <a href="/assessments" class="text-decoration-none text-reset">
-      <div class="card h-100 shadow-sm">
-        <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Listado de informes" />
-        <div class="card-body">
-          <h5 class="card-title">Valoraciones</h5>
-          <p class="card-text">Entrar al módulo unificado de scouting y seguimiento.</p>
-        </div>
-      </div>
-    </a>
+<section class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h5 mb-1">Operativa diaria</h2>
+      <p class="text-muted mb-0">Accesos rápidos para seguimiento deportivo y trabajo con plantilla.</p>
+    </div>
   </div>
-  <div class="col-md-6 col-xl-3">
-    <a href="/evaluations" class="text-decoration-none text-reset">
-      <div class="card h-100 shadow-sm">
-        <img src="/img/report.svg" class="card-img-top icon-dashboard p-3" alt="Evaluaciones" />
-        <div class="card-body">
-          <h5 class="card-title">Evaluaciones</h5>
-          <p class="card-text">Seguimiento técnico y analítico por equipo.</p>
+
+  <div class="row g-4">
+    <div class="col-md-6 col-xl-4">
+      <a href="/assessments" class="text-decoration-none text-reset">
+        <div class="card h-100 shadow-sm">
+          <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Listado de informes" />
+          <div class="card-body">
+            <h5 class="card-title">Valoraciones</h5>
+            <p class="card-text">Acceso unificado a informes scouting y evaluaciones estructuradas.</p>
+          </div>
         </div>
+      </a>
+    </div>
+
+    <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
+      <div class="col-md-6 col-xl-4">
+        <a href="/admin/players" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/players.svg" class="card-img-top icon-dashboard p-3" alt="Jugadores" />
+            <div class="card-body">
+              <h5 class="card-title">Jugadores</h5>
+              <p class="card-text">Ver, editar y seguir perfiles de jugadores.</p>
+            </div>
+          </div>
+        </a>
       </div>
-    </a>
+    <% } %>
   </div>
-  <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
-    <div class="col-md-6 col-xl-3">
-      <a href="/admin/players" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <img src="/img/players.svg" class="card-img-top icon-dashboard p-3" alt="Jugadores" />
-          <div class="card-body">
-            <h5 class="card-title">Jugadores</h5>
-            <p class="card-text">Ver, editar y seguir perfiles de jugadores.</p>
-          </div>
-        </div>
-      </a>
+</section>
+
+<% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
+  <section>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h5 mb-1">Administración</h2>
+        <p class="text-muted mb-0">Configuración interna, estructura del club y gestión de accesos.</p>
+      </div>
     </div>
-    <div class="col-md-6 col-xl-3">
-      <a href="/admin/club" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Administración de equipos" />
-          <div class="card-body">
-            <h5 class="card-title">Administración de equipos</h5>
-            <p class="card-text">Gestionar equipos legacy y configuración del club.</p>
+
+    <div class="row g-4">
+      <div class="col-md-6 col-xl-4">
+        <a href="/admin/club" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Administración de equipos" />
+            <div class="card-body">
+              <h5 class="card-title">Administración de equipos</h5>
+              <p class="card-text">Gestionar equipos legacy y configuración del club.</p>
+            </div>
           </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-6 col-xl-3">
-      <a href="/admin/users" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <img src="/img/users.svg" class="card-img-top icon-dashboard p-3" alt="Gestión de usuarios" />
-          <div class="card-body">
-            <h5 class="card-title">Gestión de usuarios</h5>
-            <p class="card-text">Administrar accesos y roles del club.</p>
+        </a>
+      </div>
+      <div class="col-md-6 col-xl-4">
+        <a href="/admin/users" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/users.svg" class="card-img-top icon-dashboard p-3" alt="Gestión de usuarios" />
+            <div class="card-body">
+              <h5 class="card-title">Gestión de usuarios</h5>
+              <p class="card-text">Administrar accesos y roles del club.</p>
+            </div>
           </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-6 col-xl-3">
-      <a href="/clubs" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <img src="/img/clubes.svg" class="card-img-top icon-dashboard p-3" alt="Clubes" />
-          <div class="card-body">
-            <h5 class="card-title">Clubes</h5>
-            <p class="card-text">Alta, edición y mantenimiento administrativo de clubes.</p>
+        </a>
+      </div>
+      <div class="col-md-6 col-xl-4">
+        <a href="/clubs" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/clubes.svg" class="card-img-top icon-dashboard p-3" alt="Clubes" />
+            <div class="card-body">
+              <h5 class="card-title">Clubes</h5>
+              <p class="card-text">Alta, edición y mantenimiento administrativo de clubes.</p>
+            </div>
           </div>
-        </div>
-      </a>
+        </a>
+      </div>
     </div>
-  <% } %>
-</div>
+  </section>
+<% } %>
