@@ -1,6 +1,18 @@
-<h1 class="mb-4">
-  Informe de <%= report.player_name %> <%= report.player_surname %>
-</h1>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1">
+      Informe de <%= report.player_name %> <%= report.player_surname %>
+    </h1>
+    <div class="text-muted"><%= report.club || '-' %> · <%= report.team || '-' %></div>
+  </div>
+  <% if (reportClub && reportClub.crest_path) { %>
+    <img
+      src="<%= reportClub.crest_path %>"
+      alt="Escudo de <%= reportClub.name %>"
+      style="width:84px;height:84px;object-fit:contain;border-radius:16px;background:#fff;border:1px solid rgba(15,61,46,0.12);padding:0.45rem;"
+    />
+  <% } %>
+</div>
 
 <div class="mb-3">
   <a href="/reports" class="btn btn-secondary btn-sm">Volver al listado</a>

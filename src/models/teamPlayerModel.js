@@ -95,7 +95,9 @@ async function getPlayersByTeamIds(teamIds) {
         p.first_name,
         p.last_name,
         p.current_team_id,
-        p.club_id
+        p.club_id,
+        p.birth_year,
+        p.laterality
       FROM team_players tp
       INNER JOIN teams t ON t.id = tp.team_id
       INNER JOIN players p ON p.id = tp.player_id

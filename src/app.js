@@ -49,6 +49,12 @@ app.use((req, res, next) => {
   res.locals.error = req.flash('error');
   res.locals.activeRoute = req.path;
   res.locals.activeClubName = req.context && req.context.club ? req.context.club.name : null;
+  res.locals.activeClubBranding = req.context && req.context.club
+    ? {
+      interfaceColor: req.context.club.interface_color || null,
+      crestPath: req.context.club.crest_path || null,
+    }
+    : null;
   res.locals.activeSeasonLabel = req.context && req.context.activeSeason
     ? req.context.activeSeason.name
     : null;

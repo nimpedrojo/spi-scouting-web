@@ -36,6 +36,8 @@ async function attachSessionContext(req, res, next) {
         ? {
           clubId: club.id,
           clubName: club.name,
+          interfaceColor: club.interface_color || null,
+          crestPath: club.crest_path || null,
           activeSeasonId: activeSeason ? activeSeason.id : null,
           activeSeasonName: activeSeason ? activeSeason.name : null,
         }
@@ -51,6 +53,8 @@ async function attachSessionContext(req, res, next) {
         ? {
           id: storedContext.clubId,
           name: storedContext.clubName,
+          interface_color: storedContext.interfaceColor || null,
+          crest_path: storedContext.crestPath || null,
         }
         : null;
       req.context.activeSeason = storedContext && storedContext.activeSeasonId

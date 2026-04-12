@@ -12,6 +12,15 @@
     />
     <link rel="stylesheet" href="/css/theme.css" />
     <link rel="stylesheet" href="/css/styles.css" />
+    <% if (activeClubBranding && activeClubBranding.interfaceColor) { %>
+      <style>
+        :root {
+          --sr-primary: <%= activeClubBranding.interfaceColor %>;
+          --sr-secondary: <%= activeClubBranding.interfaceColor %>;
+          --sr-info: <%= activeClubBranding.interfaceColor %>;
+        }
+      </style>
+    <% } %>
   </head>
   <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %>">
     <% if (currentUser) { %>

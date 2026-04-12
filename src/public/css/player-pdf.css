@@ -5,6 +5,10 @@ body.player-pdf-body {
   font-family: Georgia, 'Times New Roman', serif;
 }
 
+:root {
+  --pdf-brand-primary: #0f3d2e;
+}
+
 .pdf-preview-toolbar {
   max-width: 1120px;
   margin: 24px auto 0;
@@ -39,7 +43,7 @@ body.player-pdf-body {
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 18px;
-  border-bottom: 2px solid rgba(24, 49, 38, 0.1);
+  border-bottom: 2px solid color-mix(in srgb, var(--pdf-brand-primary) 14%, transparent);
 }
 
 .pdf-brand {
@@ -61,7 +65,7 @@ body.player-pdf-body {
   font-size: 0.8rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #5d786a;
+  color: var(--pdf-brand-primary);
 }
 
 .pdf-header h1 {
@@ -71,7 +75,7 @@ body.player-pdf-body {
 }
 
 .pdf-subtitle {
-  color: #5d786a;
+  color: color-mix(in srgb, var(--pdf-brand-primary) 72%, #5d786a);
 }
 
 .pdf-header-meta {
@@ -136,7 +140,7 @@ body.player-pdf-body {
   width: 68px;
   height: 68px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #1f6b43, #4ba367);
+  background: linear-gradient(135deg, var(--pdf-brand-primary), color-mix(in srgb, var(--pdf-brand-primary) 58%, #ffffff));
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -160,7 +164,7 @@ body.player-pdf-body {
 .pdf-chip {
   padding: 4px 10px;
   border-radius: 999px;
-  background: #edf4ec;
+  background: color-mix(in srgb, var(--pdf-brand-primary) 10%, #ffffff);
   border: 1px solid rgba(24, 49, 38, 0.08);
   font-size: 0.82rem;
 }

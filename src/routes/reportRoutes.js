@@ -10,6 +10,7 @@ const {
   updateReport,
   deleteReport,
 } = require('../models/reportModel');
+const { getClubByName } = require('../models/clubModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getAllPlayers } = require('../models/playerModel');
 const { findTeamById } = require('../models/teamModel');
@@ -523,6 +524,7 @@ router.get('/:id', ensureAdmin, async (req, res) => {
       return res.redirect('/reports');
     }
     const radarChartData = await buildReportRadarComparison(report);
+    const reportClub = report.club ? await getClubByName(report.club) : null;
     logPageView(req, 'report_detail', {
       reportId: Number(id),
       club: report.club || null,
@@ -531,6 +533,7 @@ router.get('/:id', ensureAdmin, async (req, res) => {
     });
     return res.render('reports/detail', {
       report,
+      reportClub,
       radarChartJson: JSON.stringify(radarChartData),
     });
   } catch (err) {

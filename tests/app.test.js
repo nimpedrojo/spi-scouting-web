@@ -1880,6 +1880,66 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Cargar jugadores');
   });
 
+  test('el listado de plantillas muestra un resumen de plantilla en lugar del listado de jugadores', async () => {
+    const context = await createTeamContext('Club Teams Summary Card');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.infantil.id,
+        'Infantil Resumen',
+      ],
+    );
+
+    const [playerAResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, laterality, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Iker', 'Zurdo', context.club.name, context.club.id, teamId, 'Infantil Resumen', 2013, 'IZQ'],
+    );
+    const [playerBResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, laterality, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Mario', 'Diestro', context.club.name, context.club.id, teamId, 'Infantil Resumen', 2013, 'DER'],
+    );
+
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        teamId,
+        playerAResult.insertId,
+        '3',
+        'LI',
+        randomUUID(),
+        teamId,
+        playerBResult.insertId,
+        '8',
+        'MC',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/teams?section=Masculina&category=Infantil');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Año base');
+    expect(res.text).toContain('Cobertura');
+    expect(res.text).toContain('Lateralidad');
+    expect(res.text).toContain('Diestros');
+    expect(res.text).not.toContain('Iker Zurdo');
+    expect(res.text).not.toContain('Mario Diestro');
+  });
+
   test('permite cargar jugadores de forma masiva para los equipos ProcessIQ visibles', async () => {
     const context = await createTeamContext('Club Import ProcessIQ Bulk Players');
     const teamAId = randomUUID();
@@ -1988,6 +2048,28 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Equipos v2 del club (Plantillas)');
     expect(res.text).toContain('V2 Team');
     expect(res.text).not.toContain('Compatibilidad legacy');
+  });
+
+  test('un admin puede actualizar el branding de su club', async () => {
+    const context = await createTeamContext('Club Branding');
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent
+      .post('/admin/club/branding')
+      .field('club_id', String(context.club.id))
+      .field('interface_color', '#123ABC')
+      .attach('crest_file', Buffer.from('fake-png-content'), 'crest.png');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [rows] = await db.query(
+      'SELECT interface_color, crest_path FROM clubs WHERE id = ?',
+      [context.club.id],
+    );
+    expect(rows[0].interface_color).toBe('#123ABC');
+    expect(rows[0].crest_path).toContain('/uploads/clubs/');
   });
 
   test('session-based operational context still works for /teams', async () => {

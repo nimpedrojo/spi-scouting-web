@@ -11,6 +11,11 @@
       crossorigin="anonymous"
     />
     <link rel="stylesheet" href="/css/player-pdf.css" />
+    <style>
+      :root {
+        --pdf-brand-primary: <%= report.brandingColor || '#0F3D2E' %>;
+      }
+    </style>
   </head>
   <body class="player-pdf-body">
     <% if (previewMode) { %>

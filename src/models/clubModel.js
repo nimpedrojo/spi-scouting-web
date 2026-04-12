@@ -6,15 +6,34 @@ async function createClubsTable() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(150) NOT NULL,
       code VARCHAR(50) NOT NULL UNIQUE,
+      interface_color VARCHAR(7) NULL,
+      crest_path VARCHAR(255) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
   await db.query(sql);
+
+  const alterStatements = [
+    'ALTER TABLE clubs ADD COLUMN interface_color VARCHAR(7) NULL',
+    'ALTER TABLE clubs ADD COLUMN crest_path VARCHAR(255) NULL',
+  ];
+
+  for (const statement of alterStatements) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await db.query(statement);
+    } catch (e) {
+      if (e && e.code !== 'ER_DUP_FIELDNAME') {
+        // eslint-disable-next-line no-console
+        console.error('Error altering clubs table', e);
+      }
+    }
+  }
 }
 
 async function createClub({ name, code }) {
   const [result] = await db.query(
-    'INSERT INTO clubs (name, code) VALUES (?, ?)',
+    'INSERT INTO clubs (name, code, interface_color, crest_path) VALUES (?, ?, NULL, NULL)',
     [name, code],
   );
   return result.insertId;
@@ -22,7 +41,7 @@ async function createClub({ name, code }) {
 
 async function getAllClubs() {
   const [rows] = await db.query(
-    'SELECT id, name, code, created_at FROM clubs ORDER BY name ASC',
+    'SELECT id, name, code, interface_color, crest_path, created_at FROM clubs ORDER BY name ASC',
   );
   return rows;
 }
@@ -50,6 +69,22 @@ async function updateClub(id, { name }) {
   return result.affectedRows;
 }
 
+async function updateClubBranding(id, { interfaceColor = null, crestPath }) {
+  let sql = 'UPDATE clubs SET interface_color = ?';
+  const params = [interfaceColor];
+
+  if (crestPath !== undefined) {
+    sql += ', crest_path = ?';
+    params.push(crestPath);
+  }
+
+  sql += ' WHERE id = ?';
+  params.push(id);
+
+  const [result] = await db.query(sql, params);
+  return result.affectedRows;
+}
+
 async function deleteClub(id) {
   const [result] = await db.query('DELETE FROM clubs WHERE id = ?', [id]);
   return result.affectedRows;
@@ -73,6 +108,7 @@ module.exports = {
   getClubByName,
   getClubById,
   updateClub,
+  updateClubBranding,
   deleteClubDependencies,
   deleteClub,
 };

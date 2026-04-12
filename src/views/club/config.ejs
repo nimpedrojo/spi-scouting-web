@@ -24,6 +24,67 @@
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
+        Branding del club
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/admin/club/branding" enctype="multipart/form-data">
+          <input type="hidden" name="club_id" value="<%= selectedClubId || '' %>" />
+
+          <div class="mb-3">
+            <label for="interface_color" class="form-label">Color principal del interfaz</label>
+            <div class="d-flex align-items-center gap-3">
+              <input
+                type="color"
+                class="form-control form-control-color"
+                id="interface_color"
+                name="interface_color"
+                value="<%= clubRecord && clubRecord.interface_color ? clubRecord.interface_color : '#0F3D2E' %>"
+                title="Selecciona el color principal"
+              />
+              <div class="small text-muted">
+                Se aplicará al interfaz del club y al acabado visual de reportes e informes.
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="crest_file" class="form-label">Escudo del club</label>
+            <input
+              type="file"
+              class="form-control"
+              id="crest_file"
+              name="crest_file"
+              accept="image/*"
+            />
+            <div class="form-text">Formatos recomendados: PNG o SVG. Tamaño máximo: 2MB.</div>
+          </div>
+
+          <% if (clubRecord && clubRecord.crest_path) { %>
+            <div class="mb-3 d-flex align-items-center gap-3">
+              <img
+                src="<%= clubRecord.crest_path %>"
+                alt="Escudo de <%= clubRecord.name %>"
+                style="width:72px;height:72px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid rgba(15,61,46,0.12);padding:0.4rem;"
+              />
+              <div>
+                <div class="fw-semibold">Escudo actual</div>
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" value="1" id="remove_crest" name="remove_crest" />
+                  <label class="form-check-label" for="remove_crest">Eliminar escudo actual</label>
+                </div>
+              </div>
+            </div>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary">Guardar branding</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
         Usuarios del club
       </div>
       <div class="card-body">

@@ -107,15 +107,57 @@
                 <span class="badge text-bg-primary"><%= team.player_count %> jugadores</span>
               </div>
 
-              <div class="team-card-player-list mb-3">
-                <% if (team.player_previews.length) { %>
-                  <% team.player_previews.forEach((player) => { %>
-                    <div class="team-card-player-row">
-                      <span class="text-muted">#<%= player.dorsal || '-' %></span>
-                      <span><%= player.fullName %></span>
-                      <span class="text-muted text-end"><%= player.position || '-' %></span>
+              <div class="team-card-summary mb-3">
+                <% if (team.player_count) { %>
+                  <div class="team-card-summary-grid">
+                    <article class="team-summary-stat">
+                      <span class="team-summary-stat__label">Año base</span>
+                      <strong class="team-summary-stat__value"><%= team.summary.birthYearLabel %></strong>
+                      <span class="team-summary-stat__detail"><%= team.summary.birthYearDetail %></span>
+                    </article>
+
+                    <article class="team-summary-stat">
+                      <span class="team-summary-stat__label">Cobertura</span>
+                      <strong class="team-summary-stat__value"><%= team.summary.coverageLabel %></strong>
+                      <span class="team-summary-stat__detail"><%= team.summary.coverageDetail %></span>
+                    </article>
+                  </div>
+
+                  <div class="team-summary-lines">
+                    <div class="team-summary-line">
+                      <span>POR</span>
+                      <strong><%= team.summary.lineDistribution.goalkeepers %></strong>
                     </div>
-                  <% }) %>
+                    <div class="team-summary-line">
+                      <span>DEF</span>
+                      <strong><%= team.summary.lineDistribution.defense %></strong>
+                    </div>
+                    <div class="team-summary-line">
+                      <span>MED</span>
+                      <strong><%= team.summary.lineDistribution.midfield %></strong>
+                    </div>
+                    <div class="team-summary-line">
+                      <span>ATA</span>
+                      <strong><%= team.summary.lineDistribution.attack %></strong>
+                    </div>
+                  </div>
+
+                  <div class="team-laterality-card">
+                    <div>
+                      <div class="team-summary-stat__label mb-1">Lateralidad</div>
+                      <div class="team-laterality-legend">
+                        <span><i class="team-laterality-dot team-laterality-dot--right"></i> Diestros <strong><%= team.summary.laterality.counts.right %></strong></span>
+                        <span><i class="team-laterality-dot team-laterality-dot--left"></i> Zurdos <strong><%= team.summary.laterality.counts.left %></strong></span>
+                        <span><i class="team-laterality-dot team-laterality-dot--both"></i> Ambi <strong><%= team.summary.laterality.counts.both %></strong></span>
+                      </div>
+                    </div>
+                    <div
+                      class="team-laterality-chart"
+                      style="background:<%= team.summary.laterality.chartStyle %>;"
+                      aria-label="Distribución de lateralidad"
+                      role="img"
+                    ></div>
+                  </div>
                 <% } else { %>
                   <p class="text-muted small mb-0">Sin jugadores asignados todavía.</p>
                 <% } %>

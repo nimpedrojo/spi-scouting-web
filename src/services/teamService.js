@@ -28,6 +28,28 @@ function normalizePlayerPreview(player) {
   };
 }
 
+function normalizeLaterality(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+
+  if (!normalized) {
+    return 'unknown';
+  }
+
+  if (['DER', 'DERECHO', 'DIESTRO', 'RIGHT'].includes(normalized)) {
+    return 'right';
+  }
+
+  if (['IZQ', 'IZQUIERDO', 'ZURDO', 'LEFT'].includes(normalized)) {
+    return 'left';
+  }
+
+  if (['AMB', 'AMBIDIESTRO', 'BOTH'].includes(normalized)) {
+    return 'both';
+  }
+
+  return 'unknown';
+}
+
 const POSITION_ALIAS_MAP = {
   PORTERO: 'POR',
   POR: 'POR',
@@ -86,6 +108,119 @@ function buildCoverageSummary(players) {
     .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
 }
 
+function buildLineDistribution(players) {
+  const lines = {
+    goalkeepers: 0,
+    defense: 0,
+    midfield: 0,
+    attack: 0,
+  };
+
+  players.forEach((player) => {
+    const primaryPosition = normalizePositions(player.positions)[0];
+
+    if (!primaryPosition) {
+      return;
+    }
+
+    if (primaryPosition === 'POR') {
+      lines.goalkeepers += 1;
+      return;
+    }
+
+    if (['LI', 'CENTRAL', 'LD'].includes(primaryPosition)) {
+      lines.defense += 1;
+      return;
+    }
+
+    if (['MC', 'II', 'MP', 'ID'].includes(primaryPosition)) {
+      lines.midfield += 1;
+      return;
+    }
+
+    if (['EI', 'DEL', 'ED'].includes(primaryPosition)) {
+      lines.attack += 1;
+    }
+  });
+
+  return lines;
+}
+
+function buildBirthYearSummary(players) {
+  const validYears = players
+    .map((player) => Number(player.birth_year))
+    .filter((year) => Number.isInteger(year) && year > 1900);
+
+  if (!validYears.length) {
+    return {
+      label: 'Sin dato',
+      detail: 'Año base no disponible',
+    };
+  }
+
+  const counts = validYears.reduce((acc, year) => {
+    acc[year] = (acc[year] || 0) + 1;
+    return acc;
+  }, {});
+
+  const sortedYears = Object.keys(counts)
+    .map(Number)
+    .sort((a, b) => counts[b] - counts[a] || b - a);
+
+  const dominantYear = sortedYears[0];
+  const minYear = Math.min(...validYears);
+  const maxYear = Math.max(...validYears);
+
+  return {
+    label: String(dominantYear),
+    detail: minYear === maxYear ? 'Toda la plantilla comparte año' : `Rango ${minYear}-${maxYear}`,
+  };
+}
+
+function buildLateralitySummary(players) {
+  const counts = {
+    right: 0,
+    left: 0,
+    both: 0,
+    unknown: 0,
+  };
+
+  players.forEach((player) => {
+    counts[normalizeLaterality(player.laterality)] += 1;
+  });
+
+  const total = players.length || 1;
+  const rightEnd = Math.round((counts.right / total) * 360);
+  const leftEnd = rightEnd + Math.round((counts.left / total) * 360);
+  const bothEnd = leftEnd + Math.round((counts.both / total) * 360);
+
+  return {
+    counts,
+    chartStyle: `conic-gradient(
+      #1d4ed8 0deg ${rightEnd}deg,
+      #16a34a ${rightEnd}deg ${leftEnd}deg,
+      #f59e0b ${leftEnd}deg ${bothEnd}deg,
+      #cbd5e1 ${bothEnd}deg 360deg
+    )`,
+  };
+}
+
+function buildTeamCardSummary(players) {
+  const coverageSummary = buildCoverageSummary(players);
+  const lineDistribution = buildLineDistribution(players);
+  const birthYearSummary = buildBirthYearSummary(players);
+  const lateralitySummary = buildLateralitySummary(players);
+
+  return {
+    coverageLabel: `${coverageSummary.length}/${SUPPORTED_POSITIONS.length}`,
+    coverageDetail: coverageSummary.slice(0, 4).map((entry) => entry.code).join(', ') || 'Sin posiciones',
+    birthYearLabel: birthYearSummary.label,
+    birthYearDetail: birthYearSummary.detail,
+    lineDistribution,
+    laterality: lateralitySummary,
+  };
+}
+
 async function requireClubForUser(user) {
   if (!user || !user.default_club) {
     return null;
@@ -135,6 +270,7 @@ async function getTeamsGroupedBySectionAndCategory(clubId, filters = {}) {
       ...team,
       player_count: teamPlayers.length,
       player_previews: teamPlayers.slice(0, 6).map(normalizePlayerPreview),
+      summary: buildTeamCardSummary(teamPlayers),
     });
   });
 

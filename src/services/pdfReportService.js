@@ -184,7 +184,8 @@ async function buildPlayerPdfReport(user, playerId, seasonId = null) {
     club,
     seasonLabel: summary.season_name || (activeSeason ? activeSeason.name : '-'),
     generatedDateLabel: formatDate(new Date()),
-    logoPath: '/img/soccerreport-logo.png',
+    logoPath: club.crest_path || '/img/soccerreport-logo.png',
+    brandingColor: club.interface_color || '#0F3D2E',
     player: playerCard,
     analytics: {
       ...analytics,
