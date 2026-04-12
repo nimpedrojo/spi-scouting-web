@@ -857,6 +857,38 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Crear equipo');
   });
 
+  test('formulario de usuario no muestra fallback legacy de equipo por defecto', async () => {
+    const club = await createTestClub(`Club User Legacy Hidden ${Date.now()}`);
+    const superadmin = await createTestUser({
+      name: 'Superadmin User Legacy Hidden',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const [userResult] = await db.query(
+      `INSERT INTO users (
+        name, email, password_hash, role, club_id, default_club, default_team, default_team_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'User Legacy Hidden',
+        `user_legacy_hidden_${Date.now()}@local`,
+        '$2b$10$dqViRKNFig.H8Ewz7IcQf.eiq..3sKjdfT9lsbHPq1xHSnzM6Sjsi',
+        'user',
+        club.id,
+        club.name,
+        'Equipo Legacy',
+        null,
+      ],
+    );
+
+    const res = await agent.get(`/admin/users/${userResult.insertId}/edit`);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('(legacy)');
+    expect(res.text).toContain('El equipo por defecto debe salir de Plantillas v2 del club asignado.');
+  });
+
   test('superadmin puede crear usuario con club aunque ese club aún no tenga plantillas v2', async () => {
     const club = await createTestClub(`Club User No Teams ${Date.now()}`);
     const superadmin = await createTestUser({

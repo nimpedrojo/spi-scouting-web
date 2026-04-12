@@ -63,9 +63,6 @@
               <option value="<%= team.id %>" <%= String(team.id) === String(currentTeamId) ? 'selected' : '' %>><%= team.label || team.name %></option>
             <% }) %>
           <% } %>
-          <% if (user && user.default_team && !currentTeamId) { %>
-            <option value="" selected><%= user.default_team %> (legacy)</option>
-          <% } %>
         </select>
         <div class="form-text d-flex justify-content-between align-items-center">
           <span>El equipo por defecto debe salir de Plantillas v2 del club asignado.</span>
