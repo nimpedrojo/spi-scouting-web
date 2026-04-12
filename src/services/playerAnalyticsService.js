@@ -42,7 +42,7 @@ async function getPlayerSummary(playerId, clubId) {
         p.current_team_id,
         COALESCE(tp.dorsal, '') AS dorsal,
         COALESCE(tp.positions, '') AS positions,
-        COALESCE(t.name, p.team) AS team_name,
+        t.name AS team_name,
         sec.name AS section_name,
         cat.name AS category_name,
         s.name AS season_name
@@ -171,7 +171,7 @@ async function getPlayersForComparison(clubId, filters = {}) {
       p.id,
       p.first_name,
       p.last_name,
-      COALESCE(t.name, p.team) AS team_name,
+      t.name AS team_name,
       t.id AS team_id,
       sec.name AS section_name,
       cat.name AS category_name

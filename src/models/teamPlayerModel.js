@@ -57,14 +57,15 @@ async function getPlayersByTeamId(teamId) {
         tp.player_id,
         tp.dorsal,
         tp.positions,
+        t.name AS team_name,
         p.first_name,
         p.last_name,
-        p.team AS legacy_team,
         p.current_team_id,
         p.club_id,
         p.birth_year,
         p.laterality
       FROM team_players tp
+      INNER JOIN teams t ON t.id = tp.team_id
       INNER JOIN players p ON p.id = tp.player_id
       WHERE tp.team_id = ?
       ORDER BY
@@ -90,12 +91,13 @@ async function getPlayersByTeamIds(teamIds) {
         tp.player_id,
         tp.dorsal,
         tp.positions,
+        t.name AS team_name,
         p.first_name,
         p.last_name,
-        p.team AS legacy_team,
         p.current_team_id,
         p.club_id
       FROM team_players tp
+      INNER JOIN teams t ON t.id = tp.team_id
       INNER JOIN players p ON p.id = tp.player_id
       WHERE tp.team_id IN (${placeholders})
       ORDER BY

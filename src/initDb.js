@@ -2,7 +2,6 @@ const { createUsersTable, ensureAdminUser, syncUserClubAssignments } = require('
 const { createReportsTable } = require('./models/reportModel');
 const { createPlayersTable } = require('./models/playerModel');
 const { createClubsTable } = require('./models/clubModel');
-const { createClubTeamsTable } = require('./models/clubTeamModel');
 const { createClubRecommendationsTable } = require('./models/clubRecommendationModel');
 const { createSeasonsTable } = require('./models/seasonModel');
 const { createSectionsTable, seedDefaultSections } = require('./models/sectionModel');
@@ -20,7 +19,6 @@ let initializationPromise = null;
 async function initializeDatabase() {
   await ensureDatabaseExists();
   await createClubsTable();
-  await createClubTeamsTable();
   await createClubRecommendationsTable();
   await createSeasonsTable();
   await createSectionsTable();

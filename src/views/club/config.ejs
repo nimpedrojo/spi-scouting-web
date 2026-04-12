@@ -83,40 +83,6 @@
 </div>
 
 <div class="row g-4 mt-1">
-  <div class="col-lg-12">
-    <div class="card h-100">
-      <div class="card-header">
-        Compatibilidad legacy
-      </div>
-      <div class="card-body">
-        <% if (!teams || !teams.length) { %>
-          <p class="text-muted mb-0">No hay equipos legacy configurados para este club.</p>
-        <% } else { %>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Equipo</th>
-                  <th>Origen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% teams.forEach((team) => { %>
-                  <tr>
-                    <td><%= team.name %></td>
-                    <td>legacy</td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        <% } %>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row g-4 mt-1">
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
@@ -134,7 +100,7 @@
               <li class="list-group-item">
                 <strong><%= p.first_name %> <%= p.last_name %></strong>
                 <small class="text-muted d-block">
-                  <%= p.team || 'Sin equipo' %>
+                  <%= p.relational_team_name || 'Sin equipo' %>
                 </small>
               </li>
             <% }); %>

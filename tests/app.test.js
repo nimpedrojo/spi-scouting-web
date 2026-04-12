@@ -1971,9 +1971,8 @@ describe('Aplicación SoccerReport', () => {
     expect(players.map((player) => player.external_id)).toEqual(['bulk-player-1', 'bulk-player-2']);
   });
 
-  test('club config prioriza equipos v2 y deja visible la compatibilidad legacy', async () => {
+  test('club config muestra solo equipos v2 del club', async () => {
     const context = await createTeamContext('Club Config Compat');
-    await db.query('INSERT INTO club_teams (club, name) VALUES (?, ?)', [context.club.name, 'Legacy Team']);
     const v2TeamId = randomUUID();
     await db.query(
       `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
@@ -1988,8 +1987,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Equipos v2 del club (Plantillas)');
     expect(res.text).toContain('V2 Team');
-    expect(res.text).toContain('Compatibilidad legacy');
-    expect(res.text).toContain('Legacy Team');
+    expect(res.text).not.toContain('Compatibilidad legacy');
   });
 
   test('session-based operational context still works for /teams', async () => {

@@ -11,7 +11,9 @@ const {
   deleteReport,
 } = require('../models/reportModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
-const { getPlayersByTeam } = require('../models/playerModel');
+const { getAllPlayers } = require('../models/playerModel');
+const { findTeamById } = require('../models/teamModel');
+const { getPlayersByTeamId } = require('../models/teamPlayerModel');
 const { buildReportRadarComparison } = require('../services/reportComparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
@@ -37,17 +39,39 @@ function ensureAdmin(req, res, next) {
   return next();
 }
 
+function normalizeReportPlayerOption(player) {
+  return {
+    id: player.player_id || player.id,
+    first_name: player.first_name,
+    last_name: player.last_name,
+    birth_year: player.birth_year || '',
+    laterality: player.laterality || '',
+    relational_team_name: player.team_name || player.relational_team_name || '',
+  };
+}
+
+async function getReportPlayersForContext(clubName, defaultTeamId = null) {
+  if (defaultTeamId) {
+    const players = await getPlayersByTeamId(defaultTeamId);
+    return players.map(normalizeReportPlayerOption);
+  }
+
+  const players = await getAllPlayers(clubName || null);
+  return players.map(normalizeReportPlayerOption);
+}
+
 router.get('/new', ensureAuth, async (req, res) => {
   const defaultClub =
     (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
-  const defaultTeam =
-    (req.session.user && req.session.user.default_team) || 'Primera Infantil';
+  const defaultTeamId =
+    (req.session.user && req.session.user.default_team_id) || null;
+  const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
+  const defaultTeam = defaultTeamRecord ? defaultTeamRecord.name : '';
 
-  // Intentamos filtrar jugadores por el equipo por defecto; si no hay, se podrán mostrar todos más adelante
   const clubFilter = defaultClub || null;
-  let players = await getPlayersByTeam(defaultTeam, clubFilter);
-  if (!players.length) {
-    players = await getPlayersByTeam(null, clubFilter);
+  let players = await getReportPlayersForContext(clubFilter, defaultTeamId);
+  if (!players.length && defaultTeamId) {
+    players = await getReportPlayersForContext(clubFilter, null);
   }
 
   let recommendationConfig = {};
@@ -83,7 +107,7 @@ router.get('/new', ensureAuth, async (req, res) => {
   logPageView(req, 'report_new_form', {
     playerCount: players.length,
     scopeClub: defaultClub,
-    defaultTeam,
+    defaultTeamId,
   });
 });
 
@@ -135,6 +159,9 @@ router.post('/new', ensureAuth, async (req, res) => {
   } = req.body;
 
   try {
+    const sessionDefaultTeamId = (req.session.user && req.session.user.default_team_id) || null;
+    const defaultTeamRecord = sessionDefaultTeamId ? await findTeamById(sessionDefaultTeamId) : null;
+
     // calcular medias de cada bloque a partir de sus sub-valores
     const toNumber = (v) => {
       if (v === undefined || v === null || v === '') return null;
@@ -200,7 +227,10 @@ router.post('/new', ensureAuth, async (req, res) => {
 
     if (!player_name || !player_surname) {
       const clubFilter = (req.session.user && req.session.user.default_club) || null;
-      const playersForForm = await getPlayersByTeam(team || null, clubFilter);
+      const playersForForm = await getReportPlayersForContext(
+        clubFilter,
+        sessionDefaultTeamId,
+      );
       let recommendationConfig = {};
       try {
         const clubForRec =
@@ -238,7 +268,7 @@ router.post('/new', ensureAuth, async (req, res) => {
     const finalClub =
       club || (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
     const finalTeam =
-      team || (req.session.user && req.session.user.default_team) || 'Primera Infantil';
+      team || (defaultTeamRecord ? defaultTeamRecord.name : '');
 
     await createReport({
       player_name,
@@ -311,7 +341,10 @@ router.post('/new', ensureAuth, async (req, res) => {
       `Ha ocurrido un error al guardar el informe: ${err.message}`,
     );
     const clubFilter = (req.session.user && req.session.user.default_club) || null;
-    const playersForForm = await getPlayersByTeam(team || null, clubFilter);
+    const playersForForm = await getReportPlayersForContext(
+      clubFilter,
+      (req.session.user && req.session.user.default_team_id) || null,
+    );
     return res.status(500).render('reports/new', {
       formData: req.body,
       validationErrors: {},

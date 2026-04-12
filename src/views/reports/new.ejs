@@ -12,11 +12,11 @@
               value="<%= p.id %>"
               data-first-name="<%= p.first_name %>"
               data-last-name="<%= p.last_name %>"
-              data-team="<%= p.team || '' %>"
+              data-team="<%= p.relational_team_name || '' %>"
               data-year="<%= p.birth_year || '' %>"
               data-laterality="<%= p.laterality || '' %>"
             >
-              <%= p.first_name %> <%= p.last_name %> (<%= p.team || 'Sin equipo' %>)
+              <%= p.first_name %> <%= p.last_name %> (<%= p.relational_team_name || 'Sin equipo' %>)
             </option>
           <% }) %>
         <% } %>

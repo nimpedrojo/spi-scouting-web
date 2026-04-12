@@ -165,7 +165,7 @@ async function getPlayersByTeam(team, club = null) {
       FROM players p
       LEFT JOIN teams t ON t.id = p.current_team_id
       LEFT JOIN team_players tp ON tp.player_id = p.id AND tp.team_id = p.current_team_id
-      WHERE COALESCE(t.name, p.team) = ?
+      WHERE t.name = ?
     `;
     const params = [team];
 
@@ -203,7 +203,7 @@ async function getPlayersByTeam(team, club = null) {
     params.push(club);
   }
 
-  sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
+  sql += ' ORDER BY t.name, p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
   return rows.map(normalizePlayerRow);
@@ -233,7 +233,7 @@ async function getAllPlayers(club = null) {
     params.push(club);
   }
 
-  sql += ' ORDER BY COALESCE(t.name, p.team), p.last_name, p.first_name';
+  sql += ' ORDER BY t.name, p.last_name, p.first_name';
 
   const [rows] = await db.query(sql, params);
   return rows.map(normalizePlayerRow);

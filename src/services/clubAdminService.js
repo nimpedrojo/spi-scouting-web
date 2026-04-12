@@ -2,7 +2,6 @@ const { getAllClubs, getClubById, getClubByName } = require('../models/clubModel
 const { getAllUsers } = require('../models/userModel');
 const { getAllPlayers } = require('../models/playerModel');
 const { getAllReports } = require('../models/reportModel');
-const { getTeamsByClub } = require('../models/clubTeamModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getTeamsByClubId } = require('../models/teamModel');
 const { getSeasonsByClubId } = require('../models/seasonModel');
@@ -42,11 +41,10 @@ async function getClubAdminData(club) {
     return null;
   }
 
-  const [users, players, reports, legacyTeams, recommendations, v2Teams, seasons] = await Promise.all([
+  const [users, players, reports, recommendations, v2Teams, seasons] = await Promise.all([
     getAllUsers(club.name),
     getAllPlayers(club.name),
     getAllReports(club.name),
-    getTeamsByClub(club.name),
     getRecommendationsByClub(club.name),
     getTeamsByClubId(club.id),
     getSeasonsByClubId(club.id),
@@ -57,7 +55,6 @@ async function getClubAdminData(club) {
     users,
     players,
     reports,
-    legacyTeams,
     recommendations,
     v2Teams,
     seasons,
