@@ -527,6 +527,47 @@ body {
   font-weight: 700;
 }
 
+.player-avatar--photo {
+  object-fit: cover;
+  border: 3px solid rgba(15, 61, 46, 0.12);
+  background: #fff;
+}
+
+.player-form-photo-preview {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+}
+
+.player-list-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.player-list-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.player-list-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #0f3d2e, #19c37d);
+}
+
 .profile-info-grid,
 .analytics-stat-grid {
   display: grid;

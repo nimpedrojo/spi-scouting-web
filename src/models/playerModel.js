@@ -45,6 +45,7 @@ async function createPlayersTable() {
       nationality VARCHAR(100),
       preferred_foot VARCHAR(20),
       avatar_color VARCHAR(20),
+      photo_path VARCHAR(255),
       stats_json TEXT,
       source VARCHAR(50),
       external_id VARCHAR(100),
@@ -63,6 +64,7 @@ async function createPlayersTable() {
     'ALTER TABLE players ADD COLUMN nationality VARCHAR(100)',
     'ALTER TABLE players ADD COLUMN preferred_foot VARCHAR(20)',
     'ALTER TABLE players ADD COLUMN avatar_color VARCHAR(20)',
+    'ALTER TABLE players ADD COLUMN photo_path VARCHAR(255)',
     'ALTER TABLE players ADD COLUMN stats_json TEXT',
     'ALTER TABLE players ADD COLUMN source VARCHAR(50)',
     'ALTER TABLE players ADD COLUMN external_id VARCHAR(100)',
@@ -115,6 +117,7 @@ async function insertPlayer({
   email = null,
   nationality = null,
   preferredFoot = null,
+  photoPath = null,
   stats = null,
   source = null,
   externalId = null,
@@ -122,8 +125,8 @@ async function insertPlayer({
   const [result] = await db.query(
     `INSERT INTO players (
       first_name, last_name, club, club_id, team, current_team_id, birth_date, birth_year, laterality,
-      phone, email, nationality, preferred_foot, stats_json, source, external_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      phone, email, nationality, preferred_foot, photo_path, stats_json, source, external_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       firstName,
       lastName,
@@ -138,6 +141,7 @@ async function insertPlayer({
       email,
       nationality,
       preferredFoot,
+      photoPath,
       stats ? JSON.stringify(stats) : null,
       source,
       externalId,
@@ -282,14 +286,16 @@ async function updatePlayer(id, {
   email = null,
   nationality = null,
   preferredFoot = null,
+  photoPath = undefined,
   stats = null,
   source = null,
   externalId = null,
 }) {
+  const photoPathValue = photoPath === undefined ? null : photoPath;
   const [result] = await db.query(
     `UPDATE players
      SET first_name = ?, last_name = ?, team = ?, current_team_id = ?, birth_date = ?, birth_year = ?, laterality = ?,
-         phone = ?, email = ?, nationality = ?, preferred_foot = ?, stats_json = ?, club = ?, club_id = ?, source = ?, external_id = ?
+         phone = ?, email = ?, nationality = ?, preferred_foot = ?, photo_path = ?, stats_json = ?, club = ?, club_id = ?, source = ?, external_id = ?
      WHERE id = ?`,
     [
       firstName,
@@ -303,6 +309,7 @@ async function updatePlayer(id, {
       email,
       nationality,
       preferredFoot,
+      photoPathValue,
       stats ? JSON.stringify(stats) : null,
       club,
       clubId,

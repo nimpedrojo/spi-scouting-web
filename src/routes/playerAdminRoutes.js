@@ -1,6 +1,9 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const fsPromises = require('fs/promises');
 const multer = require('multer');
+const { randomUUID } = require('crypto');
 const XLSX = require('xlsx');
 const {
   getAllPlayers,
@@ -17,11 +20,75 @@ const {
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const router = express.Router();
+const playerPhotosDir = path.join(__dirname, '..', 'public', 'uploads', 'players');
+
+fs.mkdirSync(playerPhotosDir, { recursive: true });
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
+
+const playerPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, playerPhotosDir),
+    filename: (_req, file, cb) => {
+      const extension = path.extname(file.originalname || '').toLowerCase() || '.png';
+      cb(null, `player-photo-${randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('INVALID_IMAGE_TYPE'));
+  },
+});
+
+function buildPlayerFormRedirect(req) {
+  return req.params && req.params.id
+    ? `/admin/players/${req.params.id}/edit`
+    : '/admin/players/new';
+}
+
+function uploadPlayerPhoto(req, res, next) {
+  playerPhotoUpload.single('photo_file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      req.flash('error', 'La imagen del jugador no puede superar los 3MB.');
+    } else if (err.message === 'INVALID_IMAGE_TYPE') {
+      req.flash('error', 'La foto del jugador debe ser una imagen válida.');
+    } else {
+      req.flash('error', 'No se ha podido procesar la imagen del jugador.');
+    }
+
+    res.redirect(buildPlayerFormRedirect(req));
+  });
+}
+
+async function deletePlayerPhoto(photoPath) {
+  if (!photoPath || !String(photoPath).startsWith('/uploads/players/')) {
+    return;
+  }
+
+  const filename = path.basename(photoPath);
+  const filePath = path.join(playerPhotosDir, filename);
+
+  try {
+    await fsPromises.unlink(filePath);
+  } catch (err) {
+    if (err && err.code !== 'ENOENT') {
+      // eslint-disable-next-line no-console
+      console.error('Error al borrar la imagen del jugador:', err);
+    }
+  }
+}
 
 function parseOptionalNumber(value) {
   if (value === undefined || value === null || String(value).trim() === '') {
@@ -261,7 +328,7 @@ router.get('/new', ensureAdmin, async (req, res) => {
   });
 });
 
-router.post('/new', ensureAdmin, async (req, res) => {
+router.post('/new', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
   const {
     first_name,
     last_name,
@@ -279,6 +346,7 @@ router.post('/new', ensureAdmin, async (req, res) => {
   } = req.body;
 
   if (!first_name || !last_name) {
+    await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
     req.flash('error', 'Nombre y apellidos son obligatorios.');
     return res.redirect('/admin/players/new');
   }
@@ -306,6 +374,7 @@ router.post('/new', ensureAdmin, async (req, res) => {
       email: email || null,
       nationality: nationality || null,
       preferredFoot: preferred_foot || null,
+      photoPath: req.file ? `/uploads/players/${req.file.filename}` : null,
       stats: buildPlayerStatsFromBody(req.body),
     });
 
@@ -319,6 +388,7 @@ router.post('/new', ensureAdmin, async (req, res) => {
     req.flash('success', 'Jugador creado correctamente.');
     return res.redirect('/admin/players');
   } catch (err) {
+    await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
     // eslint-disable-next-line no-console
     console.error('Error al crear jugador:', err);
     req.flash('error', 'Ha ocurrido un error al crear el jugador.');
@@ -352,7 +422,7 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/:id/edit', ensureAdmin, async (req, res) => {
+router.post('/:id/edit', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
   const { id } = req.params;
   const {
     first_name,
@@ -367,9 +437,11 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
     email,
     nationality,
     preferred_foot,
+    remove_photo,
   } = req.body;
 
   if (!first_name || !last_name) {
+    await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
     req.flash('error', 'Nombre y apellidos son obligatorios.');
     return res.redirect(`/admin/players/${id}/edit`);
   }
@@ -379,8 +451,17 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const player = await getPlayerById(id, clubFilter);
     if (!player) {
+      await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
       req.flash('error', 'Jugador no encontrado.');
       return res.redirect('/admin/players');
+    }
+
+    let nextPhotoPath = player.photo_path || null;
+    if (remove_photo === '1') {
+      nextPhotoPath = null;
+    }
+    if (req.file) {
+      nextPhotoPath = `/uploads/players/${req.file.filename}`;
     }
 
     const { affected } = await updatePlayerWithAssignment(id, {
@@ -397,12 +478,18 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
       email: email || null,
       nationality: nationality || null,
       preferredFoot: preferred_foot || null,
+      photoPath: nextPhotoPath,
       stats: buildPlayerStatsFromBody(req.body),
     });
 
     if (!affected) {
+      await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
       req.flash('error', 'No se ha podido actualizar el jugador.');
       return res.redirect(`/admin/players/${id}/edit`);
+    }
+
+    if ((remove_photo === '1' || req.file) && player.photo_path && player.photo_path !== nextPhotoPath) {
+      await deletePlayerPhoto(player.photo_path);
     }
 
     logAuditEvent(req, 'update', 'player', {
@@ -416,6 +503,7 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
     req.flash('success', 'Jugador actualizado correctamente.');
     return res.redirect('/admin/players');
   } catch (err) {
+    await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
     // eslint-disable-next-line no-console
     console.error('Error al actualizar jugador:', err);
     req.flash('error', 'Ha ocurrido un error al actualizar el jugador.');
@@ -430,18 +518,22 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
 
+    let player = null;
     if (!isSuperAdmin) {
-      const player = await getPlayerById(id, clubFilter);
+      player = await getPlayerById(id, clubFilter);
       if (!player) {
         req.flash('error', 'No se ha podido borrar el jugador.');
         return res.redirect('/admin/players');
       }
+    } else {
+      player = await getPlayerById(id, null);
     }
 
     const affected = await deletePlayer(id);
     if (!affected) {
       req.flash('error', 'No se ha podido borrar el jugador.');
     } else {
+      await deletePlayerPhoto(player && player.photo_path);
       logAuditEvent(req, 'delete', 'player', {
         playerId: Number(id),
       });

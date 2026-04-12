@@ -1,6 +1,6 @@
 <h1 class="mb-4">Nuevo jugador</h1>
 
-<form method="POST" action="/admin/players/new">
+<form method="POST" action="/admin/players/new" enctype="multipart/form-data">
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h5 mb-3">Informacion personal</h2>
@@ -40,6 +40,11 @@
         <div class="col-md-4">
           <label for="laterality" class="form-label">Lateralidad</label>
           <input type="text" class="form-control" id="laterality" name="laterality" placeholder="Diestro, zurdo, ambidiestro..." />
+        </div>
+        <div class="col-md-8">
+          <label for="photo_file" class="form-label">Foto del jugador</label>
+          <input type="file" class="form-control" id="photo_file" name="photo_file" accept="image/*" />
+          <div class="form-text">Opcional. Se mostrará en el perfil del jugador en lugar del avatar con iniciales.</div>
         </div>
       </div>
     </div>

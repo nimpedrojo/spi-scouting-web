@@ -727,17 +727,34 @@ describe('Aplicación SoccerReport', () => {
   });
 
   test('un admin puede ver la página de gestión de jugadores', async () => {
-    const { email } = await createTestUser({
-      name: 'Admin Players',
-      role: 'admin',
-    });
+    const context = await createTeamContext('Club Admin Players');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Listado Foto',
+      ],
+    );
+    await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, photo_path, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Foto', 'Listado', context.club.name, context.club.id, teamId, 'Juvenil Listado Foto', '/uploads/players/listado-test.png'],
+    );
 
     const agent = request.agent(app);
-    await agent.post('/login').send({ email, password: 'password123' });
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
 
     const res = await agent.get('/admin/players');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Base de jugadores');
+    expect(res.text).toContain('/uploads/players/listado-test.png');
   });
 
   test('un no admin no puede acceder a la gestión de jugadores', async () => {
@@ -2597,6 +2614,55 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Informes');
   });
 
+  test('player profile muestra la foto del jugador cuando existe', async () => {
+    const context = await createTeamContext('Club Player Photo');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Foto',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const createRes = await agent
+      .post('/admin/players/new')
+      .field('first_name', 'Lucas')
+      .field('last_name', 'Foto')
+      .field('club', context.club.name)
+      .field('team_id', teamId)
+      .field('dorsal', '11')
+      .field('positions', 'ED')
+      .attach('photo_file', Buffer.from('fake-image-content'), 'player.png');
+
+    expect(createRes.status).toBe(302);
+    expect(createRes.headers.location).toBe('/admin/players');
+
+    const [rows] = await db.query(
+      'SELECT id, photo_path FROM players WHERE club_id = ? AND first_name = ? AND last_name = ?',
+      [context.club.id, 'Lucas', 'Foto'],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].photo_path).toContain('/uploads/players/');
+
+    const profileRes = await agent.get(`/players/${rows[0].id}`);
+    expect(profileRes.status).toBe(200);
+    expect(profileRes.text).toContain(`src="${rows[0].photo_path}"`);
+    expect(profileRes.text).toContain('Foto de Lucas Foto');
+  });
+
   test('player profile with evaluations renders analytics and chart', async () => {
     const context = await createEvaluationContext('Club Perfil Eval');
     const evaluationId = randomUUID();
@@ -3188,6 +3254,22 @@ describe('Aplicación SoccerReport', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain(`Informe de Mario Sanz`);
     expect(res.text).toContain('Comunicación trimestral');
+  });
+
+  test('PDF route muestra la foto del jugador cuando existe', async () => {
+    const context = await createEvaluationContext('Club PDF Photo');
+    await db.query(
+      'UPDATE players SET photo_path = ? WHERE id = ?',
+      ['/uploads/players/pdf-photo-test.png', context.playerId],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/players/${context.playerId}/pdf`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('/uploads/players/pdf-photo-test.png');
+    expect(res.text).toContain('Foto de Mario Sanz');
   });
 
   test('PDF route works with player with evaluations', async () => {

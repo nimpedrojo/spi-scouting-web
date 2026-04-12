@@ -174,6 +174,7 @@ async function buildPlayerPdfReport(user, playerId, seasonId = null) {
     ...summary,
     fullName: `${player.first_name} ${player.last_name}`.trim(),
     initials: buildInitials(player),
+    photoPath: player.photo_path || null,
     age: calculateAge(player.birth_date, player.birth_year),
     primaryPosition: summary.positions ? String(summary.positions).split(',')[0].trim() : '',
     preferredFoot: player.preferred_foot || player.laterality || '',

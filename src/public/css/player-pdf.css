@@ -149,6 +149,12 @@ body.player-pdf-body {
   font-weight: 700;
 }
 
+.pdf-avatar--photo {
+  object-fit: cover;
+  border: 2px solid rgba(24, 49, 38, 0.12);
+  background: #ffffff;
+}
+
 .pdf-player-name {
   font-size: 1.35rem;
   font-weight: 700;

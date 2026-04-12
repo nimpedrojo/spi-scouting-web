@@ -3,9 +3,17 @@
     <div class="row g-4 align-items-center">
       <div class="col-lg-8">
         <div class="d-flex align-items-center gap-3 flex-wrap">
-          <div class="player-avatar" style="<%= player.avatar_color ? 'background:' + player.avatar_color : '' %>">
-            <%= player.initials %>
-          </div>
+          <% if (player.photo_path) { %>
+            <img
+              src="<%= player.photo_path %>"
+              alt="Foto de <%= player.full_name %>"
+              class="player-avatar player-avatar--photo"
+            />
+          <% } else { %>
+            <div class="player-avatar" style="<%= player.avatar_color ? 'background:' + player.avatar_color : '' %>">
+              <%= player.initials %>
+            </div>
+          <% } %>
           <div>
             <h2 class="mb-1"><%= player.full_name %></h2>
             <div class="d-flex gap-2 flex-wrap">

@@ -1,6 +1,6 @@
 <h1 class="mb-4">Editar jugador</h1>
 
-<form method="POST" action="/admin/players/<%= player.id %>/edit">
+<form method="POST" action="/admin/players/<%= player.id %>/edit" enctype="multipart/form-data">
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h5 mb-3">Informacion personal</h2>
@@ -40,6 +40,20 @@
         <div class="col-md-4">
           <label class="form-label" for="laterality">Lateralidad</label>
           <input type="text" class="form-control" id="laterality" name="laterality" value="<%= player.laterality || '' %>" />
+        </div>
+        <div class="col-md-8">
+          <label class="form-label" for="photo_file">Foto del jugador</label>
+          <input type="file" class="form-control" id="photo_file" name="photo_file" accept="image/*" />
+          <div class="form-text">Opcional. Si subes una nueva imagen sustituirá a la actual.</div>
+          <% if (player.photo_path) { %>
+            <div class="d-flex align-items-center gap-3 mt-3">
+              <img src="<%= player.photo_path %>" alt="Foto actual de <%= player.first_name %> <%= player.last_name %>" class="player-form-photo-preview" />
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="remove_photo" name="remove_photo" />
+                <label class="form-check-label" for="remove_photo">Quitar foto actual</label>
+              </div>
+            </div>
+          <% } %>
         </div>
       </div>
     </div>

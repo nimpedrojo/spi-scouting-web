@@ -51,9 +51,17 @@
         <article class="pdf-card">
           <h2>Identidad del jugador</h2>
           <div class="pdf-player-block">
-            <div class="pdf-avatar" style="<%= report.player.avatar_color ? 'background:' + report.player.avatar_color : '' %>">
-              <%= report.player.initials %>
-            </div>
+            <% if (report.player.photoPath) { %>
+              <img
+                src="<%= report.player.photoPath %>"
+                alt="Foto de <%= report.player.fullName %>"
+                class="pdf-avatar pdf-avatar--photo"
+              />
+            <% } else { %>
+              <div class="pdf-avatar" style="<%= report.player.avatar_color ? 'background:' + report.player.avatar_color : '' %>">
+                <%= report.player.initials %>
+              </div>
+            <% } %>
             <div class="pdf-player-meta">
               <div class="pdf-player-name"><%= report.player.fullName %></div>
               <div class="pdf-chip-row">

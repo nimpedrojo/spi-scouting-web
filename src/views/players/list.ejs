@@ -45,7 +45,22 @@
             />
           </td>
           <td><%= p.id %></td>
-          <td><%= p.first_name %></td>
+          <td>
+            <div class="player-list-name">
+              <% if (p.photo_path) { %>
+                <img
+                  src="<%= p.photo_path %>"
+                  alt="Foto de <%= p.first_name %> <%= p.last_name %>"
+                  class="player-list-avatar"
+                />
+              <% } else { %>
+                <span class="player-list-avatar player-list-avatar--fallback">
+                  <%= `${(p.first_name || '').charAt(0)}${(p.last_name || '').charAt(0)}`.toUpperCase() %>
+                </span>
+              <% } %>
+              <span><%= p.first_name %></span>
+            </div>
+          </td>
           <td><%= p.last_name %></td>
           <td><%= p.relational_team_name || 'Sin equipo' %></td>
           <td><%= p.dorsal || '' %></td>
