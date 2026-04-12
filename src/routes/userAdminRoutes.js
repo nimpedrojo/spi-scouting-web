@@ -34,7 +34,10 @@ router.get('/', ensureAdmin, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const users = await getAllUsers(clubFilter);
-    return res.render('users/list', { users, currentUser: req.session.user });
+    const visibleUsers = isSuperAdmin
+      ? users
+      : users.filter((user) => user.role !== 'superadmin');
+    return res.render('users/list', { users: visibleUsers, currentUser: req.session.user });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener usuarios:', err);
@@ -92,6 +95,13 @@ router.post('/', ensureAdmin, async (req, res) => {
 
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
+    const requestedRole = role && role.trim() ? role.trim() : 'user';
+
+    if (!isSuperAdmin && requestedRole !== 'user') {
+      req.flash('error', 'Solo un superadmin puede crear usuarios administradores.');
+      return res.redirect('/admin/users/new');
+    }
+
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
       req.flash('error', 'Ya existe un usuario con ese email.');
@@ -131,7 +141,7 @@ router.post('/', ensureAdmin, async (req, res) => {
       name: name.trim(),
       email: email.trim(),
       password,
-      role: isSuperAdmin ? role : 'user',
+      role: isSuperAdmin ? requestedRole : 'user',
       clubId: assignedClub ? assignedClub.id : null,
       defaultClub,
       defaultTeam,
@@ -154,7 +164,7 @@ router.post('/:id/role', ensureAdmin, async (req, res) => {
   const { role } = req.body;
 
   const isSuperAdmin = req.session.user.role === 'superadmin';
-  const validRoles = isSuperAdmin ? ['user', 'admin', 'superadmin'] : ['user', 'admin'];
+  const validRoles = isSuperAdmin ? ['user', 'admin', 'superadmin'] : ['user'];
 
   if (!validRoles.includes(role)) {
     req.flash('error', 'Rol no válido.');

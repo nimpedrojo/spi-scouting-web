@@ -84,10 +84,69 @@
 
 <script>
   (function () {
+    var form = document.querySelector('form[action="<%= formAction %>"]');
     var clubSelect = document.getElementById('club_id');
-    if (!clubSelect) return;
+    if (!form || !clubSelect) return;
+    var storageKey = 'user-form-draft:' + window.location.pathname;
+
+    function getDraftFields() {
+      return {
+        name: document.getElementById('name'),
+        email: document.getElementById('email'),
+        newPassword: document.getElementById('new_password'),
+        defaultTeamId: document.getElementById('default_team_id')
+      };
+    }
+
+    function saveDraft() {
+      var fields = getDraftFields();
+      var payload = {
+        name: fields.name ? fields.name.value : '',
+        email: fields.email ? fields.email.value : '',
+        newPassword: fields.newPassword ? fields.newPassword.value : '',
+        defaultTeamId: fields.defaultTeamId ? fields.defaultTeamId.value : ''
+      };
+      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    }
+
+    function restoreDraft() {
+      var raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) return;
+
+      try {
+        var draft = JSON.parse(raw);
+        var fields = getDraftFields();
+
+        if (fields.name && !fields.name.value && draft.name) {
+          fields.name.value = draft.name;
+        }
+
+        if (fields.email && !fields.email.value && draft.email) {
+          fields.email.value = draft.email;
+        }
+
+        if (fields.newPassword && !fields.newPassword.value && draft.newPassword) {
+          fields.newPassword.value = draft.newPassword;
+        }
+
+        if (fields.defaultTeamId && draft.defaultTeamId) {
+          var matchingOption = Array.prototype.find.call(
+            fields.defaultTeamId.options,
+            function (option) { return option.value === draft.defaultTeamId; }
+          );
+          if (matchingOption && !fields.defaultTeamId.value) {
+            fields.defaultTeamId.value = draft.defaultTeamId;
+          }
+        }
+      } catch (err) {
+        window.sessionStorage.removeItem(storageKey);
+      }
+    }
+
+    restoreDraft();
 
     clubSelect.addEventListener('change', function () {
+      saveDraft();
       var basePath = window.location.pathname;
       var nextValue = clubSelect.value || '';
       var url = new URL(window.location.href);
@@ -100,6 +159,10 @@
         url.pathname = basePath;
       }
       window.location.href = url.toString();
+    });
+
+    form.addEventListener('submit', function () {
+      window.sessionStorage.removeItem(storageKey);
     });
   })();
 </script>

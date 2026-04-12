@@ -48,7 +48,11 @@
               <option value="user" <%= u.role === 'user' ? 'selected' : '' %>>
                 Usuario
               </option>
-              <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>
+              <option
+                value="admin"
+                <%= u.role === 'admin' ? 'selected' : '' %>
+                <%= (!currentUser || currentUser.role !== 'superadmin') ? 'disabled' : '' %>
+              >
                 Admin
               </option>
               <option

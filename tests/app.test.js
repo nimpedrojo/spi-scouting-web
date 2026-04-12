@@ -560,7 +560,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain(club.name);
   });
 
-  test('admin puede acceder al listado de clubes', async () => {
+  test('admin no puede acceder al listado de clubes', async () => {
     const admin = await createTestUser({
       name: 'Admin Clubs Access',
       role: 'admin',
@@ -570,8 +570,8 @@ describe('Aplicación SoccerReport', () => {
     await agent.post('/login').send({ email: admin.email, password: 'password123' });
 
     const res = await agent.get('/clubs');
-    expect(res.status).toBe(200);
-    expect(res.text).toContain('Gestión de clubes');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/');
   });
 
   test('superadmin puede crear club en /clubs', async () => {
@@ -615,7 +615,7 @@ describe('Aplicación SoccerReport', () => {
     expect(rows[0].name).toBe('Club Editado');
   });
 
-  test('admin puede borrar varios clubes de una vez en /clubs', async () => {
+  test('admin no puede borrar varios clubes de una vez en /clubs', async () => {
     const admin = await createTestUser({
       name: 'Admin Bulk Clubs',
       role: 'admin',
@@ -631,19 +631,19 @@ describe('Aplicación SoccerReport', () => {
     });
 
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/clubs');
+    expect(res.headers.location).toBe('/');
 
     const [rows] = await db.query(
       'SELECT id FROM clubs WHERE id IN (?, ?)',
       [clubA.id, clubB.id],
     );
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(2);
   });
 
-  test('el borrado múltiple de clubes elimina antes equipos y temporadas asociadas', async () => {
-    const admin = await createTestUser({
-      name: 'Admin Bulk Clubs Dependencies',
-      role: 'admin',
+  test('un superadmin puede borrar clubes y dependencias asociadas', async () => {
+    const superadmin = await createTestUser({
+      name: 'Superadmin Bulk Clubs Dependencies',
+      role: 'superadmin',
     });
     const club = await createTestClub(`Bulk Club Dependencies ${Date.now()}`);
     const [sectionRows] = await db.query(
@@ -666,7 +666,7 @@ describe('Aplicación SoccerReport', () => {
     );
 
     const agent = request.agent(app);
-    await agent.post('/login').send({ email: admin.email, password: 'password123' });
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
 
     const res = await agent.post('/clubs/bulk-delete').send({
       clubIds: [String(club.id)],
@@ -706,6 +706,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('/admin/players');
     expect(res.text).toContain('Jugadores');
     expect(res.text).toContain('informes scouting y evaluaciones estructuradas');
+    expect(res.text).not.toContain('/clubs');
   });
 
   test('un admin ve acciones completas en la landing unificada de valoraciones', async () => {
@@ -985,7 +986,7 @@ describe('Aplicación SoccerReport', () => {
     expect(loginRes.headers.location).toBe('/dashboard');
   });
 
-  test('un admin puede cambiar el rol de un usuario', async () => {
+  test('un admin no puede promocionar a otro usuario a admin', async () => {
     const admin = await createTestUser({
       name: 'Admin Role',
       role: 'admin',
@@ -1007,7 +1008,7 @@ describe('Aplicación SoccerReport', () => {
     const [rows] = await db.query('SELECT role FROM users WHERE id = ?', [
       user.id,
     ]);
-    expect(rows[0].role).toBe('admin');
+    expect(rows[0].role).toBe('user');
   });
 
   test('un admin puede borrar un usuario diferente a sí mismo', async () => {

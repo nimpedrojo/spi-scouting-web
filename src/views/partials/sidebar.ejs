@@ -11,10 +11,21 @@
     { label: 'Jugadores', href: '/admin/players', adminOnly: true },
     { label: 'Admin. equipos', href: '/admin/club', adminOnly: true },
     { label: 'Usuarios', href: '/admin/users', adminOnly: true },
-    { label: 'Clubes', href: '/clubs', adminOnly: true },
+    { label: 'Clubes', href: '/clubs', superAdminOnly: true },
   ];
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
-  const visibleAdminItems = adminItems.filter((item) => !item.adminOnly || isAdminUser);
+  const isSuperAdminUser = currentUser && currentUser.role === 'superadmin';
+  const visibleAdminItems = adminItems.filter((item) => {
+    if (item.superAdminOnly) {
+      return isSuperAdminUser;
+    }
+
+    if (item.adminOnly) {
+      return isAdminUser;
+    }
+
+    return true;
+  });
   const isItemActive = (item) => {
     if (item.href === '#' || !activeRoute) {
       return false;

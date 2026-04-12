@@ -12,11 +12,8 @@ const { logAuditEvent } = require('../services/auditLogger');
 
 const router = express.Router();
 
-function ensureAdmin(req, res, next) {
-  if (
-    !req.session.user
-    || (req.session.user.role !== 'admin' && req.session.user.role !== 'superadmin')
-  ) {
+function ensureSuperAdmin(req, res, next) {
+  if (!req.session.user || req.session.user.role !== 'superadmin') {
     req.flash('error', 'No tienes permisos para acceder a esta sección.');
     return res.redirect('/');
   }
@@ -27,7 +24,7 @@ function getBasePath(req) {
   return req.baseUrl || '/clubs';
 }
 
-router.get('/', ensureAdmin, async (req, res) => {
+router.get('/', ensureSuperAdmin, async (req, res) => {
   try {
     const clubs = await getAllClubs();
     return res.render('clubs/index', {
@@ -44,7 +41,7 @@ router.get('/', ensureAdmin, async (req, res) => {
   }
 });
 
-router.get('/new', ensureAdmin, (req, res) => res.render('clubs/form', {
+router.get('/new', ensureSuperAdmin, (req, res) => res.render('clubs/form', {
   pageTitle: 'Nuevo club',
   activeRoute: '/clubs',
   club: null,
@@ -53,7 +50,7 @@ router.get('/new', ensureAdmin, (req, res) => res.render('clubs/form', {
   submitLabel: 'Crear club',
 }));
 
-router.post('/', ensureAdmin, async (req, res) => {
+router.post('/', ensureSuperAdmin, async (req, res) => {
   const { name, code } = req.body;
 
   if (!name || !code) {
@@ -73,7 +70,7 @@ router.post('/', ensureAdmin, async (req, res) => {
   }
 });
 
-router.get('/:id/edit', ensureAdmin, async (req, res) => {
+router.get('/:id/edit', ensureSuperAdmin, async (req, res) => {
   try {
     const club = await getClubById(req.params.id);
     if (!club) {
@@ -97,7 +94,7 @@ router.get('/:id/edit', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/:id/update', ensureAdmin, async (req, res) => {
+router.post('/:id/update', ensureSuperAdmin, async (req, res) => {
   const { name } = req.body;
 
   if (!name || !name.trim()) {
@@ -121,7 +118,7 @@ router.post('/:id/update', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/:id/delete', ensureAdmin, async (req, res) => {
+router.post('/:id/delete', ensureSuperAdmin, async (req, res) => {
   try {
     const club = await getClubById(req.params.id);
     if (!club) {
@@ -150,7 +147,7 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/bulk-delete', ensureAdmin, async (req, res) => {
+router.post('/bulk-delete', ensureSuperAdmin, async (req, res) => {
   let { clubIds } = req.body;
 
   if (!clubIds) {
