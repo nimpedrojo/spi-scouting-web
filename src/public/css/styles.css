@@ -262,6 +262,60 @@ body {
   min-height: 100vh;
 }
 
+.dashboard-context-card {
+  background:
+    linear-gradient(135deg, rgba(11, 59, 140, 0.08), rgba(255, 193, 7, 0.08)),
+    #ffffff;
+}
+
+.dashboard-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(11, 59, 140, 0.12);
+  color: var(--sv-red-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-context-stat,
+.dashboard-context-panel {
+  height: 100%;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(11, 59, 140, 0.12);
+  border-radius: 0.9rem;
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+.dashboard-entry-card,
+.dashboard-module-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-entry-card:hover,
+.dashboard-module-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(11, 59, 140, 0.2);
+  box-shadow: 0 1rem 2rem rgba(31, 41, 51, 0.08);
+}
+
+.dashboard-entry-eyebrow {
+  margin-bottom: 0.6rem;
+  color: var(--sv-red-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-inline-metrics .badge {
+  color: var(--sv-text-dark);
+  font-weight: 600;
+}
+
 .app-sidebar {
   width: 280px;
   background: linear-gradient(

@@ -1,180 +1,169 @@
-<!-- BLOQUE 1 — CONTEXTO -->
-<div class="row g-3 mb-4">
-  <div class="col-12 col-md-8">
-    <div class="card shadow-sm">
-      <div class="card-body d-flex flex-column flex-md-row justify-content-between gap-3 align-items-start align-items-md-center">
-        <div>
-          <h2 class="h5 mb-1">Contexto</h2>
-          <div class="small text-muted">Club activo</div>
-          <div class="fw-semibold mb-1"><%= activeClubName || 'Sin club asignado' %></div>
-          <div class="small text-muted">Equipo por defecto</div>
-          <div class="fw-semibold"><%= (currentUser && (currentUser.default_team || currentUser.defaultTeam || currentUser.defaultTeamName)) || '—' %></div>
+<%
+  const activeModuleCount = Array.isArray(moduleEntries) ? moduleEntries.length : 0;
+  const defaultTeamName = currentUser && (currentUser.default_team || currentUser.defaultTeam || currentUser.defaultTeamName);
+  const showPendingByTeam = dashboard
+    && dashboard.modules
+    && dashboard.modules.scoutingPlayersEnabled
+    && dashboard.pendingByTeam
+    && dashboard.pendingByTeam.length;
+%>
+
+<section class="dashboard-suite mb-4">
+  <div class="card dashboard-context-card shadow-sm border-0">
+    <div class="card-body p-4 p-lg-5">
+      <div class="row g-4 align-items-start">
+        <div class="col-12 col-lg-8">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="dashboard-kicker">SoccerProcessIQ Suite</span>
+            <span class="badge text-bg-light border">Modular Football Club Platform</span>
+          </div>
+          <h1 class="h3 mb-2">Panel general del club</h1>
+          <p class="text-muted mb-4">
+            <%= currentUser ? `Visión rápida para ${currentUser.name}.` : 'Visión rápida de la suite.' %>
+            Accede al núcleo operativo y a los módulos activos del club desde un solo punto.
+          </p>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <div class="dashboard-context-stat">
+                <div class="small text-uppercase text-muted">Club</div>
+                <div class="fw-semibold mt-1"><%= activeClubName || 'Sin club asignado' %></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="dashboard-context-stat">
+                <div class="small text-uppercase text-muted">Equipo por defecto</div>
+                <div class="fw-semibold mt-1"><%= defaultTeamName || 'Sin equipo asignado' %></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="dashboard-context-stat">
+                <div class="small text-uppercase text-muted">Temporada activa</div>
+                <div class="fw-semibold mt-1"><%= activeSeason ? activeSeason.name : 'Sin temporada activa' %></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="text-end">
-          <div class="small text-muted">Temporada</div>
-          <div class="fw-semibold"><%= activeSeason ? activeSeason.name : 'Sin temporada activa' %></div>
-          <div class="mt-2">
-            <a href="/account" class="btn btn-sm btn-outline-secondary">Mi cuenta</a>
+
+        <div class="col-12 col-lg-4">
+          <div class="dashboard-context-panel">
+            <div class="small text-uppercase text-muted mb-2">Estado de la suite</div>
+            <div class="d-flex align-items-end gap-2 mb-2">
+              <div class="display-6 fw-semibold lh-1"><%= activeModuleCount %></div>
+              <div class="text-muted mb-1">módulos activos</div>
+            </div>
+            <div class="small text-muted mb-3">
+              SPI Core permanece disponible como base común y los módulos se muestran según la activación del club.
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <a href="/account" class="btn btn-sm btn-outline-secondary">Mi cuenta</a>
+              <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
+                <a href="/admin/club" class="btn btn-sm btn-primary">Configurar club</a>
+              <% } %>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-  <div class="col-12 col-md-4">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h2 class="h6 mb-2">SoccerProcessIQ Suite</h2>
-        <div class="small text-muted">Modular Football Club Platform</div>
-        <div class="mt-3">
-          <% if (dashboard && dashboard.modules) { %>
-            <% const activeCount = (dashboard.modules.scoutingPlayersEnabled ? 1 : 0) + (dashboard.modules.scoutingTeamsEnabled ? 1 : 0) + (activeModuleKeys.includes('planning') ? 1 : 0); %>
-            <div class="fw-semibold"><%= activeCount %> módulos activos</div>
-          <% } else { %>
-            <div class="fw-semibold">Sin módulos configurados</div>
-          <% } %>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- BLOQUE 2 — SPI CORE -->
-<section class="mb-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-      <h2 class="h5 mb-0">SPI Core</h2>
-      <p class="text-muted mb-0">Operaciones y configuración básica del club</p>
-    </div>
-  </div>
-
-  <div class="row g-4 mb-3">
-    <div class="col-6 col-md-3">
-      <a href="/teams" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body text-center">
-            <img src="/img/list.svg" class="mb-2" alt="Equipos" style="height:36px;" />
-            <div class="fw-semibold">Equipos</div>
-            <div class="small text-muted">Accede al listado de equipos</div>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-6 col-md-3">
-      <a href="/admin/players" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body text-center">
-            <img src="/img/players.svg" class="mb-2" alt="Jugadores" style="height:36px;" />
-            <div class="fw-semibold">Jugadores</div>
-            <div class="small text-muted">Perfiles y gestión de plantilla</div>
-            <% if (dashboard && dashboard.metrics) { %>
-              <div class="mt-2 display-6 fw-semibold"><%= dashboard.metrics.totalActivePlayers %></div>
-            <% } %>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-6 col-md-3">
-      <a href="/admin/users" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body text-center">
-            <img src="/img/users.svg" class="mb-2" alt="Usuarios" style="height:36px;" />
-            <div class="fw-semibold">Usuarios</div>
-            <div class="small text-muted">Roles y accesos</div>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-6 col-md-3">
-      <a href="/admin/club" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body text-center">
-            <img src="/img/list.svg" class="mb-2" alt="Configuración" style="height:36px;" />
-            <div class="fw-semibold">Configuración</div>
-            <div class="small text-muted">Ajustes del club</div>
-          </div>
-        </div>
-      </a>
     </div>
   </div>
 </section>
 
-<!-- BLOQUE 3 — MÓDULOS ACTIVOS -->
 <section class="mb-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
-      <h2 class="h5 mb-0">SPI Modules</h2>
-      <p class="text-muted mb-0">Accesos rápidos a los módulos habilitados para el club</p>
+      <h2 class="h4 mb-1">SPI Core</h2>
+      <p class="text-muted mb-0">Núcleo operativo común de SoccerProcessIQ Suite.</p>
     </div>
+    <% if (dashboard && dashboard.metrics) { %>
+      <div class="d-flex flex-wrap gap-2 dashboard-inline-metrics">
+        <span class="badge rounded-pill text-bg-light border"><%= dashboard.metrics.activeTeams %> equipos activos</span>
+        <span class="badge rounded-pill text-bg-light border"><%= dashboard.metrics.totalActivePlayers %> jugadores activos</span>
+      </div>
+    <% } %>
   </div>
 
   <div class="row g-4">
-    <% /* SPI Scouting Players */ %>
-    <% if (activeModuleKeys.includes('scouting_players')) { %>
+    <% coreEntries.forEach((entry) => { %>
       <div class="col-12 col-md-6 col-xl-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body d-flex flex-column justify-content-between">
-            <div>
-              <h3 class="h6">SPI Scouting Players</h3>
-              <p class="small text-muted">Informes individuales, valoraciones y seguimiento de jugadores</p>
-            </div>
-            <div class="mt-3 d-flex flex-wrap gap-2">
-              <a href="/reports/new" class="btn btn-primary">Nuevo informe</a>
-              <a href="/reports" class="btn btn-outline-secondary">Ver informes</a>
-              <a href="/assessments" class="btn btn-outline-secondary">Valoraciones</a>
+        <a href="<%= entry.href %>" class="text-decoration-none text-reset">
+          <div class="card dashboard-entry-card h-100 shadow-sm">
+            <div class="card-body">
+              <div class="dashboard-entry-eyebrow">SPI Core</div>
+              <h3 class="h5 mb-2"><%= entry.title %></h3>
+              <p class="text-muted small mb-3"><%= entry.description %></p>
+              <div class="small fw-semibold"><%= entry.meta %></div>
             </div>
           </div>
-        </div>
+        </a>
       </div>
-    <% } %>
-
-    <% /* SPI Planning */ %>
-    <% if (activeModuleKeys.includes('planning')) { %>
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body d-flex flex-column justify-content-between">
-            <div>
-              <h3 class="h6">SPI Planning</h3>
-              <p class="small text-muted">Temporadas, microciclos y sesiones</p>
-            </div>
-            <div class="mt-3 d-flex flex-wrap gap-2">
-              <a href="/seasons" class="btn btn-primary">Temporadas</a>
-              <a href="/planning" class="btn btn-outline-secondary">Planning</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    <% } %>
-
-    <% /* SPI Scouting Teams */ %>
-    <% if (activeModuleKeys.includes('scouting_teams')) { %>
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body d-flex flex-column justify-content-between">
-            <div>
-              <h3 class="h6">SPI Scouting Teams</h3>
-              <p class="small text-muted">Informes de rivales y análisis táctico</p>
-              <% if (dashboard && dashboard.modules) { %>
-                <div class="small text-muted mt-1"><%= dashboard.modules.scoutingTeamsReportCount %> informes registrados</div>
-              <% } %>
-            </div>
-            <div class="mt-3 d-flex flex-wrap gap-2">
-              <a href="/scouting-teams/new" class="btn btn-primary">Nuevo informe rival</a>
-              <a href="/scouting-teams" class="btn btn-outline-secondary">Informes de rivales</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    <% } %>
+    <% }) %>
   </div>
 </section>
 
-<!-- Sección: Pendientes por equipo (si hay datos de scouting players) -->
-<% if (dashboard && dashboard.modules && dashboard.modules.scoutingPlayersEnabled && dashboard.pendingByTeam && dashboard.pendingByTeam.length) { %>
+<section class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h4 mb-1">Módulos activos</h2>
+      <p class="text-muted mb-0">Verticales habilitados para el club dentro de la suite modular.</p>
+    </div>
+    <span class="badge rounded-pill text-bg-light border"><%= activeModuleCount %> activos</span>
+  </div>
+
+  <% if (moduleEntries.length) { %>
+    <div class="row g-4">
+      <% moduleEntries.forEach((moduleEntry) => { %>
+        <div class="col-12 col-lg-6">
+          <div class="card dashboard-module-card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                  <div class="dashboard-entry-eyebrow">Módulo activo</div>
+                  <h3 class="h5 mb-1"><%= moduleEntry.title %></h3>
+                  <p class="text-muted small mb-0"><%= moduleEntry.strapline %></p>
+                </div>
+                <span class="badge rounded-pill text-bg-success-subtle border border-success-subtle text-success-emphasis">Activo</span>
+              </div>
+
+              <p class="mb-3"><%= moduleEntry.description %></p>
+
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                <% moduleEntry.meta.forEach((metaItem) => { %>
+                  <span class="badge rounded-pill text-bg-light border"><%= metaItem %></span>
+                <% }) %>
+              </div>
+
+              <div class="mt-auto d-flex flex-wrap gap-2">
+                <% moduleEntry.actions.forEach((action) => { %>
+                  <a href="<%= action.href %>" class="btn btn-<%= action.variant %>"><%= action.label %></a>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="h6 mb-2">Sin módulos adicionales activos</h3>
+        <p class="text-muted mb-0">
+          El club mantiene disponible SPI Core como base operativa. Cuando se activen módulos, aparecerán aquí con sus accesos correspondientes.
+        </p>
+      </div>
+    </div>
+  <% } %>
+</section>
+
+<% if (showPendingByTeam) { %>
   <section class="mb-4">
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h5 mb-0">Jugadores sin evaluación por equipo</h2>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <div class="dashboard-entry-eyebrow">SPI Scouting Players</div>
+            <h2 class="h5 mb-1">Seguimiento operativo de evaluaciones</h2>
+            <p class="text-muted mb-0">Equipos con jugadores pendientes de evaluar en la temporada activa.</p>
+          </div>
           <a href="/evaluations/compare" class="btn btn-sm btn-outline-secondary">Comparativa</a>
         </div>
         <div class="table-responsive">
@@ -182,8 +171,8 @@
             <thead>
               <tr>
                 <th>Equipo</th>
-                <th>Categoria</th>
-                <th>Seccion</th>
+                <th>Categoría</th>
+                <th>Sección</th>
                 <th>Total jugadores</th>
                 <th>Evaluados</th>
                 <th>Pendientes</th>
@@ -213,53 +202,6 @@
           </table>
         </div>
       </div>
-    </div>
-  </section>
-<% } %>
-
-<!-- ADMIN -->
-<% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
-  <section>
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-      <div>
-        <h2 class="h5 mb-1">Administración</h2>
-        <p class="text-muted mb-0">Configuración interna, estructura del club y gestión de accesos.</p>
-      </div>
-    </div>
-
-    <div class="row g-4">
-      <div class="col-md-6 col-xl-3">
-        <a href="/admin/club" class="text-decoration-none text-reset">
-          <div class="card h-100 shadow-sm">
-            <div class="card-body">
-              <h5 class="card-title">Administración de equipos</h5>
-              <p class="card-text">Gestionar la estructura deportiva y la configuración del club.</p>
-            </div>
-          </div>
-        </a>
-      </div>
-      <div class="col-md-6 col-xl-3">
-        <a href="/admin/users" class="text-decoration-none text-reset">
-          <div class="card h-100 shadow-sm">
-            <div class="card-body">
-              <h5 class="card-title">Gestión de usuarios</h5>
-              <p class="card-text">Administrar accesos y roles del club.</p>
-            </div>
-          </div>
-        </a>
-      </div>
-      <% if (currentUser && currentUser.role === 'superadmin') { %>
-        <div class="col-md-6 col-xl-3">
-          <a href="/clubs" class="text-decoration-none text-reset">
-            <div class="card h-100 shadow-sm">
-              <div class="card-body">
-                <h5 class="card-title">Clubes</h5>
-                <p class="card-text">Alta, edición y mantenimiento administrativo de clubes.</p>
-              </div>
-            </div>
-          </a>
-        </div>
-      <% } %>
     </div>
   </section>
 <% } %>
