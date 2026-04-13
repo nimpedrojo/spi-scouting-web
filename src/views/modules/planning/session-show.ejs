@@ -1,0 +1,128 @@
+<div class="mb-4">
+  <a href="/planning/microcycles/<%= detail.microcycle.id %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+    <span aria-hidden="true">←</span>
+    <span>Volver al microciclo</span>
+  </a>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+      <div>
+        <div class="dashboard-entry-eyebrow">Sesión</div>
+        <h1 class="h3 mb-2"><%= detail.session.title %></h1>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge text-bg-light border"><%= detail.session.session_date_iso || 'Sin fecha' %></span>
+          <span class="badge text-bg-light border"><%= detail.session.session_type || 'Sin tipo' %></span>
+          <span class="badge <%= detail.session.status_meta.badgeClass %>"><%= detail.session.status_meta.label %></span>
+          <span class="badge text-bg-light border"><%= detail.tasks.length %> tareas</span>
+        </div>
+        <p class="text-muted mb-0"><%= detail.session.objective || 'Sin objetivo específico definido.' %></p>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/planning/tasks/new?session_id=<%= detail.session.id %>" class="btn btn-primary">Nueva tarea</a>
+        <a href="/planning/sessions/<%= detail.session.id %>/edit?microcycle_id=<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Editar sesión</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Equipo</div>
+        <div class="fw-semibold"><%= detail.seasonPlan.team_name %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Microciclo</div>
+        <div class="fw-semibold"><%= detail.microcycle.name %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Duración</div>
+        <div class="fw-semibold"><%= detail.session.duration_minutes ? detail.session.duration_minutes + ' min' : 'Sin definir' %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Tareas</div>
+        <div class="display-6 fw-semibold"><%= detail.tasks.length %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="h4 mb-0">Tareas</h2>
+      <a href="/planning/tasks/new?session_id=<%= detail.session.id %>" class="btn btn-sm btn-primary">Nueva tarea</a>
+    </div>
+
+    <% if (!detail.tasks.length) { %>
+      <p class="mb-0 text-muted">Todavía no hay tareas dentro de esta sesión.</p>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Orden</th>
+              <th>Tarea</th>
+              <th>Tipo</th>
+              <th>Duración</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% detail.tasks.forEach((task) => { %>
+              <tr>
+                <td><span class="badge text-bg-light border"><%= task.sort_order %></span></td>
+                <td>
+                  <div class="fw-semibold"><%= task.title %></div>
+                  <div class="small text-muted"><%= task.objective || 'Sin objetivo específico' %></div>
+                  <% if (task.details) { %>
+                    <div class="small mt-1"><%= task.details %></div>
+                  <% } %>
+                  <div class="small text-muted mt-1 d-flex flex-wrap gap-2">
+                    <% if (task.player_count) { %><span><%= task.player_count %> jugadores</span><% } %>
+                    <% if (task.space) { %><span><%= task.space %></span><% } %>
+                    <% if (task.age_group) { %><span><%= task.age_group %></span><% } %>
+                    <% if (task.complexity) { %><span><%= task.complexity %></span><% } %>
+                  </div>
+                  <% if (task.explanatory_image_path) { %>
+                    <div class="mt-2">
+                      <a href="<%= task.explanatory_image_path %>" target="_blank" rel="noopener noreferrer">
+                        <img src="<%= task.explanatory_image_path %>" alt="Imagen explicativa de <%= task.title %>" class="img-fluid rounded border" style="max-width: 160px;" />
+                      </a>
+                    </div>
+                  <% } %>
+                </td>
+                <td><%= task.task_type || '-' %></td>
+                <td><%= task.duration_minutes ? task.duration_minutes + ' min' : '-' %></td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <a href="/planning/tasks/<%= task.id %>/edit?session_id=<%= detail.session.id %>" class="btn btn-sm btn-outline-secondary">Editar</a>
+                    <form method="POST" action="/planning/tasks/<%= task.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar esta tarea?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

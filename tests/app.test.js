@@ -12,6 +12,7 @@ const { resolveBestTemplateForContext } = require('../src/services/evaluationTem
 const uploadsRoots = [
   path.join(__dirname, '..', 'src', 'public', 'uploads', 'clubs'),
   path.join(__dirname, '..', 'src', 'public', 'uploads', 'players'),
+  path.join(__dirname, '..', 'src', 'public', 'uploads', 'planning'),
 ];
 
 const STATIC_TEST_REPORT_CLUBS = ['Club Manual', 'Club Test', 'Club Default'];
@@ -20,6 +21,21 @@ let testState = null;
 
 function buildPlaceholders(values) {
   return values.map(() => '?').join(', ');
+}
+
+function formatMysqlDate(value) {
+  if (!value) {
+    return '';
+  }
+
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return String(value).slice(0, 10);
 }
 
 async function readUploadSnapshot() {
@@ -3214,6 +3230,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       title: 'Sesion MD-4',
       session_type: 'Entrenamiento de campo',
       duration_minutes: '90',
+      status: 'planned',
       objective: 'Principios ofensivos',
       contents: 'Rondo, juego de posicion',
       notes: 'Carga media',
@@ -3222,17 +3239,232 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(resCreateSession.headers.location).toBe(`/planning/microcycles/${microcycleId}`);
 
     const [sessionRows] = await db.query(
-      'SELECT id, title, duration_minutes FROM plan_sessions WHERE microcycle_id = ?',
+      'SELECT id, title, duration_minutes, status FROM plan_sessions WHERE microcycle_id = ?',
       [microcycleId],
     );
     expect(sessionRows).toHaveLength(1);
     expect(sessionRows[0].title).toBe('Sesion MD-4');
     expect(sessionRows[0].duration_minutes).toBe(90);
+    expect(sessionRows[0].status).toBe('planned');
+
+    const sessionId = sessionRows[0].id;
+    const resCreateTask = await agent.post('/planning/tasks')
+      .field('session_id', sessionId)
+      .field('sort_order', '1')
+      .field('title', 'Rondo de activacion')
+      .field('task_type', 'Activacion')
+      .field('duration_minutes', '15')
+      .field('objective', 'Preparar para la parte principal')
+      .field('details', '3x1 con apoyo exterior y normas de orientacion')
+      .field('space', '20x20')
+      .field('age_group', 'Sub-19')
+      .field('player_count', '8')
+      .field('complexity', 'Media')
+      .field('strategy', 'Grupal')
+      .field('coordinative_skills', 'Orientacion')
+      .field('tactical_intention', 'Conservar')
+      .field('dynamics', 'Integrada')
+      .field('game_situation', 'Con oposicion')
+      .field('coordination', 'Especifica')
+      .field('contents', '3x1 en espacio reducido')
+      .field('notes', 'Alta implicacion')
+      .attach('explanatory_image_file', Buffer.from('fake-png-content'), {
+        filename: 'task-test.png',
+        contentType: 'image/png',
+      });
+    expect(resCreateTask.status).toBe(302);
+    expect(resCreateTask.headers.location).toBe(`/planning/sessions/${sessionId}`);
+
+    const [taskRows] = await db.query(
+      `SELECT id, title, duration_minutes, player_count, complexity, strategy,
+              explanatory_image_path, details
+       FROM plan_session_tasks WHERE session_id = ?`,
+      [sessionId],
+    );
+    expect(taskRows).toHaveLength(1);
+    expect(taskRows[0].title).toBe('Rondo de activacion');
+    expect(taskRows[0].duration_minutes).toBe(15);
+    expect(taskRows[0].player_count).toBe(8);
+    expect(taskRows[0].complexity).toBe('Media');
+    expect(taskRows[0].strategy).toBe('Grupal');
+    expect(taskRows[0].details).toContain('3x1');
+    expect(taskRows[0].explanatory_image_path).toContain('/uploads/planning/');
+
+    const taskId = taskRows[0].id;
+    const resUpdateTask = await agent.post(`/planning/tasks/${taskId}/update`).send({
+      session_id: sessionId,
+      sort_order: '1',
+      title: 'Rondo de activacion',
+      task_type: 'Activacion',
+      duration_minutes: '20',
+      objective: 'Preparar para la parte principal',
+      details: '3x1 con una serie adicional y cambio de roles',
+      space: '25x25',
+      age_group: 'Sub-19',
+      player_count: '10',
+      complexity: 'Alta',
+      strategy: 'Colectiva',
+      coordinative_skills: 'Reaccion',
+      tactical_intention: 'Progresar',
+      dynamics: 'Competitiva',
+      game_situation: 'Superioridad',
+      coordination: 'Neuromuscular',
+      explanatory_image_path: taskRows[0].explanatory_image_path,
+      contents: '3x1 en espacio reducido',
+      notes: 'Carga ajustada',
+    });
+    expect(resUpdateTask.status).toBe(302);
+    expect(resUpdateTask.headers.location).toBe(`/planning/sessions/${sessionId}`);
+
+    const [updatedTaskRows] = await db.query(
+      `SELECT duration_minutes, notes, player_count, complexity, strategy, explanatory_image_path
+       FROM plan_session_tasks WHERE id = ?`,
+      [taskId],
+    );
+    expect(updatedTaskRows[0].duration_minutes).toBe(20);
+    expect(updatedTaskRows[0].notes).toBe('Carga ajustada');
+    expect(updatedTaskRows[0].player_count).toBe(10);
+    expect(updatedTaskRows[0].complexity).toBe('Alta');
+    expect(updatedTaskRows[0].strategy).toBe('Colectiva');
+    expect(updatedTaskRows[0].explanatory_image_path).toContain('/uploads/planning/');
+
+    const resUpdateSession = await agent.post(`/planning/sessions/${sessionId}/update`).send({
+      microcycle_id: microcycleId,
+      session_date: '2026-07-16',
+      title: 'Sesion MD-4',
+      session_type: 'Entrenamiento de campo',
+      duration_minutes: '90',
+      status: 'done',
+      objective: 'Principios ofensivos',
+      contents: 'Rondo, juego de posicion',
+      notes: 'Carga completada',
+    });
+    expect(resUpdateSession.status).toBe(302);
+
+    const [updatedSessionRows] = await db.query(
+      'SELECT status, notes FROM plan_sessions WHERE id = ?',
+      [sessionId],
+    );
+    expect(updatedSessionRows[0].status).toBe('done');
+    expect(updatedSessionRows[0].notes).toBe('Carga completada');
+
+    const resCreateTemplate = await agent.post('/planning/templates').send({
+      source_microcycle_id: microcycleId,
+      name: 'Plantilla competitiva',
+      phase: 'Competicion',
+      objective: 'Base competitiva',
+      notes: 'Plantilla reusable',
+    });
+    expect(resCreateTemplate.status).toBe(302);
+    expect(resCreateTemplate.headers.location).toBe(`/planning/plans/${seasonPlanId}`);
+
+    const [templateRows] = await db.query(
+      'SELECT id, name FROM planning_microcycle_templates WHERE club_id = ? AND team_id = ?',
+      [context.club.id, teamId],
+    );
+    expect(templateRows).toHaveLength(1);
+    expect(templateRows[0].name).toBe('Plantilla competitiva');
+
+    const templateId = templateRows[0].id;
+    const [templateSessionRows] = await db.query(
+      'SELECT day_offset, title, status FROM planning_microcycle_template_sessions WHERE template_id = ? ORDER BY sort_order ASC',
+      [templateId],
+    );
+    expect(templateSessionRows).toHaveLength(1);
+    expect(templateSessionRows[0].day_offset).toBe(1);
+    expect(templateSessionRows[0].status).toBe('done');
+
+    const [templateTaskRows] = await db.query(
+      `SELECT pmtsst.title, pmtsst.explanatory_image_path
+       FROM planning_microcycle_template_session_tasks pmtsst
+       INNER JOIN planning_microcycle_template_sessions pmts ON pmts.id = pmtsst.template_session_id
+       WHERE pmts.template_id = ?`,
+      [templateId],
+    );
+    expect(templateTaskRows).toHaveLength(1);
+    expect(templateTaskRows[0].title).toBe('Rondo de activacion');
+    expect(templateTaskRows[0].explanatory_image_path).toContain('/uploads/planning/');
+
+    const resCreateFromTemplate = await agent.post('/planning/microcycles').send({
+      season_plan_id: seasonPlanId,
+      template_id: templateId,
+      name: '',
+      order_index: '2',
+      start_date: '2026-08-01',
+      end_date: '2026-08-07',
+      objective: '',
+      phase: '',
+      notes: '',
+    });
+    expect(resCreateFromTemplate.status).toBe(302);
+    expect(resCreateFromTemplate.headers.location).toMatch(/^\/planning\/microcycles\//);
+
+    const [templatedMicrocycleRows] = await db.query(
+      'SELECT id, name FROM plan_microcycles WHERE season_plan_id = ? ORDER BY order_index ASC',
+      [seasonPlanId],
+    );
+    expect(templatedMicrocycleRows).toHaveLength(2);
+    expect(templatedMicrocycleRows[1].name).toBe('Plantilla competitiva');
+
+    const templatedMicrocycleId = templatedMicrocycleRows[1].id;
+    const [templatedSessionRows] = await db.query(
+      'SELECT id, session_date, status FROM plan_sessions WHERE microcycle_id = ?',
+      [templatedMicrocycleId],
+    );
+    expect(templatedSessionRows).toHaveLength(1);
+    expect(formatMysqlDate(templatedSessionRows[0].session_date)).toBe('2026-08-02');
+    expect(templatedSessionRows[0].status).toBe('done');
+
+    const [templatedTaskRows] = await db.query(
+      'SELECT title, explanatory_image_path FROM plan_session_tasks WHERE session_id = ?',
+      [templatedSessionRows[0].id],
+    );
+    expect(templatedTaskRows).toHaveLength(1);
+    expect(templatedTaskRows[0].title).toBe('Rondo de activacion');
+    expect(templatedTaskRows[0].explanatory_image_path).toContain('/uploads/planning/');
+
+    const resDuplicateMicrocycle = await agent.post(`/planning/microcycles/${microcycleId}/duplicate`);
+    expect(resDuplicateMicrocycle.status).toBe(302);
+    expect(resDuplicateMicrocycle.headers.location).toMatch(/^\/planning\/microcycles\//);
+
+    const [duplicatedMicrocycleRows] = await db.query(
+      'SELECT id, name, order_index FROM plan_microcycles WHERE season_plan_id = ? ORDER BY order_index ASC',
+      [seasonPlanId],
+    );
+    expect(duplicatedMicrocycleRows).toHaveLength(3);
+    expect(duplicatedMicrocycleRows[2].name).toContain('(copia)');
+
+    const duplicatedMicrocycleId = duplicatedMicrocycleRows[2].id;
+    const [duplicatedSessionRows] = await db.query(
+      'SELECT id, title, status FROM plan_sessions WHERE microcycle_id = ?',
+      [duplicatedMicrocycleId],
+    );
+    expect(duplicatedSessionRows).toHaveLength(1);
+    expect(duplicatedSessionRows[0].title).toBe('Sesion MD-4');
+    expect(duplicatedSessionRows[0].status).toBe('done');
+
+    const [duplicatedTaskRows] = await db.query(
+      'SELECT title, explanatory_image_path FROM plan_session_tasks WHERE session_id = ?',
+      [duplicatedSessionRows[0].id],
+    );
+    expect(duplicatedTaskRows).toHaveLength(1);
+    expect(duplicatedTaskRows[0].title).toBe('Rondo de activacion');
+    expect(duplicatedTaskRows[0].explanatory_image_path).toContain('/uploads/planning/');
 
     const resMicrocycleShow = await agent.get(`/planning/microcycles/${microcycleId}`);
     expect(resMicrocycleShow.status).toBe(200);
     expect(resMicrocycleShow.text).toContain('Sesion MD-4');
     expect(resMicrocycleShow.text).toContain('Entrenamiento de campo');
+    expect(resMicrocycleShow.text).toContain('Vista semanal');
+    expect(resMicrocycleShow.text).toContain('Realizada');
+    expect(resMicrocycleShow.text).toContain('Abrir');
+
+    const resSessionShow = await agent.get(`/planning/sessions/${sessionId}`);
+    expect(resSessionShow.status).toBe(200);
+    expect(resSessionShow.text).toContain('Rondo de activacion');
+    expect(resSessionShow.text).toContain('Tareas');
+    expect(resSessionShow.text).toContain('25x25');
+    expect(resSessionShow.text).toContain('/uploads/planning/');
   });
 
   test('planning aísla planificaciones de equipos fuera del alcance del usuario', async () => {

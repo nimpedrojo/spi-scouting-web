@@ -10,6 +10,41 @@
   <div class="card-body">
     <form method="POST" action="<%= formAction %>" class="row g-3">
       <input type="hidden" name="season_plan_id" value="<%= formValues.season_plan_id %>" />
+      <% if (!microcycle) { %>
+        <div class="col-12">
+          <div class="planning-template-callout">
+            <div>
+              <div class="planning-template-callout-title">Plantillas reutilizables</div>
+              <p class="text-muted mb-0">Puedes arrancar el microciclo desde una plantilla del equipo. Si la plantilla incluye sesiones base, indica la fecha de inicio para poder generarlas.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label for="template_id" class="form-label">Plantilla</label>
+          <select id="template_id" name="template_id" class="form-select">
+            <option value="">Sin plantilla</option>
+            <% (templates || []).forEach((templateDetail) => { %>
+              <option value="<%= templateDetail.id %>" <%= String(formValues.template_id || '') === String(templateDetail.id) ? 'selected' : '' %>>
+                <%= templateDetail.name %> · <%= templateDetail.session_blueprint_count %> sesiones base
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Sesiones base</label>
+          <div class="form-control bg-body-tertiary">
+            <% if (selectedTemplate && selectedTemplate.sessions.length) { %>
+              <span><%= selectedTemplate.sessions.length %> sesiones configuradas en la plantilla</span>
+            <% } else if (selectedTemplate) { %>
+              <span>La plantilla seleccionada no incluye sesiones base</span>
+            <% } else { %>
+              <span>Sin plantilla aplicada</span>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
 
       <div class="col-md-8">
         <label for="name" class="form-label">Nombre</label>

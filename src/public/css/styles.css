@@ -996,6 +996,31 @@ body {
   border-color: rgba(39, 74, 170, 0.92);
 }
 
+.planning-template-callout {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(13, 110, 253, 0.16);
+  border-radius: 0.9rem;
+  background: rgba(13, 110, 253, 0.04);
+}
+
+.planning-template-callout-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d6efd;
+  margin-bottom: 0.35rem;
+}
+
+.planning-status-card,
+.planning-weekday-card,
+.planning-template-card {
+  background: #fff;
+}
+
 @media (max-width: 991.98px) {
   .app-frame {
     flex-direction: column;

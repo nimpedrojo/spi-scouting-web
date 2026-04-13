@@ -9,8 +9,9 @@ El MVP queda centrado en la jerarquía:
 - planificación de temporada
 - microciclos
 - sesiones
+- tareas por sesión
 
-No intenta resolver todavía calendarios avanzados, carga interna, tareas o bibliotecas metodológicas.
+No intenta resolver todavía calendarios avanzados, carga interna o bibliotecas metodológicas avanzadas.
 
 ## Integración con la suite
 
@@ -82,7 +83,105 @@ Campos principales:
 - `title`
 - `session_type`
 - `duration_minutes`
+- `status`
 - `objective`
+- `contents`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### plan_session_tasks
+
+Tareas operativas ligadas a una sesión concreta.
+
+Campos principales:
+
+- `id`
+- `session_id`
+- `sort_order`
+- `title`
+- `task_type`
+- `duration_minutes`
+- `objective`
+- `details`
+- `space`
+- `age_group`
+- `player_count`
+- `complexity`
+- `strategy`
+- `coordinative_skills`
+- `tactical_intention`
+- `dynamics`
+- `game_situation`
+- `coordination`
+- `explanatory_image_path`
+- `contents`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### planning_microcycle_templates
+
+Plantillas reutilizables de microciclo ligadas a un equipo.
+
+Campos principales:
+
+- `id`
+- `club_id`
+- `team_id`
+- `name`
+- `phase`
+- `objective`
+- `notes`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+### planning_microcycle_template_sessions
+
+Sesiones base opcionales que cuelgan de una plantilla reutilizable.
+
+Campos principales:
+
+- `id`
+- `template_id`
+- `day_offset`
+- `sort_order`
+- `title`
+- `session_type`
+- `duration_minutes`
+- `status`
+- `objective`
+- `contents`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### planning_microcycle_template_session_tasks
+
+Tareas base opcionales que cuelgan de una sesión plantilla.
+
+Campos principales:
+
+- `id`
+- `template_session_id`
+- `sort_order`
+- `title`
+- `task_type`
+- `duration_minutes`
+- `objective`
+- `details`
+- `space`
+- `age_group`
+- `player_count`
+- `complexity`
+- `strategy`
+- `coordinative_skills`
+- `tactical_intention`
+- `dynamics`
+- `game_situation`
+- `coordination`
+- `explanatory_image_path`
 - `contents`
 - `notes`
 - `created_at`
@@ -124,7 +223,31 @@ Muestra:
 - contexto de planificación
 - datos del microciclo
 - listado de sesiones
+- acceso a abrir cada sesión como ficha operativa
+- resumen por estado
+- vista semanal simple
 - acceso a crear sesión
+- acceso a duplicar el microciclo
+- acceso a guardarlo como plantilla reutilizable
+
+### Detalle de sesión
+
+- `/planning/sessions/:id`
+
+Muestra:
+
+- contexto de sesión
+- datos principales
+- listado de tareas
+- acceso a crear, editar y borrar tareas
+- imagen explicativa opcional por tarea
+- campos metodológicos básicos para describir la tarea
+
+### Plantillas reutilizables
+
+- `/planning/templates/new?microcycle_id=<id>`
+
+Permite guardar un microciclo como plantilla del equipo y reutilizarla después al crear nuevos microciclos.
 
 ## Alcance funcional actual
 
@@ -134,15 +257,22 @@ Muestra:
 - creación, edición y borrado de planificación
 - creación, edición y borrado de microciclos
 - creación, edición y borrado de sesiones
+- creación, edición y borrado de tareas dentro de cada sesión
+- soporte visual y descriptivo ampliado para tareas
+- estados simples de sesión: `planned`, `done`, `cancelled`
+- duplicación rápida de microciclos con sus sesiones
+- duplicación de tareas al duplicar microciclos
+- guardado de microciclos como plantillas reutilizables del equipo
+- creación de microciclos desde plantilla con sesiones base y tareas base
+- vista semanal simple del microciclo
 - aislamiento por club y equipo
 - acceso contextual desde la ficha de equipo
 
 ### Fuera del MVP
 
-- tareas o ejercicios
-- plantillas metodológicas avanzadas
-- duplicación de microciclos
-- calendario visual
+- ejercicios detallados con métricas avanzadas
+- plantillas metodológicas avanzadas con editor propio
+- calendario visual avanzado
 - exportación
 - métricas de carga
 - integración con rival o partido
@@ -157,8 +287,7 @@ El módulo no muestra ni permite manipular:
 
 ## Siguientes pasos recomendados
 
-- añadir estados metodológicos por sesión
-- duplicación rápida de microciclos
-- vista calendario semanal
-- plantillas reutilizables de microciclo
-- relación futura con partido/rival cuando el producto lo requiera
+- duplicación selectiva de sesiones o bloques
+- edición avanzada de plantillas reutilizables
+- calendario semanal con vista más táctica
+- métricas simples de carga por tarea y por sesión

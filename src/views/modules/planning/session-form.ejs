@@ -36,6 +36,15 @@
         <input type="number" min="0" id="duration_minutes" name="duration_minutes" class="form-control" value="<%= formValues.duration_minutes %>" />
       </div>
 
+      <div class="col-md-6">
+        <label for="status" class="form-label">Estado</label>
+        <select id="status" name="status" class="form-select">
+          <% sessionStatusOptions.forEach((statusOption) => { %>
+            <option value="<%= statusOption.key %>" <%= formValues.status === statusOption.key ? 'selected' : '' %>><%= statusOption.label %></option>
+          <% }) %>
+        </select>
+      </div>
+
       <div class="col-12">
         <label for="objective" class="form-label">Objetivo</label>
         <textarea id="objective" name="objective" class="form-control" rows="3"><%= formValues.objective %></textarea>

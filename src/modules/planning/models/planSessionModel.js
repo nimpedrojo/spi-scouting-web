@@ -10,6 +10,7 @@ async function createPlanSessionsTable() {
       title VARCHAR(150) NOT NULL,
       session_type VARCHAR(100) NULL,
       duration_minutes INT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'planned',
       objective TEXT NULL,
       contents TEXT NULL,
       notes TEXT NULL,
@@ -23,6 +24,15 @@ async function createPlanSessionsTable() {
   `;
 
   await db.query(sql);
+
+  try {
+    await db.query("ALTER TABLE plan_sessions ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'planned'");
+  } catch (error) {
+    if (error && error.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding plan_sessions.status column', error);
+    }
+  }
 }
 
 function mapSessionRow(row) {
@@ -33,6 +43,7 @@ function mapSessionRow(row) {
     title: row.title,
     session_type: row.session_type,
     duration_minutes: row.duration_minutes !== null ? Number(row.duration_minutes) : null,
+    status: row.status || 'planned',
     objective: row.objective,
     contents: row.contents,
     notes: row.notes,
@@ -41,6 +52,7 @@ function mapSessionRow(row) {
     microcycle_name: row.microcycle_name,
     season_plan_id: row.season_plan_id,
     team_name: row.team_name,
+    task_count: Number(row.task_count || 0),
   };
 }
 
@@ -50,6 +62,7 @@ async function createPlanSession({
   title,
   sessionType = null,
   durationMinutes = null,
+  status = 'planned',
   objective = null,
   contents = null,
   notes = null,
@@ -57,9 +70,9 @@ async function createPlanSession({
   const id = randomUUID();
   await db.query(
     `INSERT INTO plan_sessions (
-      id, microcycle_id, session_date, title, session_type, duration_minutes, objective, contents, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, microcycleId, sessionDate, title, sessionType, durationMinutes, objective, contents, notes],
+      id, microcycle_id, session_date, title, session_type, duration_minutes, status, objective, contents, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, microcycleId, sessionDate, title, sessionType, durationMinutes, status, objective, contents, notes],
   );
 
   return findPlanSessionById(id);
@@ -71,12 +84,18 @@ async function findPlanSessionById(id) {
         ps.*,
         pm.name AS microcycle_name,
         pm.season_plan_id,
-        t.name AS team_name
+        t.name AS team_name,
+        COUNT(DISTINCT pst.id) AS task_count
       FROM plan_sessions ps
       INNER JOIN plan_microcycles pm ON pm.id = ps.microcycle_id
       INNER JOIN season_plans sp ON sp.id = pm.season_plan_id
       INNER JOIN teams t ON t.id = sp.team_id
+      LEFT JOIN plan_session_tasks pst ON pst.session_id = ps.id
       WHERE ps.id = ?
+      GROUP BY
+        ps.id, ps.microcycle_id, ps.session_date, ps.title, ps.session_type, ps.duration_minutes,
+        ps.status, ps.objective, ps.contents, ps.notes, ps.created_at, ps.updated_at,
+        pm.name, pm.season_plan_id, t.name
       LIMIT 1`,
     [id],
   );
@@ -90,12 +109,18 @@ async function listPlanSessionsByMicrocycle(microcycleId) {
         ps.*,
         pm.name AS microcycle_name,
         pm.season_plan_id,
-        t.name AS team_name
+        t.name AS team_name,
+        COUNT(DISTINCT pst.id) AS task_count
       FROM plan_sessions ps
       INNER JOIN plan_microcycles pm ON pm.id = ps.microcycle_id
       INNER JOIN season_plans sp ON sp.id = pm.season_plan_id
       INNER JOIN teams t ON t.id = sp.team_id
+      LEFT JOIN plan_session_tasks pst ON pst.session_id = ps.id
       WHERE ps.microcycle_id = ?
+      GROUP BY
+        ps.id, ps.microcycle_id, ps.session_date, ps.title, ps.session_type, ps.duration_minutes,
+        ps.status, ps.objective, ps.contents, ps.notes, ps.created_at, ps.updated_at,
+        pm.name, pm.season_plan_id, t.name
       ORDER BY ps.session_date ASC, ps.created_at ASC`,
     [microcycleId],
   );
@@ -108,15 +133,16 @@ async function updatePlanSession(id, {
   title,
   sessionType = null,
   durationMinutes = null,
+  status = 'planned',
   objective = null,
   contents = null,
   notes = null,
 }) {
   const [result] = await db.query(
     `UPDATE plan_sessions
-     SET session_date = ?, title = ?, session_type = ?, duration_minutes = ?, objective = ?, contents = ?, notes = ?
+     SET session_date = ?, title = ?, session_type = ?, duration_minutes = ?, status = ?, objective = ?, contents = ?, notes = ?
      WHERE id = ?`,
-    [sessionDate, title, sessionType, durationMinutes, objective, contents, notes, id],
+    [sessionDate, title, sessionType, durationMinutes, status, objective, contents, notes, id],
   );
 
   return result.affectedRows;

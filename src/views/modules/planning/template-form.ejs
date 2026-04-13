@@ -1,0 +1,58 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1">Guardar plantilla de microciclo</h1>
+    <p class="text-muted mb-0">Convierte este microciclo en una base reutilizable para el equipo dentro de SPI Planning.</p>
+  </div>
+  <a href="/planning/microcycles/<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Volver al microciclo</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <form method="POST" action="<%= formAction %>" class="row g-3">
+          <input type="hidden" name="source_microcycle_id" value="<%= formValues.source_microcycle_id %>" />
+
+          <div class="col-12">
+            <label for="name" class="form-label">Nombre de la plantilla</label>
+            <input type="text" id="name" name="name" class="form-control" required value="<%= formValues.name %>" placeholder="Ej. Microciclo competitivo base" />
+          </div>
+
+          <div class="col-md-6">
+            <label for="phase" class="form-label">Fase</label>
+            <input type="text" id="phase" name="phase" class="form-control" value="<%= formValues.phase %>" placeholder="Ej. Competicion" />
+          </div>
+
+          <div class="col-12">
+            <label for="objective" class="form-label">Objetivo</label>
+            <textarea id="objective" name="objective" class="form-control" rows="4"><%= formValues.objective %></textarea>
+          </div>
+
+          <div class="col-12">
+            <label for="notes" class="form-label">Notas</label>
+            <textarea id="notes" name="notes" class="form-control" rows="5"><%= formValues.notes %></textarea>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+            <a href="/planning/microcycles/<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="dashboard-entry-eyebrow">Resumen de origen</div>
+        <h2 class="h5 mb-3"><%= detail.microcycle.name %></h2>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="badge text-bg-light border"><%= detail.sessions.length %> sesiones base</span>
+          <span class="badge text-bg-light border"><%= detail.microcycle.phase || 'Sin fase' %></span>
+        </div>
+        <p class="text-muted mb-0"><%= detail.microcycle.objective || 'Sin objetivo específico definido.' %></p>
+      </div>
+    </div>
+  </div>
+</div>

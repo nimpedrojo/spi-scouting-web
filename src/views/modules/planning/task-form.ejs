@@ -1,0 +1,170 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><%= task ? 'Editar tarea' : 'Nueva tarea' %></h1>
+    <p class="text-muted mb-0">Desglosa la sesión en bloques de trabajo operativos dentro de SPI Planning.</p>
+  </div>
+  <a href="/planning/sessions/<%= detail.session.id %>" class="btn btn-outline-secondary">Volver a la sesión</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= formAction %>" enctype="multipart/form-data" class="row g-3">
+      <input type="hidden" name="session_id" value="<%= formValues.session_id %>" />
+
+      <div class="col-md-2">
+        <label for="sort_order" class="form-label">Orden</label>
+        <input type="number" min="1" id="sort_order" name="sort_order" class="form-control" required value="<%= formValues.sort_order %>" />
+      </div>
+
+      <div class="col-md-10">
+        <label for="title" class="form-label">Nombre</label>
+        <input type="text" id="title" name="title" class="form-control" required value="<%= formValues.title %>" placeholder="Ej. Rondo de activación" />
+      </div>
+
+      <div class="col-md-6">
+        <label for="objective" class="form-label">Objetivos del ejercicio</label>
+        <textarea id="objective" name="objective" class="form-control" rows="3"><%= formValues.objective %></textarea>
+      </div>
+
+      <div class="col-md-6">
+        <label for="details" class="form-label">Explicación / Detalles</label>
+        <textarea id="details" name="details" class="form-control" rows="3"><%= formValues.details %></textarea>
+      </div>
+
+      <div class="col-md-4">
+        <label for="duration_minutes" class="form-label">Tiempo (min)</label>
+        <input type="number" min="0" id="duration_minutes" name="duration_minutes" class="form-control" value="<%= formValues.duration_minutes %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="space" class="form-label">Espacio</label>
+        <input type="text" id="space" name="space" class="form-control" value="<%= formValues.space %>" placeholder="Ej. Medio campo / 20x20" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="age_group" class="form-label">Edad</label>
+        <input type="text" id="age_group" name="age_group" class="form-control" value="<%= formValues.age_group %>" placeholder="Ej. Sub-16" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="player_count" class="form-label">N Jugadores/as</label>
+        <input type="number" min="0" id="player_count" name="player_count" class="form-control" value="<%= formValues.player_count %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="complexity" class="form-label">Complejidad</label>
+        <select id="complexity" name="complexity" class="form-select">
+          <option value="">Selecciona...</option>
+          <% complexityOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.complexity === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="task_type" class="form-label">Tipo de tarea</label>
+        <select id="task_type" name="task_type" class="form-select">
+          <option value="">Sin tipo</option>
+          <% taskTypeOptions.forEach((taskType) => { %>
+            <option value="<%= taskType %>" <%= formValues.task_type === taskType ? 'selected' : '' %>><%= taskType %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="strategy" class="form-label">Estrategia</label>
+        <select id="strategy" name="strategy" class="form-select">
+          <option value="">Selecciona...</option>
+          <% strategyOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.strategy === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="coordinative_skills" class="form-label">Habilidades Coordinativas</label>
+        <select id="coordinative_skills" name="coordinative_skills" class="form-select">
+          <option value="">Selecciona...</option>
+          <% coordinativeSkillsOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.coordinative_skills === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="tactical_intention" class="form-label">Intención Táctica</label>
+        <select id="tactical_intention" name="tactical_intention" class="form-select">
+          <option value="">Selecciona...</option>
+          <% tacticalIntentionOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.tactical_intention === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="dynamics" class="form-label">Dinámica</label>
+        <select id="dynamics" name="dynamics" class="form-select">
+          <option value="">Selecciona...</option>
+          <% dynamicsOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.dynamics === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="game_situation" class="form-label">Situación de Juego</label>
+        <select id="game_situation" name="game_situation" class="form-select">
+          <option value="">Selecciona...</option>
+          <% gameSituationOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.game_situation === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="coordination" class="form-label">Coordinación</label>
+        <select id="coordination" name="coordination" class="form-select">
+          <option value="">Selecciona...</option>
+          <% coordinationOptions.forEach((option) => { %>
+            <option value="<%= option %>" <%= formValues.coordination === option ? 'selected' : '' %>><%= option %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label for="explanatory_image_file" class="form-label">Imagen explicativa</label>
+        <input type="file" id="explanatory_image_file" name="explanatory_image_file" class="form-control" accept="image/*" />
+        <div class="form-text">Adjunta una imagen de apoyo para explicar la tarea. Tamaño máximo 4MB.</div>
+      </div>
+
+      <% if (formValues.explanatory_image_path) { %>
+        <div class="col-12">
+          <div class="border rounded p-3 bg-light">
+            <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
+              <img src="<%= formValues.explanatory_image_path %>" alt="Imagen explicativa de la tarea" class="img-fluid rounded border" style="max-width: 280px;" />
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="remove_image" name="remove_image" />
+                <label class="form-check-label" for="remove_image">Eliminar imagen actual</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="col-12">
+        <label for="contents" class="form-label">Contenidos</label>
+        <textarea id="contents" name="contents" class="form-control" rows="4"><%= formValues.contents %></textarea>
+      </div>
+
+      <div class="col-12">
+        <label for="notes" class="form-label">Notas</label>
+        <textarea id="notes" name="notes" class="form-control" rows="4"><%= formValues.notes %></textarea>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/planning/sessions/<%= detail.session.id %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
