@@ -43,7 +43,7 @@ function getDefaultFallbackTemplate() {
   return {
     id: 'fallback-default',
     name: 'Plantilla por defecto',
-    description: 'Plantilla base de SoccerReport',
+    description: 'Plantilla base de SoccerProcessIQ Suite',
     section_id: null,
     category_id: null,
     section_name: null,

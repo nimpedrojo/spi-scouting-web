@@ -287,7 +287,7 @@ Archivo sugerido:
 
 ```ini
 [Unit]
-Description=SoccerReport
+Description=SoccerProcessIQ Suite
 After=network.target mysql.service
 
 [Service]

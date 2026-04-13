@@ -116,7 +116,7 @@ function buildEvaluationWorkbookBuffer(rows) {
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
-describe('Aplicación SoccerReport', () => {
+describe('Aplicación SoccerProcessIQ Suite', () => {
   beforeAll(async () => {
     await initDatabaseOnce();
   });
