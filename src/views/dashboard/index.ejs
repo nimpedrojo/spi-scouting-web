@@ -9,9 +9,11 @@
     </p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    <a href="/assessments" class="btn btn-primary">Abrir valoraciones</a>
-    <a href="/reports/new" class="btn btn-outline-secondary">Nuevo informe</a>
-    <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
+    <% if (activeModuleKeys.includes('scouting_players')) { %>
+      <a href="/assessments" class="btn btn-primary">Abrir valoraciones</a>
+      <a href="/reports/new" class="btn btn-outline-secondary">Nuevo informe</a>
+    <% } %>
+    <% if (activeModuleKeys.includes('scouting_players') && currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
       <a href="/evaluations/new" class="btn btn-outline-secondary">Nueva evaluación</a>
     <% } %>
     <a href="/account" class="btn btn-outline-secondary">Mi cuenta</a>
@@ -24,7 +26,7 @@
       <p class="mb-0">Configura un club por defecto para ver el panel analítico.</p>
     </div>
   </div>
-<% } else { %>
+<% } else if (dashboard && dashboard.modules && dashboard.modules.scoutingPlayersEnabled && dashboard.metrics) { %>
   <div class="row g-4 mb-4">
     <div class="col-md-6 col-xl-3">
       <a href="/admin/players" class="text-decoration-none text-reset">
@@ -119,6 +121,15 @@
     </div>
   </div>
 
+<% } else { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-2">Dashboard base activo</h2>
+      <p class="mb-0 text-muted">
+        El club actual no tiene activado el módulo de scouting de jugadores, así que el panel muestra solo la base común de la suite.
+      </p>
+    </div>
+  </div>
 <% } %>
 
 <section class="mb-4">
@@ -130,17 +141,19 @@
   </div>
 
   <div class="row g-4">
-    <div class="col-md-6 col-xl-3">
-      <a href="/assessments" class="text-decoration-none text-reset">
-        <div class="card h-100 shadow-sm">
-          <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Listado de informes" />
-          <div class="card-body">
-            <h5 class="card-title">Valoraciones</h5>
-            <p class="card-text">Acceso unificado a informes scouting y evaluaciones estructuradas.</p>
+    <% if (activeModuleKeys.includes('scouting_players')) { %>
+      <div class="col-md-6 col-xl-3">
+        <a href="/assessments" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Listado de informes" />
+            <div class="card-body">
+              <h5 class="card-title">Valoraciones</h5>
+              <p class="card-text">Acceso unificado a informes scouting y evaluaciones estructuradas.</p>
+            </div>
           </div>
-        </div>
-      </a>
-    </div>
+        </a>
+      </div>
+    <% } %>
 
     <% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
       <div class="col-md-6 col-xl-3">
@@ -150,6 +163,39 @@
             <div class="card-body">
               <h5 class="card-title">Jugadores</h5>
               <p class="card-text">Ver, editar y seguir perfiles de jugadores.</p>
+            </div>
+          </div>
+        </a>
+      </div>
+    <% } %>
+
+    <% if (activeModuleKeys.includes('planning')) { %>
+      <div class="col-md-6 col-xl-3">
+        <a href="/planning" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Planning" />
+            <div class="card-body">
+              <h5 class="card-title">Planning</h5>
+              <p class="card-text">Base del futuro módulo de planificación deportiva por club.</p>
+            </div>
+          </div>
+        </a>
+      </div>
+    <% } %>
+
+    <% if (activeModuleKeys.includes('scouting_teams')) { %>
+      <div class="col-md-6 col-xl-3">
+        <a href="/scouting-teams" class="text-decoration-none text-reset">
+          <div class="card h-100 shadow-sm">
+            <img src="/img/list.svg" class="card-img-top icon-dashboard p-3" alt="Scouting Teams" />
+            <div class="card-body">
+              <h5 class="card-title">Scouting Teams</h5>
+              <p class="card-text">
+                Informes de rivales integrados en la suite.
+                <% if (dashboard && dashboard.modules) { %>
+                  <span class="d-block text-muted mt-1"><%= dashboard.modules.scoutingTeamsReportCount %> informes registrados</span>
+                <% } %>
+              </p>
             </div>
           </div>
         </a>

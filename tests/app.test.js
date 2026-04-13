@@ -1,10 +1,41 @@
 const request = require('supertest');
+const fsPromises = require('fs/promises');
+const path = require('path');
 const { randomUUID } = require('crypto');
 const XLSX = require('xlsx');
 const app = require('../src/app');
 const db = require('../src/db');
 const { initDatabaseOnce } = require('../src/initDb');
+const { setModuleEnabledForClub } = require('../src/core/models/clubModuleModel');
 const { resolveBestTemplateForContext } = require('../src/services/evaluationTemplateService');
+
+const uploadsRoots = [
+  path.join(__dirname, '..', 'src', 'public', 'uploads', 'clubs'),
+  path.join(__dirname, '..', 'src', 'public', 'uploads', 'players'),
+];
+
+const STATIC_TEST_REPORT_CLUBS = ['Club Manual', 'Club Test', 'Club Default'];
+
+let testState = null;
+
+function buildPlaceholders(values) {
+  return values.map(() => '?').join(', ');
+}
+
+async function readUploadSnapshot() {
+  const snapshot = new Map();
+
+  for (const root of uploadsRoots) {
+    try {
+      const entries = await fsPromises.readdir(root);
+      snapshot.set(root, new Set(entries));
+    } catch (_error) {
+      snapshot.set(root, new Set());
+    }
+  }
+
+  return snapshot;
+}
 
 async function createTestClub(name) {
   const code = `club_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -12,6 +43,10 @@ async function createTestClub(name) {
     'INSERT INTO clubs (name, code) VALUES (?, ?)',
     [name, code],
   );
+  if (testState) {
+    testState.clubIds.add(result.insertId);
+    testState.clubNames.add(name);
+  }
   return { id: result.insertId, name, code };
 }
 
@@ -39,6 +74,9 @@ async function createTestUser({
       defaultTeamId,
     ],
   );
+  if (testState) {
+    testState.userIds.add(result.insertId);
+  }
   return { id: result.insertId, email: userEmail, password };
 }
 
@@ -81,6 +119,177 @@ function buildEvaluationWorkbookBuffer(rows) {
 describe('Aplicación SoccerReport', () => {
   beforeAll(async () => {
     await initDatabaseOnce();
+  });
+
+  beforeEach(async () => {
+    testState = {
+      clubIds: new Set(),
+      clubNames: new Set(),
+      userIds: new Set(),
+      uploadSnapshot: await readUploadSnapshot(),
+    };
+  });
+
+  afterEach(async () => {
+    if (!testState) {
+      return;
+    }
+
+    const clubIds = [...testState.clubIds];
+    const clubNames = [...testState.clubNames];
+    const userIds = [...testState.userIds];
+
+    let teamIds = [];
+    let seasonIds = [];
+    let evaluationIds = [];
+
+    if (clubIds.length) {
+      const clubPlaceholders = buildPlaceholders(clubIds);
+      const [teamRows] = await db.query(
+        `SELECT id FROM teams WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      const [seasonRows] = await db.query(
+        `SELECT id FROM seasons WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      const [evaluationRows] = await db.query(
+        `SELECT id FROM evaluations WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+
+      teamIds = teamRows.map((row) => row.id);
+      seasonIds = seasonRows.map((row) => row.id);
+      evaluationIds = evaluationRows.map((row) => row.id);
+    }
+
+    if (userIds.length) {
+      const userPlaceholders = buildPlaceholders(userIds);
+      const [authorEvaluationRows] = await db.query(
+        `SELECT id FROM evaluations WHERE author_id IN (${userPlaceholders})`,
+        userIds,
+      );
+      evaluationIds = [...new Set([
+        ...evaluationIds,
+        ...authorEvaluationRows.map((row) => row.id),
+      ])];
+    }
+
+    if (evaluationIds.length) {
+      const evaluationPlaceholders = buildPlaceholders(evaluationIds);
+      await db.query(
+        `DELETE FROM evaluation_scores WHERE evaluation_id IN (${evaluationPlaceholders})`,
+        evaluationIds,
+      );
+      await db.query(
+        `DELETE FROM evaluations WHERE id IN (${evaluationPlaceholders})`,
+        evaluationIds,
+      );
+    }
+
+    if (teamIds.length) {
+      const teamPlaceholders = buildPlaceholders(teamIds);
+      await db.query(
+        `DELETE FROM team_players WHERE team_id IN (${teamPlaceholders})`,
+        teamIds,
+      );
+    }
+
+    if (clubIds.length) {
+      const clubPlaceholders = buildPlaceholders(clubIds);
+      await db.query(
+        `DELETE FROM scouting_team_reports WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM scouting_team_opponents WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM evaluation_templates WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM players WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM club_modules WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM teams WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+    }
+
+    if (userIds.length) {
+      const userPlaceholders = buildPlaceholders(userIds);
+      await db.query(
+        `DELETE FROM scouting_team_reports WHERE created_by IN (${userPlaceholders})`,
+        userIds,
+      );
+      await db.query(
+        `DELETE FROM reports WHERE created_by IN (${userPlaceholders})`,
+        userIds,
+      );
+      await db.query(
+        `DELETE FROM users WHERE id IN (${userPlaceholders})`,
+        userIds,
+      );
+    }
+
+    if (clubNames.length) {
+      const clubNamePlaceholders = buildPlaceholders(clubNames);
+      await db.query(
+        `DELETE FROM users WHERE default_club IN (${clubNamePlaceholders})`,
+        clubNames,
+      );
+    }
+
+    const reportClubNames = [...new Set([
+      ...clubNames,
+      ...STATIC_TEST_REPORT_CLUBS,
+    ])];
+    if (reportClubNames.length) {
+      const reportClubPlaceholders = buildPlaceholders(reportClubNames);
+      await db.query(
+        `DELETE FROM reports WHERE club IN (${reportClubPlaceholders})`,
+        reportClubNames,
+      );
+    }
+
+    if (seasonIds.length) {
+      const seasonPlaceholders = buildPlaceholders(seasonIds);
+      await db.query(
+        `DELETE FROM seasons WHERE id IN (${seasonPlaceholders})`,
+        seasonIds,
+      );
+    }
+
+    if (clubIds.length) {
+      const clubPlaceholders = buildPlaceholders(clubIds);
+      await db.query(
+        `DELETE FROM clubs WHERE id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+    }
+
+    const currentSnapshot = await readUploadSnapshot();
+    for (const root of uploadsRoots) {
+      const beforeEntries = testState.uploadSnapshot.get(root) || new Set();
+      const afterEntries = currentSnapshot.get(root) || new Set();
+
+      for (const entry of afterEntries) {
+        if (entry === '.gitkeep' || beforeEntries.has(entry)) {
+          continue;
+        }
+
+        await fsPromises.unlink(path.join(root, entry)).catch(() => {});
+      }
+    }
+
+    testState = null;
   });
 
   afterAll(async () => {
@@ -595,6 +804,15 @@ describe('Aplicación SoccerReport', () => {
 
     const [rows] = await db.query('SELECT id FROM clubs WHERE name = ?', [clubName]);
     expect(rows).toHaveLength(1);
+
+    const [moduleRows] = await db.query(
+      'SELECT module_key, enabled FROM club_modules WHERE club_id = ? ORDER BY module_key ASC',
+      [rows[0].id],
+    );
+    expect(moduleRows).toHaveLength(3);
+    expect(moduleRows.find((row) => row.module_key === 'scouting_players').enabled).toBe(1);
+    expect(moduleRows.find((row) => row.module_key === 'planning').enabled).toBe(0);
+    expect(moduleRows.find((row) => row.module_key === 'scouting_teams').enabled).toBe(0);
   });
 
   test('superadmin puede editar club en /clubs', async () => {
@@ -709,6 +927,263 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Jugadores');
     expect(res.text).toContain('informes scouting y evaluaciones estructuradas');
     expect(res.text).not.toContain('/clubs');
+  });
+
+  test('si scouting_players está desactivado el dashboard oculta accesos del módulo', async () => {
+    const club = await createTestClub(`Club Dashboard Modules ${Date.now()}`);
+    const user = await createTestUser({
+      name: 'Dashboard Modules User',
+      role: 'admin',
+      defaultClub: club.name,
+    });
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE id = ?',
+      [club.id, user.id],
+    );
+    await setModuleEnabledForClub(club.id, 'scouting_players', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: user.email, password: 'password123' });
+
+    const res = await agent.get('/dashboard');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Dashboard base activo');
+    expect(res.text).not.toContain('Abrir valoraciones');
+    expect(res.text).not.toContain('/assessments');
+    expect(res.text).not.toContain('/reports/new');
+  });
+
+  test('si scouting_players está desactivado se bloquea el acceso a valoraciones con 403', async () => {
+    const club = await createTestClub(`Club Module Gate ${Date.now()}`);
+    const user = await createTestUser({
+      name: 'Module Gate User',
+      role: 'user',
+      defaultClub: club.name,
+    });
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE id = ?',
+      [club.id, user.id],
+    );
+    await setModuleEnabledForClub(club.id, 'scouting_players', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: user.email, password: 'password123' });
+
+    const res = await agent.get('/assessments');
+    expect(res.status).toBe(403);
+    expect(res.text).toContain('MODULE_DISABLED');
+    expect(res.text).toContain('scouting_players');
+  });
+
+  test('scoutingTeams bloquea el acceso cuando el módulo no está activo', async () => {
+    const club = await createTestClub(`Club Scouting Teams Disabled ${Date.now()}`);
+    const user = await createTestUser({
+      name: 'Scouting Teams Disabled',
+      role: 'admin',
+      defaultClub: club.name,
+    });
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE id = ?',
+      [club.id, user.id],
+    );
+    await setModuleEnabledForClub(club.id, 'scouting_teams', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: user.email, password: 'password123' });
+
+    const res = await agent.get('/scouting-teams');
+    expect(res.status).toBe(403);
+    expect(res.text).toContain('MODULE_DISABLED');
+    expect(res.text).toContain('scouting_teams');
+  });
+
+  test('scoutingTeams permite CRUD básico cuando el módulo está activo', async () => {
+    const context = await createTeamContext('Club Scouting Teams CRUD');
+    const ownTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        ownTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Scouting Teams',
+      ],
+    );
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE id = ?',
+      [context.club.id, context.admin.id],
+    );
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const resIndex = await agent.get('/scouting-teams');
+    expect(resIndex.status).toBe(200);
+    expect(resIndex.text).toContain('Scouting Teams');
+    expect(resIndex.text).toContain('Nuevo informe');
+
+    const resCreate = await agent.post('/scouting-teams').send({
+      opponent_name: 'Real Opponent',
+      opponent_country_name: 'España',
+      own_team_id: ownTeamId,
+      match_date: '2026-04-01',
+      competition: 'División de Honor',
+      system_shape: '4-4-2',
+      style_in_possession: 'Ataque combinativo por dentro',
+      style_out_of_possession: 'Bloque medio reactivo',
+      transitions: 'Busca robo y salida rápida',
+      set_pieces: 'Corners cerrados al primer palo',
+      strengths: 'Laterales profundos',
+      weaknesses: 'Espacio a la espalda',
+      key_players: 'Mediocentro y extremo izquierdo',
+      general_observations: 'Rival competitivo con buen ritmo inicial',
+    });
+    expect(resCreate.status).toBe(302);
+    expect(resCreate.headers.location).toMatch(/^\/scouting-teams\//);
+
+    const [reportRows] = await db.query(
+      `SELECT r.id, r.competition, r.system_shape, o.name AS opponent_name
+       FROM scouting_team_reports r
+       INNER JOIN scouting_team_opponents o ON o.id = r.opponent_id
+       WHERE r.club_id = ?
+       ORDER BY r.created_at DESC
+       LIMIT 1`,
+      [context.club.id],
+    );
+    expect(reportRows[0].opponent_name).toBe('Real Opponent');
+    expect(reportRows[0].competition).toBe('División de Honor');
+    expect(reportRows[0].system_shape).toBe('4-4-2');
+
+    const reportId = reportRows[0].id;
+
+    const resShow = await agent.get(`/scouting-teams/${reportId}`);
+    expect(resShow.status).toBe(200);
+    expect(resShow.text).toContain('Real Opponent');
+    expect(resShow.text).toContain('Ataque combinativo por dentro');
+    expect(resShow.text).toContain('Laterales profundos');
+    expect(resShow.text).toContain('Borrar informe');
+
+    const resUpdate = await agent.post(`/scouting-teams/${reportId}/update`).send({
+      opponent_name: 'Real Opponent',
+      opponent_country_name: 'España',
+      own_team_id: ownTeamId,
+      match_date: '2026-04-02',
+      competition: 'Liga Nacional',
+      system_shape: '4-3-3',
+      style_in_possession: 'Salida por tres',
+      style_out_of_possession: 'Presión alta intermitente',
+      transitions: 'Amenaza tras recuperación en banda',
+      set_pieces: 'Saques de esquina con bloqueos',
+      strengths: 'Buen ritmo de circulación',
+      weaknesses: 'Sufre en pérdidas interiores',
+      key_players: 'Pivote y delantero',
+      general_observations: 'Conviene atacar lado débil del lateral derecho',
+    });
+    expect(resUpdate.status).toBe(302);
+    expect(resUpdate.headers.location).toBe(`/scouting-teams/${reportId}`);
+
+    const [updatedRows] = await db.query(
+      `SELECT competition, system_shape, general_observations
+       FROM scouting_team_reports
+       WHERE id = ?`,
+      [reportId],
+    );
+    expect(updatedRows[0].competition).toBe('Liga Nacional');
+    expect(updatedRows[0].system_shape).toBe('4-3-3');
+    expect(updatedRows[0].general_observations).toContain('lateral derecho');
+
+    const resDelete = await agent.post(`/scouting-teams/${reportId}/delete`);
+    expect(resDelete.status).toBe(302);
+    expect(resDelete.headers.location).toBe('/scouting-teams');
+
+    const [deletedRows] = await db.query(
+      'SELECT id FROM scouting_team_reports WHERE id = ?',
+      [reportId],
+    );
+    expect(deletedRows).toHaveLength(0);
+  });
+
+  test('scoutingTeams permite a un usuario editar solo sus propios informes', async () => {
+    const context = await createTeamContext('Club Scouting Teams Ownership');
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+
+    const analyst = await createTestUser({
+      name: 'Analyst Teams',
+      email: `analyst-teams-${Date.now()}@test.local`,
+      role: 'user',
+      defaultClub: context.club.name,
+    });
+    const secondAnalyst = await createTestUser({
+      name: 'Second Analyst Teams',
+      email: `analyst-teams-second-${Date.now()}@test.local`,
+      role: 'user',
+      defaultClub: context.club.name,
+    });
+
+    await db.query('UPDATE users SET club_id = ? WHERE id IN (?, ?)', [
+      context.club.id,
+      analyst.id,
+      secondAnalyst.id,
+    ]);
+
+    const analystAgent = request.agent(app);
+    await analystAgent.post('/login').send({ email: analyst.email, password: 'password123' });
+
+    const resNew = await analystAgent.get('/scouting-teams/new');
+    expect(resNew.status).toBe(200);
+    expect(resNew.text).toContain('Nuevo informe de scouting');
+
+    const resCreate = await analystAgent.post('/scouting-teams').send({
+      opponent_name: 'Owned Opponent',
+      competition: 'Liga Nacional',
+      strengths: 'Buen pie interior',
+    });
+    expect(resCreate.status).toBe(302);
+    expect(resCreate.headers.location).toMatch(/^\/scouting-teams\//);
+
+    const createdReportId = resCreate.headers.location.replace('/scouting-teams/', '');
+
+    const resOwnedShow = await analystAgent.get(`/scouting-teams/${createdReportId}`);
+    expect(resOwnedShow.status).toBe(200);
+    expect(resOwnedShow.text).toContain('Editar');
+    expect(resOwnedShow.text).not.toContain('Borrar informe');
+    expect(resOwnedShow.text).toContain('el borrado queda reservado a administradores');
+
+    const resOwnedEdit = await analystAgent.get(`/scouting-teams/${createdReportId}/edit`);
+    expect(resOwnedEdit.status).toBe(200);
+    expect(resOwnedEdit.text).toContain('Editar informe de scouting');
+
+    const resOwnedUpdate = await analystAgent.post(`/scouting-teams/${createdReportId}/update`).send({
+      opponent_name: 'Owned Opponent Updated',
+      competition: 'Liga Nacional',
+      strengths: 'Buen pie interior',
+      weaknesses: 'Sufre a la espalda',
+    });
+    expect(resOwnedUpdate.status).toBe(302);
+    expect(resOwnedUpdate.headers.location).toBe(`/scouting-teams/${createdReportId}`);
+
+    const secondAgent = request.agent(app);
+    await secondAgent.post('/login').send({ email: secondAnalyst.email, password: 'password123' });
+
+    const resForbiddenEdit = await secondAgent.get(`/scouting-teams/${createdReportId}/edit`);
+    expect(resForbiddenEdit.status).toBe(302);
+    expect(resForbiddenEdit.headers.location).toBe(`/scouting-teams/${createdReportId}`);
+
+    const resForbiddenDelete = await analystAgent.post(`/scouting-teams/${createdReportId}/delete`);
+    expect(resForbiddenDelete.status).toBe(302);
+    expect(resForbiddenDelete.headers.location).toBe(`/scouting-teams/${createdReportId}`);
+
+    const [rows] = await db.query(
+      'SELECT competition, weaknesses, created_by FROM scouting_team_reports WHERE id = ?',
+      [createdReportId],
+    );
+    expect(rows[0].competition).toBe('Liga Nacional');
+    expect(rows[0].weaknesses).toBe('Sufre a la espalda');
+    expect(rows[0].created_by).toBe(analyst.id);
   });
 
   test('un admin ve acciones completas en la landing unificada de valoraciones', async () => {
@@ -2100,6 +2575,58 @@ describe('Aplicación SoccerReport', () => {
     );
     expect(rows[0].interface_color).toBe('#123ABC');
     expect(rows[0].crest_path).toContain('/uploads/clubs/');
+  });
+
+  test('un admin puede gestionar los módulos activos de su club desde configuración', async () => {
+    const context = await createTeamContext('Club Module Admin');
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', false);
+    await setModuleEnabledForClub(context.club.id, 'planning', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const resConfig = await agent.get('/admin/club');
+    expect(resConfig.status).toBe(200);
+    expect(resConfig.text).toContain('Módulos activos del club');
+    expect(resConfig.text).toContain('Presets rápidos');
+    expect(resConfig.text).toContain('Core operativo');
+    expect(resConfig.text).toContain('Análisis deportivo');
+    expect(resConfig.text).toContain('Scouting Players');
+    expect(resConfig.text).toContain('Scouting Teams');
+    expect(resConfig.text).toContain('Usuarios del club pueden crear y editar sus propios informes');
+
+    const resUpdate = await agent.post('/admin/club/modules').send({
+      club_id: String(context.club.id),
+      module_keys: ['scouting_players', 'scouting_teams'],
+    });
+    expect(resUpdate.status).toBe(302);
+    expect(resUpdate.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [rows] = await db.query(
+      'SELECT module_key, enabled FROM club_modules WHERE club_id = ? ORDER BY module_key ASC',
+      [context.club.id],
+    );
+    expect(rows.find((row) => row.module_key === 'scouting_players').enabled).toBe(1);
+    expect(rows.find((row) => row.module_key === 'scouting_teams').enabled).toBe(1);
+    expect(rows.find((row) => row.module_key === 'planning').enabled).toBe(0);
+
+    const resDashboard = await agent.get('/dashboard');
+    expect(resDashboard.status).toBe(200);
+    expect(resDashboard.text).toContain('/scouting-teams');
+    expect(resDashboard.text).toContain('Scouting Teams');
+
+    const resPreset = await agent.post('/admin/club/modules').send({
+      club_id: String(context.club.id),
+      module_preset: 'full_suite',
+    });
+    expect(resPreset.status).toBe(302);
+    expect(resPreset.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [rowsAfterPreset] = await db.query(
+      'SELECT module_key, enabled FROM club_modules WHERE club_id = ? ORDER BY module_key ASC',
+      [context.club.id],
+    );
+    expect(rowsAfterPreset.every((row) => row.enabled === 1)).toBe(true);
   });
 
   test('session-based operational context still works for /teams', async () => {

@@ -1,11 +1,16 @@
 <%
+  const scoutingPlayersEnabled = activeModules.includes('scouting_players');
+  const planningEnabled = activeModules.includes('planning');
+  const scoutingTeamsEnabled = activeModules.includes('scouting_teams');
   const managementItems = [
     { label: 'Panel general', href: '/dashboard' },
     { label: 'Plantillas', href: '/teams' },
     { label: 'Jugadores', href: '/admin/players' },
-    { label: 'Previsión 2026/27', href: '/season-forecast' },
-    { label: 'Comparativa 26/27', href: '/season-comparison' },
-    { label: 'Valoraciones', href: '/assessments' },
+    { label: 'Previsión 2026/27', href: scoutingPlayersEnabled ? '/season-forecast' : '#', moduleKey: 'scouting_players' },
+    { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players' },
+    { label: 'Valoraciones', href: scoutingPlayersEnabled ? '/assessments' : '#', moduleKey: 'scouting_players' },
+    { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning' },
+    { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams' },
   ];
   const adminItems = [
     { label: 'Plantillas eval.', href: '/evaluation-templates' },

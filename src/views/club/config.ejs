@@ -24,6 +24,111 @@
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
+        Módulos activos del club
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Activa solo los verticales que este club debe tener disponibles en navegación, dashboard y acceso por URL.
+        </p>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Activos</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.active : 0 %></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Inactivos</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.inactive : 0 %></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Total preparado</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.total : 0 %></div>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST" action="/admin/club/modules">
+          <input type="hidden" name="club_id" value="<%= selectedClubId || '' %>" />
+
+          <% if (modulePresets && modulePresets.length) { %>
+            <div class="mb-4">
+              <div class="fw-semibold mb-2">Presets rápidos</div>
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                <% modulePresets.forEach((preset) => { %>
+                  <button
+                    type="submit"
+                    name="module_preset"
+                    value="<%= preset.key %>"
+                    class="btn btn-outline-secondary btn-sm"
+                  >
+                    <%= preset.label %>
+                  </button>
+                <% }) %>
+              </div>
+              <div class="small text-muted">
+                Usa un preset para aplicar una combinación recomendada sin marcar módulo a módulo.
+              </div>
+            </div>
+          <% } %>
+
+          <% if (!modules || !modules.length) { %>
+            <p class="text-muted mb-3">No hay módulos configurados todavía para este club.</p>
+          <% } else { %>
+            <div class="vstack gap-3 mb-3">
+              <% modules.forEach((moduleEntry) => { %>
+                <div class="border rounded p-3">
+                  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div class="form-check flex-grow-1">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="module_keys"
+                        value="<%= moduleEntry.moduleKey %>"
+                        id="module_<%= moduleEntry.moduleKey %>"
+                        <%= moduleEntry.enabled ? 'checked' : '' %>
+                      />
+                      <label class="form-check-label fw-semibold" for="module_<%= moduleEntry.moduleKey %>">
+                        <%= moduleEntry.label %>
+                      </label>
+                    </div>
+                    <span class="badge <%= moduleEntry.enabled ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis' %>">
+                      <%= moduleEntry.enabled ? 'Activo' : 'Inactivo' %>
+                    </span>
+                  </div>
+                  <div class="small text-muted mt-2"><%= moduleEntry.description %></div>
+                  <div class="small text-muted mt-2">
+                    Ruta principal:
+                    <% if (moduleEntry.entryPath && moduleEntry.entryPath !== '#') { %>
+                      <code><%= moduleEntry.entryPath %></code>
+                    <% } else { %>
+                      <span>No definida todavía</span>
+                    <% } %>
+                  </div>
+                  <div class="small text-muted mt-2">
+                    Acceso previsto: <%= moduleEntry.roleSummary || 'Pendiente de definir.' %>
+                  </div>
+                  <% if (moduleEntry.defaultEnabled) { %>
+                    <div class="small text-muted mt-2">Módulo base recomendado para todos los clubes.</div>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary">Guardar selección manual</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
         Branding del club
       </div>
       <div class="card-body">

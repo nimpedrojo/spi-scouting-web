@@ -5,6 +5,10 @@ const { getAllReports } = require('../models/reportModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getTeamsByClubId } = require('../models/teamModel');
 const { getSeasonsByClubId } = require('../models/seasonModel');
+const {
+  getClubModules,
+  getClubModulePresets,
+} = require('../shared/services/clubModuleService');
 
 async function resolveAdminClub(req, explicitClubId = null) {
   const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';
@@ -41,14 +45,21 @@ async function getClubAdminData(club) {
     return null;
   }
 
-  const [users, players, reports, recommendations, v2Teams, seasons] = await Promise.all([
+  const [users, players, reports, recommendations, v2Teams, seasons, modules] = await Promise.all([
     getAllUsers(club.name),
     getAllPlayers(club.name),
     getAllReports(club.name),
     getRecommendationsByClub(club.name),
     getTeamsByClubId(club.id),
     getSeasonsByClubId(club.id),
+    getClubModules(club.id),
   ]);
+
+  const moduleSummary = {
+    total: modules.length,
+    active: modules.filter((moduleEntry) => moduleEntry.enabled).length,
+    inactive: modules.filter((moduleEntry) => !moduleEntry.enabled).length,
+  };
 
   return {
     club,
@@ -58,6 +69,9 @@ async function getClubAdminData(club) {
     recommendations,
     v2Teams,
     seasons,
+    modules,
+    moduleSummary,
+    modulePresets: getClubModulePresets(),
   };
 }
 

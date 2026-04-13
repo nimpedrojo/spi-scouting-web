@@ -12,6 +12,16 @@ const { createEvaluationsTable } = require('./models/evaluationModel');
 const { createEvaluationScoresTable } = require('./models/evaluationScoreModel');
 const { createEvaluationTemplatesTable } = require('./models/evaluationTemplateModel');
 const { createEvaluationTemplateMetricsTable } = require('./models/evaluationTemplateMetricModel');
+const {
+  createClubModulesTable,
+  seedDefaultClubModules,
+} = require('./core/models/clubModuleModel');
+const {
+  createScoutingTeamOpponentsTable,
+} = require('./modules/scoutingTeams/models/scoutingTeamOpponentModel');
+const {
+  createScoutingTeamReportsTable,
+} = require('./modules/scoutingTeams/models/scoutingTeamReportModel');
 const { ensureDatabaseExists } = require('./db');
 
 let initializationPromise = null;
@@ -25,6 +35,9 @@ async function initializeDatabase() {
   await createCategoriesTable();
   await createTeamsTable();
   await createUsersTable();
+  await createClubModulesTable();
+  await createScoutingTeamOpponentsTable();
+  await createScoutingTeamReportsTable();
   await createReportsTable();
   await createPlayersTable();
   await createTeamPlayersTable();
@@ -35,6 +48,7 @@ async function initializeDatabase() {
   await seedDefaultSections();
   await seedDefaultCategories();
   await syncUserClubAssignments();
+  await seedDefaultClubModules();
   await ensureAdminUser();
 }
 

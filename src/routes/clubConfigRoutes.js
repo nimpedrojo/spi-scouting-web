@@ -10,6 +10,7 @@ const {
   deleteRecommendation,
 } = require('../models/clubRecommendationModel');
 const { updateClubBranding } = require('../models/clubModel');
+const { updateClubModules } = require('../shared/services/clubModuleService');
 const {
   resolveAdminClub,
   getClubAdminData,
@@ -104,6 +105,9 @@ router.get('/', ensureAdmin, async (req, res) => {
       recommendations: data.recommendations,
       v2Teams: data.v2Teams,
       seasons: data.seasons,
+      modules: data.modules,
+      moduleSummary: data.moduleSummary,
+      modulePresets: data.modulePresets,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -164,6 +168,33 @@ router.post('/branding', ensureAdmin, uploadClubCrest, async (req, res) => {
     req.flash('error', message);
     return res.redirect(buildClubConfigRedirect(club));
   }
+});
+
+router.post('/modules', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club por defecto en tu cuenta.',
+    );
+    return res.redirect('/account');
+  }
+
+  try {
+    await updateClubModules(club.id, req.body.module_keys, req.body.module_preset || null);
+    req.session.clubContext = null;
+
+    const message = req.body.module_preset
+      ? 'Preset de módulos aplicado correctamente.'
+      : 'Módulos del club actualizados correctamente.';
+    req.flash('success', message);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al actualizar módulos del club:', err);
+    req.flash('error', 'Ha ocurrido un error al guardar la configuración de módulos.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/recommendations', ensureAdmin, async (req, res) => {

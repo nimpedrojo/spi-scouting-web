@@ -1,4 +1,6 @@
 const db = require('../db');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { countScoutingTeamReportsByClub } = require('../modules/scoutingTeams/models/scoutingTeamReportModel');
 
 function getSeasonDateRange(seasonName) {
   if (!seasonName || !/^\d{4}\/\d{2}$/.test(seasonName)) {
@@ -98,15 +100,33 @@ async function getPendingEvaluationsByTeam(clubId, activeSeasonId) {
   }));
 }
 
-async function getDashboardData(clubId, activeSeason) {
-  const [metrics, pendingByTeam] = await Promise.all([
-    getDashboardMetrics(clubId, activeSeason),
-    activeSeason ? getPendingEvaluationsByTeam(clubId, activeSeason.id) : Promise.resolve([]),
+async function getDashboardData(clubId, activeSeason, options = {}) {
+  const activeModuleKeys = Array.isArray(options.activeModuleKeys)
+    ? options.activeModuleKeys
+    : [];
+  const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
+  const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
+
+  const [metrics, pendingByTeam, scoutingTeamsReportCount] = await Promise.all([
+    scoutingPlayersEnabled
+      ? getDashboardMetrics(clubId, activeSeason)
+      : Promise.resolve(null),
+    scoutingPlayersEnabled && activeSeason
+      ? getPendingEvaluationsByTeam(clubId, activeSeason.id)
+      : Promise.resolve([]),
+    scoutingTeamsEnabled
+      ? countScoutingTeamReportsByClub(clubId)
+      : Promise.resolve(0),
   ]);
 
   return {
     metrics,
     pendingByTeam,
+    modules: {
+      scoutingPlayersEnabled,
+      scoutingTeamsEnabled,
+      scoutingTeamsReportCount,
+    },
   };
 }
 

@@ -1,0 +1,17 @@
+<div class="container py-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h1 class="h4 mb-3">Módulo no disponible para este club</h1>
+      <p class="text-muted mb-3">
+        El módulo <strong><%= moduleKey %></strong> no está activo en el club seleccionado.
+      </p>
+      <% if (activeModules && activeModules.length) { %>
+        <p class="mb-3">Módulos activos actualmente: <%= activeModules.join(', ') %></p>
+      <% } %>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/dashboard" class="btn btn-primary">Volver al dashboard</a>
+        <a href="/account" class="btn btn-outline-secondary">Revisar cuenta</a>
+      </div>
+    </div>
+  </div>
+</div>

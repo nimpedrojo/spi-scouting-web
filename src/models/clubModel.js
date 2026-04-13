@@ -1,4 +1,5 @@
 const db = require('../db');
+const { ensureDefaultModulesForClub } = require('../core/models/clubModuleModel');
 
 async function createClubsTable() {
   const sql = `
@@ -36,6 +37,7 @@ async function createClub({ name, code }) {
     'INSERT INTO clubs (name, code, interface_color, crest_path) VALUES (?, ?, NULL, NULL)',
     [name, code],
   );
+  await ensureDefaultModulesForClub(result.insertId);
   return result.insertId;
 }
 
@@ -91,6 +93,7 @@ async function deleteClub(id) {
 }
 
 async function deleteClubDependencies({ clubId, clubName }) {
+  await db.query('DELETE FROM club_modules WHERE club_id = ?', [clubId]);
   await db.query('DELETE FROM evaluations WHERE club_id = ?', [clubId]);
   await db.query('DELETE FROM club_recommendations WHERE club = ?', [clubName]);
   await db.query('DELETE FROM reports WHERE club = ?', [clubName]);
