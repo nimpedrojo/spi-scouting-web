@@ -105,10 +105,11 @@ async function getDashboardData(clubId, activeSeason, options = {}) {
     ? options.activeModuleKeys
     : [];
   const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
+  const planningEnabled = activeModuleKeys.includes(MODULE_KEYS.PLANNING);
   const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
 
   const [metrics, pendingByTeam, scoutingTeamsReportCount] = await Promise.all([
-    scoutingPlayersEnabled
+    clubId
       ? getDashboardMetrics(clubId, activeSeason)
       : Promise.resolve(null),
     scoutingPlayersEnabled && activeSeason
@@ -124,6 +125,7 @@ async function getDashboardData(clubId, activeSeason, options = {}) {
     pendingByTeam,
     modules: {
       scoutingPlayersEnabled,
+      planningEnabled,
       scoutingTeamsEnabled,
       scoutingTeamsReportCount,
     },

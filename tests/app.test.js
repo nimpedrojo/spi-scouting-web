@@ -116,7 +116,7 @@ function buildEvaluationWorkbookBuffer(rows) {
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
-describe('Aplicación SoccerReport', () => {
+describe('Aplicación SoccerProcessIQ Suite', () => {
   beforeAll(async () => {
     await initDatabaseOnce();
   });
@@ -576,13 +576,19 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Abrir valoraciones');
+    expect(res.text).toContain('SoccerProcessIQ Suite');
+    expect(res.text).toContain('SPI Core');
+    expect(res.text).toContain('Módulos activos');
+    expect(res.text).toContain('SPI Scouting Players');
+    expect(res.text).toContain('Valoraciones');
     expect(res.text).toContain('/assessments');
     expect(res.text).toContain('Nuevo informe');
     expect(res.text).toContain('/reports/new');
     expect(res.text).toContain('Mi cuenta');
     expect(res.text).toContain('/account');
-    expect(res.text).not.toContain('Gestión de usuarios');
+    expect(res.text).toContain('Equipos');
+    expect(res.text).toContain('Jugadores');
+    expect(res.text).not.toContain('/admin/users');
   });
 
   test('un usuario autenticado puede ver la landing unificada de valoraciones', async () => {
@@ -1009,18 +1015,13 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Abrir valoraciones');
-    expect(res.text).toContain('/assessments');
-    expect(res.text).toContain('Nuevo informe');
-    expect(res.text).toContain('/reports/new');
-    expect(res.text).toContain('Mi cuenta');
-    expect(res.text).toContain('/account');
-    expect(res.text).toContain('Valoraciones');
-    expect(res.text).toContain('Gestión de usuarios');
+    expect(res.text).toContain('SPI Core');
+    expect(res.text).toContain('SPI Scouting Players');
+    expect(res.text).toContain('Usuarios');
     expect(res.text).toContain('/admin/users');
     expect(res.text).toContain('/admin/players');
-    expect(res.text).toContain('Jugadores');
-    expect(res.text).toContain('informes scouting y evaluaciones estructuradas');
+    expect(res.text).toContain('/admin/club');
+    expect(res.text).toContain('Configuración del club');
     expect(res.text).not.toContain('/clubs');
   });
 
@@ -1042,8 +1043,8 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Dashboard base activo');
-    expect(res.text).not.toContain('Abrir valoraciones');
+    expect(res.text).toContain('Sin módulos adicionales activos');
+    expect(res.text).not.toContain('SPI Scouting Players');
     expect(res.text).not.toContain('/assessments');
     expect(res.text).not.toContain('/reports/new');
   });
@@ -1068,6 +1069,25 @@ describe('Aplicación SoccerReport', () => {
     expect(res.status).toBe(403);
     expect(res.text).toContain('MODULE_DISABLED');
     expect(res.text).toContain('scouting_players');
+  });
+
+  test('dashboard muestra solo los módulos activos del club', async () => {
+    const context = await createTeamContext('Club Dashboard Active Modules');
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/dashboard');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('SPI Scouting Players');
+    expect(res.text).toContain('SPI Planning');
+    expect(res.text).toContain('Abrir módulo');
+    expect(res.text).toContain('/planning');
+    expect(res.text).toContain('SPI Scouting Teams');
+    expect(res.text).toContain('/scouting-teams');
+    expect(res.text).toContain('Informes de rivales');
   });
 
   test('scoutingTeams bloquea el acceso cuando el módulo no está activo', async () => {
@@ -3590,8 +3610,8 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Jugadores registrados');
-    expect(res.text).toContain('Jugadores sin evaluación por equipo');
+    expect(res.text).toContain('SPI Core');
+    expect(res.text).toContain('Seguimiento operativo de evaluaciones');
     expect(res.text).toContain('Juvenil Eval');
   });
 
@@ -3633,10 +3653,10 @@ describe('Aplicación SoccerReport', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('1.00');
-    expect(res.text).toContain('Informes emitidos');
-    expect(res.text).toContain('Equipos activos');
-    expect(res.text).toContain('Acceso unificado a informes scouting y evaluaciones estructuradas.');
+    expect(res.text).toContain('1 equipos activos');
+    expect(res.text).toContain('1 jugadores activos');
+    expect(res.text).toContain('1 informes en temporada');
+    expect(res.text).toContain('SPI Scouting Players');
   });
 
   test('pending evaluations table renders correctly', async () => {

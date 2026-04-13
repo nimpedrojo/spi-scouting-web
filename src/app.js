@@ -60,7 +60,7 @@ app.use((req, res, next) => {
   res.locals.activeSeasonLabel = req.context && req.context.activeSeason
     ? req.context.activeSeason.name
     : null;
-  res.locals.pageTitle = 'SoccerReport';
+  res.locals.pageTitle = 'SoccerProcessIQ Suite';
   res.locals.activeModules = req.context ? req.context.activeModuleKeys || [] : [];
 
   next();
