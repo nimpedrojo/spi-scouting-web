@@ -658,6 +658,12 @@ body {
   border-radius: 1.25rem;
 }
 
+.team-workspace-hero {
+  background:
+    linear-gradient(135deg, rgba(11, 59, 140, 0.08), rgba(255, 193, 7, 0.08)),
+    #ffffff;
+}
+
 .team-detail-hero__crest {
   width: 56px;
   height: 56px;
@@ -842,6 +848,12 @@ body {
 .team-player-card__name {
   font-weight: 700;
   font-size: 1.1rem;
+}
+
+.team-activity-item + .team-activity-item {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(15, 61, 46, 0.08);
 }
 
 .team-detail-table tbody tr {

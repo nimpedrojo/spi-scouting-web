@@ -1,0 +1,60 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><%= session ? 'Editar sesión' : 'Nueva sesión' %></h1>
+    <p class="text-muted mb-0">Sesión operativa dentro del microciclo y del contexto de equipo.</p>
+  </div>
+  <a href="/planning/microcycles/<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Volver al microciclo</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= formAction %>" class="row g-3">
+      <input type="hidden" name="microcycle_id" value="<%= formValues.microcycle_id %>" />
+
+      <div class="col-md-4">
+        <label for="session_date" class="form-label">Fecha</label>
+        <input type="date" id="session_date" name="session_date" class="form-control" required value="<%= formValues.session_date %>" />
+      </div>
+
+      <div class="col-md-8">
+        <label for="title" class="form-label">Título</label>
+        <input type="text" id="title" name="title" class="form-control" required value="<%= formValues.title %>" placeholder="Ej. Sesión MD-2" />
+      </div>
+
+      <div class="col-md-6">
+        <label for="session_type" class="form-label">Tipo de sesión</label>
+        <select id="session_type" name="session_type" class="form-select">
+          <option value="">Sin tipo</option>
+          <% sessionTypeOptions.forEach((type) => { %>
+            <option value="<%= type %>" <%= formValues.session_type === type ? 'selected' : '' %>><%= type %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label for="duration_minutes" class="form-label">Duración (min)</label>
+        <input type="number" min="0" id="duration_minutes" name="duration_minutes" class="form-control" value="<%= formValues.duration_minutes %>" />
+      </div>
+
+      <div class="col-12">
+        <label for="objective" class="form-label">Objetivo</label>
+        <textarea id="objective" name="objective" class="form-control" rows="3"><%= formValues.objective %></textarea>
+      </div>
+
+      <div class="col-12">
+        <label for="contents" class="form-label">Contenidos</label>
+        <textarea id="contents" name="contents" class="form-control" rows="4"><%= formValues.contents %></textarea>
+      </div>
+
+      <div class="col-12">
+        <label for="notes" class="form-label">Notas</label>
+        <textarea id="notes" name="notes" class="form-control" rows="4"><%= formValues.notes %></textarea>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/planning/microcycles/<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

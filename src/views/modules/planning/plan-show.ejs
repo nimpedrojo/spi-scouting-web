@@ -1,0 +1,122 @@
+<div class="mb-4">
+  <a href="/planning?team_id=<%= detail.seasonPlan.team_id %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+    <span aria-hidden="true">←</span>
+    <span>Volver a SPI Planning</span>
+  </a>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+      <div>
+        <div class="dashboard-entry-eyebrow">Planificación de temporada</div>
+        <h1 class="h3 mb-2"><%= detail.seasonPlan.team_name %> · <%= detail.seasonPlan.season_label %></h1>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge text-bg-light border"><%= detail.seasonPlan.planning_model %></span>
+          <span class="badge text-bg-light border"><%= detail.seasonPlan.microcycle_count %> microciclos</span>
+          <span class="badge text-bg-light border"><%= detail.seasonPlan.session_count %> sesiones</span>
+        </div>
+        <p class="text-muted mb-0"><%= detail.seasonPlan.objective || 'Sin objetivo general definido.' %></p>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/planning/microcycles/new?plan_id=<%= detail.seasonPlan.id %>" class="btn btn-primary">Nuevo microciclo</a>
+        <a href="/planning/plans/<%= detail.seasonPlan.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+        <form method="POST" action="/planning/plans/<%= detail.seasonPlan.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar esta planificación?');">
+          <button type="submit" class="btn btn-outline-danger">Eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Equipo</div>
+        <div class="fw-semibold"><%= detail.seasonPlan.team_name %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Rango</div>
+        <div class="fw-semibold">
+          <%= detail.seasonPlan.start_date ? detail.seasonPlan.start_date.toISOString().slice(0, 10) : 'Sin inicio' %>
+          -
+          <%= detail.seasonPlan.end_date ? detail.seasonPlan.end_date.toISOString().slice(0, 10) : 'Sin fin' %>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Microciclos</div>
+        <div class="display-6 fw-semibold"><%= detail.microcycles.length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Sesiones</div>
+        <div class="display-6 fw-semibold"><%= detail.microcycles.reduce((sum, item) => sum + (item.session_count || 0), 0) %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="h4 mb-0">Microciclos</h2>
+      <a href="/planning/microcycles/new?plan_id=<%= detail.seasonPlan.id %>" class="btn btn-sm btn-primary">Nuevo microciclo</a>
+    </div>
+
+    <% if (!detail.microcycles.length) { %>
+      <p class="mb-0 text-muted">Todavía no hay microciclos en esta planificación.</p>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Orden</th>
+              <th>Nombre</th>
+              <th>Fechas</th>
+              <th>Fase</th>
+              <th>Sesiones</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% detail.microcycles.forEach((microcycle) => { %>
+              <tr>
+                <td><span class="badge text-bg-light border"><%= microcycle.order_index %></span></td>
+                <td>
+                  <div class="fw-semibold"><%= microcycle.name %></div>
+                  <div class="small text-muted"><%= microcycle.objective || 'Sin objetivo' %></div>
+                </td>
+                <td>
+                  <%= microcycle.start_date ? microcycle.start_date.toISOString().slice(0, 10) : '-' %>
+                  -
+                  <%= microcycle.end_date ? microcycle.end_date.toISOString().slice(0, 10) : '-' %>
+                </td>
+                <td><%= microcycle.phase || '-' %></td>
+                <td><%= microcycle.session_count %></td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <a href="/planning/microcycles/<%= microcycle.id %>" class="btn btn-sm btn-primary">Abrir</a>
+                    <a href="/planning/microcycles/<%= microcycle.id %>/edit" class="btn btn-sm btn-outline-secondary">Editar</a>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

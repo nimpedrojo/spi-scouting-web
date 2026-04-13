@@ -1,0 +1,66 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><%= seasonPlan ? 'Editar planificación' : 'Nueva planificación' %></h1>
+    <p class="text-muted mb-0">MVP de SPI Planning centrado en la temporada metodológica del equipo.</p>
+  </div>
+  <a href="<%= formValues.team_id ? '/planning?team_id=' + encodeURIComponent(formValues.team_id) : '/planning' %>" class="btn btn-outline-secondary">Volver al módulo</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= formAction %>" class="row g-3">
+      <div class="col-md-6">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select" <%= seasonPlan ? 'disabled' : '' %> required>
+          <% formData.visibleTeams.forEach((team) => { %>
+            <option value="<%= team.id %>" <%= String(formValues.team_id || '') === String(team.id) ? 'selected' : '' %>>
+              <%= team.name %> · <%= team.category_name %> · <%= team.section_name %> · <%= team.season_name %>
+            </option>
+          <% }) %>
+        </select>
+        <% if (seasonPlan) { %>
+          <input type="hidden" name="team_id" value="<%= formValues.team_id %>" />
+        <% } %>
+      </div>
+
+      <div class="col-md-6">
+        <label for="season_label" class="form-label">Etiqueta de temporada</label>
+        <input type="text" id="season_label" name="season_label" class="form-control" required value="<%= formValues.season_label %>" placeholder="Ej. 2025/2026" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="planning_model" class="form-label">Modelo de planificación</label>
+        <select id="planning_model" name="planning_model" class="form-select" required>
+          <% formData.planningModels.forEach((item) => { %>
+            <option value="<%= item.key %>" <%= formValues.planning_model === item.key ? 'selected' : '' %>><%= item.label %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="start_date" class="form-label">Fecha inicio</label>
+        <input type="date" id="start_date" name="start_date" class="form-control" value="<%= formValues.start_date %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="end_date" class="form-label">Fecha fin</label>
+        <input type="date" id="end_date" name="end_date" class="form-control" value="<%= formValues.end_date %>" />
+      </div>
+
+      <div class="col-12">
+        <label for="objective" class="form-label">Objetivo general</label>
+        <textarea id="objective" name="objective" class="form-control" rows="4"><%= formValues.objective %></textarea>
+      </div>
+
+      <div class="col-12">
+        <label for="notes" class="form-label">Notas</label>
+        <textarea id="notes" name="notes" class="form-control" rows="5"><%= formValues.notes %></textarea>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="<%= formValues.team_id ? '/planning?team_id=' + encodeURIComponent(formValues.team_id) : '/planning' %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -89,14 +89,32 @@ function getReportSessionDefaults(user) {
 
 router.get('/new', ensureAuth, async (req, res) => {
   const { defaultClub, defaultTeamId, defaultTeam } = getReportSessionDefaults(req.session.user);
+  const requestedTeamId = req.query.team_id ? String(req.query.team_id).trim() : null;
+  const activeTeamScope = await getActiveTeamScope(req.session.user);
   const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
-  const resolvedDefaultTeam = defaultTeamRecord
-    ? defaultTeamRecord.name
-    : defaultTeam;
+
+  let scopedTeamRecord = null;
+  if (requestedTeamId) {
+    const candidateTeam = await findTeamById(requestedTeamId);
+    const isAllowedTeam = candidateTeam
+      && (!defaultClub || candidateTeam.club_name === defaultClub)
+      && (!activeTeamScope || String(activeTeamScope.id) === String(candidateTeam.id));
+
+    if (isAllowedTeam) {
+      scopedTeamRecord = candidateTeam;
+    }
+  }
+
+  const resolvedDefaultTeam = scopedTeamRecord
+    ? scopedTeamRecord.name
+    : (defaultTeamRecord ? defaultTeamRecord.name : defaultTeam);
+  const resolvedTeamId = scopedTeamRecord
+    ? scopedTeamRecord.id
+    : defaultTeamId;
 
   const clubFilter = defaultClub || null;
-  let players = await getReportPlayersForContext(clubFilter, defaultTeamId);
-  if (!players.length && defaultTeamId) {
+  let players = await getReportPlayersForContext(clubFilter, resolvedTeamId);
+  if (!players.length && resolvedTeamId) {
     players = await getReportPlayersForContext(clubFilter, null);
   }
 
@@ -133,7 +151,7 @@ router.get('/new', ensureAuth, async (req, res) => {
   logPageView(req, 'report_new_form', {
     playerCount: players.length,
     scopeClub: defaultClub,
-    defaultTeamId,
+    defaultTeamId: resolvedTeamId,
   });
 });
 
@@ -404,15 +422,25 @@ router.get('/', ensureAuth, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const activeTeamScope = await getActiveTeamScope(req.session.user);
-    let reports = await getAllReports(clubFilter);
+    const requestedTeamFilter = req.query.team ? String(req.query.team).trim() : null;
+    const effectiveTeamFilter = activeTeamScope
+      ? activeTeamScope.name
+      : requestedTeamFilter;
+    let reports = await getAllReports(clubFilter, { team: effectiveTeamFilter });
     if (activeTeamScope) {
       reports = reports.filter((report) => reportBelongsToTeamScope(report, activeTeamScope));
     }
     logPageView(req, 'reports_list', {
       reportCount: reports.length,
       scopeClub: clubFilter,
+      team: effectiveTeamFilter,
     });
-    res.render('reports/list', { reports });
+    res.render('reports/list', {
+      reports,
+      filters: {
+        team: effectiveTeamFilter || '',
+      },
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener informes:', err);

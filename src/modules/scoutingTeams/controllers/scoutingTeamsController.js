@@ -11,8 +11,10 @@ const { getScoutingTeamsPermissions } = require('../services/scoutingTeamsPermis
 
 async function renderIndex(req, res) {
   const club = req.context ? req.context.club : null;
+  const scopedTeamId = req.query.team_id ? String(req.query.team_id).trim() : '';
   const filters = {
     search: req.query.q ? String(req.query.q).trim() : '',
+    teamId: scopedTeamId || null,
   };
 
   const data = await getScoutingTeamsIndexData(club.id, filters);
@@ -34,13 +36,19 @@ async function renderIndex(req, res) {
 async function renderNew(req, res) {
   const club = req.context ? req.context.club : null;
   const teamOptions = await getScoutingTeamsFormOptions(club.id);
+  const scopedTeamId = req.query.team_id ? String(req.query.team_id).trim() : '';
+  const initialTeamId = teamOptions.some((team) => String(team.id) === scopedTeamId)
+    ? scopedTeamId
+    : '';
 
   return res.render('modules/scouting-teams/form', {
     pageTitle: 'Nuevo informe de scouting',
     formAction: '/scouting-teams',
     submitLabel: 'Guardar informe',
     report: null,
-    formData: buildScoutingTeamsFormData(),
+    formData: buildScoutingTeamsFormData({
+      own_team_id: initialTeamId,
+    }),
     teamOptions,
   });
 }

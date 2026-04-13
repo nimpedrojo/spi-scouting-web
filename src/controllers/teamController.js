@@ -1,6 +1,6 @@
 const {
   getTeamsGroupedBySectionAndCategory,
-  getTeamDetail,
+  getTeamWorkspaceData,
   getTeamFormData,
   createTeamForUser,
   requireClubForUser,
@@ -22,6 +22,79 @@ const {
   getActiveTeamScope,
   canManageMultipleTeams,
 } = require('../services/userScopeService');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+
+function buildTeamCoreActions(team, canManageMultipleTeamsForUser) {
+  const actions = [
+    {
+      title: 'Plantilla',
+      description: 'Jugadores, dorsales y posiciones de la plantilla actual.',
+      href: `/teams/${team.id}?view=list#team-roster`,
+      meta: `${team.players.length} jugadores`,
+    },
+    {
+      title: 'Jugadores',
+      description: 'Alta y mantenimiento de jugadores dentro del entorno core del club.',
+      href: '/admin/players',
+      meta: 'Gestión de perfiles',
+    },
+  ];
+
+  if (canManageMultipleTeamsForUser) {
+    actions.push({
+      title: 'Configuración del equipo',
+      description: 'Editar identidad, estructura y metadatos operativos del equipo.',
+      href: `/teams/${team.id}/edit`,
+      meta: 'Gestión de plantilla',
+    });
+  }
+
+  return actions;
+}
+
+function buildTeamModuleEntries(team, activeModuleKeys) {
+  const entries = [];
+
+  if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS)) {
+    entries.push({
+      key: MODULE_KEYS.SCOUTING_PLAYERS,
+      title: 'SPI Scouting Players',
+      description: 'Acceso a informes de jugador y evaluaciones vinculadas al contexto del equipo.',
+      actions: [
+        { label: 'Nuevo informe de jugador', href: `/reports/new?team_id=${team.id}`, variant: 'primary' },
+        { label: 'Informes del equipo', href: `/reports?team=${encodeURIComponent(team.name)}`, variant: 'outline-secondary' },
+        { label: 'Evaluaciones', href: `/evaluations?team_id=${team.id}`, variant: 'outline-secondary' },
+      ],
+    });
+  }
+
+  if (activeModuleKeys.includes(MODULE_KEYS.PLANNING)) {
+    entries.push({
+      key: MODULE_KEYS.PLANNING,
+      title: 'SPI Planning',
+      description: 'El módulo está activo para el club y hoy ofrece acceso al workspace general de planificación.',
+      actions: [
+        { label: 'Abrir planning', href: `/planning?team_id=${team.id}`, variant: 'primary' },
+      ],
+      note: 'El acceso se abre ya contextualizado al equipo dentro del MVP operativo del módulo.',
+    });
+  }
+
+  if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS)) {
+    entries.push({
+      key: MODULE_KEYS.SCOUTING_TEAMS,
+      title: 'SPI Scouting Teams',
+      description: 'Scouting rival vinculado al equipo propio y acceso al histórico del módulo.',
+      actions: [
+        { label: 'Nuevo informe rival', href: `/scouting-teams/new?team_id=${team.id}`, variant: 'primary' },
+        { label: 'Rivales del equipo', href: `/scouting-teams?team_id=${team.id}`, variant: 'outline-secondary' },
+        { label: 'Histórico del módulo', href: '/scouting-teams', variant: 'outline-secondary' },
+      ],
+    });
+  }
+
+  return entries;
+}
 
 function summarizeProcessIqError(err) {
   if (!err) {
@@ -132,7 +205,8 @@ async function renderIndex(req, res) {
 async function renderShow(req, res) {
   try {
     const club = req.context ? req.context.club : null;
-    const team = await getTeamDetail(req.params.id);
+    const activeModuleKeys = req.context ? req.context.activeModuleKeys || [] : [];
+    const team = await getTeamWorkspaceData(req.params.id, { activeModuleKeys });
     const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
     const canAccessRequestedTeam = await canAccessTeam(req.session.user, req.params.id);
     if (!club || !team || team.club_id !== club.id || !canAccessRequestedTeam) {
@@ -151,6 +225,8 @@ async function renderShow(req, res) {
       team,
       viewMode,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
+      coreActions: buildTeamCoreActions(team, canManageMultipleTeams(req.session.user)),
+      moduleEntries: buildTeamModuleEntries(team, activeModuleKeys),
     });
   } catch (err) {
     // eslint-disable-next-line no-console

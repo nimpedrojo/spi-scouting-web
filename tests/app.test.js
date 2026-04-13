@@ -3064,8 +3064,240 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     const res = await agent.get(`/teams/${teamId}`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('Infantil F');
+    expect(res.text).toContain('SoccerProcessIQ Suite');
+    expect(res.text).toContain('SPI Core');
+    expect(res.text).toContain('Módulos activos');
     expect(res.text).toContain('Lucia Pardo');
     expect(res.text).toContain('Perfil');
+    expect(res.text).toContain('SPI Scouting Players');
+    expect(res.text).not.toContain('SPI Planning');
+  });
+
+  test('team detail muestra módulos activos del club en el contexto del equipo', async () => {
+    const context = await createTeamContext('Club Team Workspace Modules');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Workspace',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/teams/${teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('SPI Scouting Players');
+    expect(res.text).toContain('SPI Planning');
+    expect(res.text).toContain('SPI Scouting Teams');
+    expect(res.text).toContain(`/planning?team_id=${teamId}`);
+    expect(res.text).toContain(`/scouting-teams?team_id=${teamId}`);
+  });
+
+  test('planning bloquea el acceso cuando el módulo no está activo', async () => {
+    const context = await createTeamContext('Club Planning Disabled');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Planning Off',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/planning?team_id=${teamId}`);
+    expect(res.status).toBe(403);
+    expect(res.text).toContain('MODULE_DISABLED');
+    expect(res.text).toContain('planning');
+  });
+
+  test('planning permite CRUD básico de planificación, microciclos y sesiones', async () => {
+    const context = await createTeamContext('Club Planning CRUD');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Planning',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const resHome = await agent.get(`/planning?team_id=${teamId}`);
+    expect(resHome.status).toBe(200);
+    expect(resHome.text).toContain('SPI Planning');
+    expect(resHome.text).toContain('Juvenil Planning');
+
+    const resCreatePlan = await agent.post('/planning/plans').send({
+      team_id: teamId,
+      season_label: '2026/2027',
+      planning_model: 'structured_microcycle',
+      start_date: '2026-07-15',
+      end_date: '2027-06-15',
+      objective: 'Desarrollo del modelo de juego',
+      notes: 'Plan inicial',
+    });
+    expect(resCreatePlan.status).toBe(302);
+    expect(resCreatePlan.headers.location).toMatch(/^\/planning\/plans\//);
+
+    const [planRows] = await db.query(
+      'SELECT id, team_id, season_label FROM season_plans WHERE club_id = ? AND team_id = ?',
+      [context.club.id, teamId],
+    );
+    expect(planRows).toHaveLength(1);
+    expect(planRows[0].season_label).toBe('2026/2027');
+
+    const seasonPlanId = planRows[0].id;
+    const resPlanShow = await agent.get(`/planning/plans/${seasonPlanId}`);
+    expect(resPlanShow.status).toBe(200);
+    expect(resPlanShow.text).toContain('Microciclos');
+
+    const resCreateMicrocycle = await agent.post('/planning/microcycles').send({
+      season_plan_id: seasonPlanId,
+      name: 'Microciclo 1',
+      order_index: '1',
+      start_date: '2026-07-15',
+      end_date: '2026-07-21',
+      objective: 'Base condicional',
+      phase: 'Acumulacion',
+      notes: 'Semana 1',
+    });
+    expect(resCreateMicrocycle.status).toBe(302);
+    expect(resCreateMicrocycle.headers.location).toMatch(/^\/planning\/microcycles\//);
+
+    const [microcycleRows] = await db.query(
+      'SELECT id, name FROM plan_microcycles WHERE season_plan_id = ?',
+      [seasonPlanId],
+    );
+    expect(microcycleRows).toHaveLength(1);
+    expect(microcycleRows[0].name).toBe('Microciclo 1');
+
+    const microcycleId = microcycleRows[0].id;
+    const resCreateSession = await agent.post('/planning/sessions').send({
+      microcycle_id: microcycleId,
+      session_date: '2026-07-16',
+      title: 'Sesion MD-4',
+      session_type: 'Entrenamiento de campo',
+      duration_minutes: '90',
+      objective: 'Principios ofensivos',
+      contents: 'Rondo, juego de posicion',
+      notes: 'Carga media',
+    });
+    expect(resCreateSession.status).toBe(302);
+    expect(resCreateSession.headers.location).toBe(`/planning/microcycles/${microcycleId}`);
+
+    const [sessionRows] = await db.query(
+      'SELECT id, title, duration_minutes FROM plan_sessions WHERE microcycle_id = ?',
+      [microcycleId],
+    );
+    expect(sessionRows).toHaveLength(1);
+    expect(sessionRows[0].title).toBe('Sesion MD-4');
+    expect(sessionRows[0].duration_minutes).toBe(90);
+
+    const resMicrocycleShow = await agent.get(`/planning/microcycles/${microcycleId}`);
+    expect(resMicrocycleShow.status).toBe(200);
+    expect(resMicrocycleShow.text).toContain('Sesion MD-4');
+    expect(resMicrocycleShow.text).toContain('Entrenamiento de campo');
+  });
+
+  test('planning aísla planificaciones de equipos fuera del alcance del usuario', async () => {
+    const context = await createTeamContext('Club Planning Scope');
+    const visibleTeamId = randomUUID();
+    const hiddenTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      [
+        visibleTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Visible Planning',
+        hiddenTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Hidden Planning',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+    await db.query(
+      `INSERT INTO season_plans (
+        id, club_id, team_id, season_label, planning_model, start_date, end_date, objective, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        context.club.id,
+        hiddenTeamId,
+        '2026/2027',
+        'structured_microcycle',
+        '2026-07-01',
+        '2027-06-01',
+        'Plan oculto',
+        context.admin.id,
+      ],
+    );
+
+    const scopedUser = await createTestUser({
+      name: 'Planning Scoped User',
+      role: 'user',
+      defaultClub: context.club.name,
+      defaultTeamId: visibleTeamId,
+      defaultTeam: 'Juvenil Visible Planning',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ? WHERE id = ?',
+      [context.club.id, scopedUser.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: scopedUser.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/planning');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Juvenil Visible Planning');
+    expect(res.text).not.toContain('Cadete Hidden Planning');
+    expect(res.text).not.toContain('Plan oculto');
   });
 
   test('usuario normal solo ve su equipo activo en plantillas', async () => {

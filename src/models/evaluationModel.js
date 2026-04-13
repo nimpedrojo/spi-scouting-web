@@ -172,10 +172,56 @@ async function getPlayerEvaluationsByClub(clubId, playerId) {
   return rows;
 }
 
+async function countEvaluationsByTeam(clubId, teamId) {
+  if (!clubId || !teamId) {
+    return 0;
+  }
+
+  const [rows] = await db.query(
+    'SELECT COUNT(*) AS total FROM evaluations WHERE club_id = ? AND team_id = ?',
+    [clubId, teamId],
+  );
+  return Number(rows[0] ? rows[0].total : 0);
+}
+
+async function listRecentEvaluationsByTeam(clubId, teamId, limit = 3) {
+  if (!clubId || !teamId) {
+    return [];
+  }
+
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 3;
+  const [rows] = await db.query(
+    `SELECT
+        e.id,
+        e.team_id,
+        e.player_id,
+        e.author_id,
+        e.evaluation_date,
+        e.source,
+        e.title,
+        e.overall_score,
+        e.created_at,
+        p.first_name,
+        p.last_name,
+        u.name AS author_name
+      FROM evaluations e
+      INNER JOIN players p ON p.id = e.player_id
+      INNER JOIN users u ON u.id = e.author_id
+      WHERE e.club_id = ? AND e.team_id = ?
+      ORDER BY e.evaluation_date DESC, e.created_at DESC
+      LIMIT ${safeLimit}`,
+    [clubId, teamId],
+  );
+
+  return rows;
+}
+
 module.exports = {
   createEvaluationsTable,
   insertEvaluation,
   findEvaluationById,
   listEvaluationsByClub,
   getPlayerEvaluationsByClub,
+  countEvaluationsByTeam,
+  listRecentEvaluationsByTeam,
 };

@@ -22,6 +22,15 @@ const {
 const {
   createScoutingTeamReportsTable,
 } = require('./modules/scoutingTeams/models/scoutingTeamReportModel');
+const {
+  createSeasonPlansTable,
+} = require('./modules/planning/models/seasonPlanModel');
+const {
+  createPlanMicrocyclesTable,
+} = require('./modules/planning/models/planMicrocycleModel');
+const {
+  createPlanSessionsTable,
+} = require('./modules/planning/models/planSessionModel');
 const { ensureDatabaseExists } = require('./db');
 
 let initializationPromise = null;
@@ -36,6 +45,9 @@ async function initializeDatabase() {
   await createTeamsTable();
   await createUsersTable();
   await createClubModulesTable();
+  await createSeasonPlansTable();
+  await createPlanMicrocyclesTable();
+  await createPlanSessionsTable();
   await createScoutingTeamOpponentsTable();
   await createScoutingTeamReportsTable();
   await createReportsTable();

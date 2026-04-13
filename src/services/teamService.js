@@ -18,6 +18,19 @@ const {
   getPlayersByTeamIds,
   deleteTeamPlayersByTeamId,
 } = require('../models/teamPlayerModel');
+const {
+  countReportsByClubAndTeam,
+  listRecentReportsByClubAndTeam,
+} = require('../models/reportModel');
+const {
+  countEvaluationsByTeam,
+  listRecentEvaluationsByTeam,
+} = require('../models/evaluationModel');
+const {
+  countScoutingTeamReportsByOwnTeam,
+  listRecentScoutingTeamReportsByOwnTeam,
+} = require('../modules/scoutingTeams/models/scoutingTeamReportModel');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
 
 function normalizePlayerPreview(player) {
   return {
@@ -338,6 +351,79 @@ async function getTeamDetail(teamId) {
   };
 }
 
+async function getTeamWorkspaceData(teamId, options = {}) {
+  const team = await getTeamDetail(teamId);
+  if (!team) {
+    return null;
+  }
+
+  const activeModuleKeys = Array.isArray(options.activeModuleKeys) ? options.activeModuleKeys : [];
+  const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
+  const planningEnabled = activeModuleKeys.includes(MODULE_KEYS.PLANNING);
+  const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
+
+  const [
+    evaluationCount,
+    scoutingPlayerReportCount,
+    scoutingTeamReportCount,
+    recentEvaluations,
+    recentReports,
+    recentScoutingTeamReports,
+  ] = await Promise.all([
+    scoutingPlayersEnabled ? countEvaluationsByTeam(team.club_id, team.id) : Promise.resolve(0),
+    scoutingPlayersEnabled
+      ? countReportsByClubAndTeam(team.club_name, team.name)
+      : Promise.resolve(0),
+    scoutingTeamsEnabled
+      ? countScoutingTeamReportsByOwnTeam(team.club_id, team.id)
+      : Promise.resolve(0),
+    scoutingPlayersEnabled
+      ? listRecentEvaluationsByTeam(team.club_id, team.id, 3)
+      : Promise.resolve([]),
+    scoutingPlayersEnabled
+      ? listRecentReportsByClubAndTeam(team.club_name, team.name, 3)
+      : Promise.resolve([]),
+    scoutingTeamsEnabled
+      ? listRecentScoutingTeamReportsByOwnTeam(team.club_id, team.id, 3)
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    ...team,
+    workspaceSummary: {
+      playerCount: team.players.length,
+      evaluationCount,
+      scoutingPlayerReportCount,
+      scoutingTeamReportCount,
+      planningAvailable: planningEnabled,
+    },
+    recentActivity: {
+      evaluations: recentEvaluations.map((entry) => ({
+        id: entry.id,
+        date: entry.evaluation_date,
+        title: entry.title || 'Evaluación manual',
+        playerName: `${entry.first_name} ${entry.last_name}`.trim(),
+        authorName: entry.author_name || '',
+        overallScore: Number(entry.overall_score || 0),
+      })),
+      reports: recentReports.map((entry) => ({
+        id: entry.id,
+        date: entry.created_at,
+        title: `${entry.player_name} ${entry.player_surname}`.trim(),
+        authorName: entry.created_by_name || '',
+        overallRating: entry.overall_rating != null ? Number(entry.overall_rating) : null,
+      })),
+      scoutingTeams: recentScoutingTeamReports.map((entry) => ({
+        id: entry.id,
+        date: entry.matchDate || entry.createdAt,
+        title: entry.opponentName || 'Rival',
+        competition: entry.competition || '',
+        authorName: entry.authorName || '',
+      })),
+    },
+  };
+}
+
 async function getTeamFormData(user) {
   const club = await requireClubForUser(user);
   if (!club) {
@@ -442,6 +528,7 @@ module.exports = {
   getPlayerPreviewsPerTeam,
   getDefaultTeamOptionsForClub,
   getTeamDetail,
+  getTeamWorkspaceData,
   getTeamFormData,
   createTeamForUser,
   updateTeamForUser,

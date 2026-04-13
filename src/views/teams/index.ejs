@@ -164,7 +164,7 @@
               </div>
 
               <div class="mt-auto d-flex gap-2 flex-wrap">
-                <a href="/teams/<%= team.id %>" class="btn btn-sm btn-primary">Ver</a>
+                <a href="/teams/<%= team.id %>" class="btn btn-sm btn-primary">Abrir ficha</a>
                 <% if (team.source === 'processiq' && team.external_id) { %>
                   <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" data-processiq-player-loading-form>
                     <button type="submit" class="btn btn-sm btn-outline-dark" data-loading-button data-loading-text="Cargando...">

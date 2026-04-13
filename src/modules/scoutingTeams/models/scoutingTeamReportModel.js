@@ -74,6 +74,11 @@ async function listScoutingTeamReportsByClub(clubId, filters = {}) {
   const conditions = ['r.club_id = ?'];
   const params = [clubId];
 
+  if (filters.teamId) {
+    conditions.push('r.own_team_id = ?');
+    params.push(filters.teamId);
+  }
+
   if (filters.search) {
     conditions.push('(o.name LIKE ? OR r.competition LIKE ? OR t.name LIKE ?)');
     const query = `%${filters.search}%`;
@@ -230,6 +235,45 @@ async function countScoutingTeamReportsByClub(clubId) {
   return Number(rows[0] ? rows[0].total : 0);
 }
 
+async function countScoutingTeamReportsByOwnTeam(clubId, ownTeamId) {
+  if (!clubId || !ownTeamId) {
+    return 0;
+  }
+
+  const [rows] = await db.query(
+    'SELECT COUNT(*) AS total FROM scouting_team_reports WHERE club_id = ? AND own_team_id = ?',
+    [clubId, ownTeamId],
+  );
+  return Number(rows[0] ? rows[0].total : 0);
+}
+
+async function listRecentScoutingTeamReportsByOwnTeam(clubId, ownTeamId, limit = 3) {
+  if (!clubId || !ownTeamId) {
+    return [];
+  }
+
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 3;
+  const [rows] = await db.query(
+    `SELECT
+        r.*,
+        o.name AS opponent_name,
+        o.country_name AS opponent_country_name,
+        t.name AS own_team_name,
+        u.name AS author_name,
+        u.email AS author_email
+      FROM scouting_team_reports r
+      INNER JOIN scouting_team_opponents o ON o.id = r.opponent_id
+      LEFT JOIN teams t ON t.id = r.own_team_id
+      LEFT JOIN users u ON u.id = r.created_by
+      WHERE r.club_id = ? AND r.own_team_id = ?
+      ORDER BY r.match_date DESC, r.created_at DESC
+      LIMIT ${safeLimit}`,
+    [clubId, ownTeamId],
+  );
+
+  return rows.map(mapReportRow);
+}
+
 module.exports = {
   createScoutingTeamReportsTable,
   listScoutingTeamReportsByClub,
@@ -238,4 +282,6 @@ module.exports = {
   updateScoutingTeamReport,
   deleteScoutingTeamReport,
   countScoutingTeamReportsByClub,
+  countScoutingTeamReportsByOwnTeam,
+  listRecentScoutingTeamReportsByOwnTeam,
 };
