@@ -257,10 +257,17 @@ async function getAllUsers(club = null) {
 }
 
 async function updateUserRole(id, role) {
-  const [result] = await db.query('UPDATE users SET role = ? WHERE id = ?', [
-    role,
-    id,
-  ]);
+  let sql = 'UPDATE users SET role = ?';
+  const params = [role];
+
+  if (role === 'superadmin') {
+    sql += ', club_id = NULL, default_club = NULL, default_team = NULL, default_team_id = NULL';
+  }
+
+  sql += ' WHERE id = ?';
+  params.push(id);
+
+  const [result] = await db.query(sql, params);
   return result.affectedRows;
 }
 

@@ -96,6 +96,7 @@ router.post('/', ensureAdmin, async (req, res) => {
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const requestedRole = role && role.trim() ? role.trim() : 'user';
+    const isGlobalSuperAdminTarget = requestedRole === 'superadmin';
 
     if (!isSuperAdmin && requestedRole !== 'user') {
       req.flash('error', 'Solo un superadmin puede crear usuarios administradores.');
@@ -108,7 +109,7 @@ router.post('/', ensureAdmin, async (req, res) => {
       return res.redirect('/admin/users/new');
     }
 
-    const selectedClubId = club_id ? Number(club_id) : null;
+    const selectedClubId = isGlobalSuperAdminTarget ? null : (club_id ? Number(club_id) : null);
     let assignedClub = null;
     if (selectedClubId) {
       assignedClub = await getClubById(selectedClubId);
@@ -126,7 +127,9 @@ router.post('/', ensureAdmin, async (req, res) => {
 
     const defaultClub = assignedClub ? assignedClub.name : null;
     let defaultTeam = null;
-    let defaultTeamId = default_team_id && default_team_id.trim() ? default_team_id.trim() : null;
+    let defaultTeamId = isGlobalSuperAdminTarget
+      ? null
+      : (default_team_id && default_team_id.trim() ? default_team_id.trim() : null);
     if (defaultTeamId) {
       const selectedTeam = await findTeamById(defaultTeamId);
       if (!selectedTeam || !assignedClub || selectedTeam.club_id !== assignedClub.id) {
@@ -498,10 +501,10 @@ router.post('/:id/edit', ensureAdmin, async (req, res) => {
     const affected = await updateUserAccount(id, {
       name,
       email,
-      clubId: selectedClub ? selectedClub.id : null,
-      defaultClub: defaultClubValue,
-      defaultTeam: defaultTeamValue,
-      defaultTeamId: defaultTeamIdValue,
+      clubId: targetUser.role === 'superadmin' ? null : (selectedClub ? selectedClub.id : null),
+      defaultClub: targetUser.role === 'superadmin' ? null : defaultClubValue,
+      defaultTeam: targetUser.role === 'superadmin' ? null : defaultTeamValue,
+      defaultTeamId: targetUser.role === 'superadmin' ? null : defaultTeamIdValue,
       passwordHash,
     });
     if (!affected) {

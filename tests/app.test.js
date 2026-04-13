@@ -1422,6 +1422,38 @@ describe('Aplicación SoccerReport', () => {
     expect(rows[0].default_club).toBe(club.name);
   });
 
+  test('superadmin creado desde administración no conserva club ni equipo aunque se envíen en el formulario', async () => {
+    const context = await createEvaluationContext('Create Superadmin Global');
+    const rootSuperadmin = await createTestUser({
+      name: 'Root Superadmin Global Create',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: rootSuperadmin.email, password: 'password123' });
+
+    const email = `global_superadmin_${Date.now()}@local`;
+    const resPost = await agent.post('/admin/users').send({
+      name: 'Nuevo Superadmin Global',
+      email,
+      password: 'password123',
+      role: 'superadmin',
+      club_id: String(context.club.id),
+      default_team_id: context.teamId,
+    });
+    expect(resPost.status).toBe(302);
+
+    const [rows] = await db.query(
+      'SELECT role, club_id, default_club, default_team, default_team_id FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].role).toBe('superadmin');
+    expect(rows[0].club_id).toBeNull();
+    expect(rows[0].default_club).toBeNull();
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
+  });
+
   test('formulario de usuario muestra enlace a Plantillas v2', async () => {
     const club = await createTestClub(`Club User Form Link ${Date.now()}`);
     const superadmin = await createTestUser({
@@ -1578,6 +1610,81 @@ describe('Aplicación SoccerReport', () => {
     );
     expect(rows[0].club_id).toBe(clubB.id);
     expect(rows[0].default_club).toBe(clubB.name);
+  });
+
+  test('editar un superadmin limpia cualquier club o equipo enviado desde administración', async () => {
+    const context = await createEvaluationContext('Edit Superadmin Global');
+    const rootSuperadmin = await createTestUser({
+      name: 'Root Superadmin Global Edit',
+      role: 'superadmin',
+    });
+    const targetSuperadmin = await createTestUser({
+      name: 'Target Superadmin With Legacy',
+      role: 'superadmin',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ?, default_team = ?, default_team_id = ? WHERE id = ?',
+      [context.club.id, context.club.name, 'Juvenil Eval', context.teamId, targetSuperadmin.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: rootSuperadmin.email, password: 'password123' });
+
+    const resPost = await agent.post(`/admin/users/${targetSuperadmin.id}/edit`).send({
+      name: 'Target Superadmin With Legacy',
+      email: targetSuperadmin.email,
+      club_id: String(context.club.id),
+      default_club: context.club.name,
+      default_team_id: context.teamId,
+      new_password: '',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/admin/users');
+
+    const [rows] = await db.query(
+      'SELECT role, club_id, default_club, default_team, default_team_id FROM users WHERE id = ?',
+      [targetSuperadmin.id],
+    );
+    expect(rows[0].role).toBe('superadmin');
+    expect(rows[0].club_id).toBeNull();
+    expect(rows[0].default_club).toBeNull();
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
+  });
+
+  test('promocionar un usuario a superadmin limpia su contexto de club y equipo', async () => {
+    const context = await createEvaluationContext('Promote Superadmin Global');
+    const rootSuperadmin = await createTestUser({
+      name: 'Root Superadmin Promote',
+      role: 'superadmin',
+    });
+    const targetUser = await createTestUser({
+      name: 'Target Promote Superadmin',
+      role: 'user',
+      defaultClub: context.club.name,
+      defaultTeam: 'Juvenil Eval',
+      defaultTeamId: context.teamId,
+    });
+    await db.query('UPDATE users SET club_id = ? WHERE id = ?', [context.club.id, targetUser.id]);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: rootSuperadmin.email, password: 'password123' });
+
+    const resPost = await agent.post(`/admin/users/${targetUser.id}/role`).send({
+      role: 'superadmin',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/admin/users');
+
+    const [rows] = await db.query(
+      'SELECT role, club_id, default_club, default_team, default_team_id FROM users WHERE id = ?',
+      [targetUser.id],
+    );
+    expect(rows[0].role).toBe('superadmin');
+    expect(rows[0].club_id).toBeNull();
+    expect(rows[0].default_club).toBeNull();
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
   });
 
   test('un admin puede cambiar la contraseña de un usuario', async () => {
