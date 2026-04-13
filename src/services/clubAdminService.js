@@ -24,6 +24,10 @@ async function resolveAdminClub(req, explicitClubId = null) {
     }
   }
 
+  if (isSuperAdmin) {
+    return null;
+  }
+
   if (req.session.user && req.session.user.default_club) {
     const club = await getClubByName(req.session.user.default_club);
     if (club) {

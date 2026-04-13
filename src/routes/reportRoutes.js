@@ -73,15 +73,26 @@ function reportBelongsToTeamScope(report, teamScope) {
   return Boolean(report && String(report.team || '').trim() === String(teamScope.name || '').trim());
 }
 
+function isSuperAdminUser(user) {
+  return Boolean(user && user.role === 'superadmin');
+}
+
+function getReportSessionDefaults(user) {
+  const isSuperAdmin = isSuperAdminUser(user);
+
+  return {
+    defaultClub: isSuperAdmin ? null : ((user && user.default_club) || 'Stadium Venecia'),
+    defaultTeamId: isSuperAdmin ? null : ((user && user.default_team_id) || null),
+    defaultTeam: isSuperAdmin ? '' : ((user && user.default_team) || ''),
+  };
+}
+
 router.get('/new', ensureAuth, async (req, res) => {
-  const defaultClub =
-    (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
-  const defaultTeamId =
-    (req.session.user && req.session.user.default_team_id) || null;
+  const { defaultClub, defaultTeamId, defaultTeam } = getReportSessionDefaults(req.session.user);
   const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
-  const defaultTeam = defaultTeamRecord
+  const resolvedDefaultTeam = defaultTeamRecord
     ? defaultTeamRecord.name
-    : ((req.session.user && req.session.user.default_team) || '');
+    : defaultTeam;
 
   const clubFilter = defaultClub || null;
   let players = await getReportPlayersForContext(clubFilter, defaultTeamId);
@@ -113,7 +124,7 @@ router.get('/new', ensureAuth, async (req, res) => {
   res.render('reports/new', {
     formData: {
       club: defaultClub,
-      team: defaultTeam,
+      team: resolvedDefaultTeam,
     },
     validationErrors: {},
     players,
@@ -174,7 +185,10 @@ router.post('/new', ensureAuth, async (req, res) => {
   } = req.body;
 
   try {
-    const sessionDefaultTeamId = (req.session.user && req.session.user.default_team_id) || null;
+    const {
+      defaultClub: sessionDefaultClub,
+      defaultTeamId: sessionDefaultTeamId,
+    } = getReportSessionDefaults(req.session.user);
     const defaultTeamRecord = sessionDefaultTeamId ? await findTeamById(sessionDefaultTeamId) : null;
     const activeTeamScope = await getActiveTeamScope(req.session.user);
 
@@ -242,15 +256,14 @@ router.post('/new', ensureAuth, async (req, res) => {
     const overallRating = avg(overallValues);
 
     if (!player_name || !player_surname) {
-      const clubFilter = (req.session.user && req.session.user.default_club) || null;
+      const clubFilter = sessionDefaultClub || null;
       const playersForForm = await getReportPlayersForContext(
         clubFilter,
         sessionDefaultTeamId,
       );
       let recommendationConfig = {};
       try {
-        const clubForRec =
-          (req.session.user && req.session.user.default_club) || clubFilter || 'DEFAULT';
+        const clubForRec = sessionDefaultClub || clubFilter || 'DEFAULT';
         let rows = await getRecommendationsByClub(clubForRec);
         if (!rows || !rows.length) {
           rows = await getRecommendationsByClub('DEFAULT');
@@ -282,7 +295,7 @@ router.post('/new', ensureAuth, async (req, res) => {
 
     if (activeTeamScope) {
       const allowedPlayers = await getReportPlayersForContext(
-        req.session.user.default_club || null,
+        sessionDefaultClub || null,
         activeTeamScope.id,
       );
       const canCreateForPlayer = allowedPlayers.some((player) => (
@@ -297,8 +310,7 @@ router.post('/new', ensureAuth, async (req, res) => {
     }
 
     // Valores por defecto de club/equipo desde la sesión (si no se ha rellenado nada)
-    const finalClub =
-      club || (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
+    const finalClub = club || sessionDefaultClub || null;
     const finalTeam =
       (activeTeamScope ? activeTeamScope.name : team) || (defaultTeamRecord ? defaultTeamRecord.name : '');
 
@@ -372,10 +384,11 @@ router.post('/new', ensureAuth, async (req, res) => {
       'error',
       `Ha ocurrido un error al guardar el informe: ${err.message}`,
     );
-    const clubFilter = (req.session.user && req.session.user.default_club) || null;
+    const { defaultClub, defaultTeamId } = getReportSessionDefaults(req.session.user);
+    const clubFilter = defaultClub || null;
     const playersForForm = await getReportPlayersForContext(
       clubFilter,
-      (req.session.user && req.session.user.default_team_id) || null,
+      defaultTeamId,
     );
     return res.status(500).render('reports/new', {
       formData: req.body,

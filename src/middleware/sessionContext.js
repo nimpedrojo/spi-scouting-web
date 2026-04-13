@@ -24,6 +24,8 @@ async function attachSessionContext(req, res, next) {
 
   if (!user || !user.default_club) {
     req.session.clubContext = null;
+    req.session.clubId = null;
+    req.session.seasonId = null;
     return next();
   }
 

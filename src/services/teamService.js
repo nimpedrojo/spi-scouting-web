@@ -222,7 +222,7 @@ function buildTeamCardSummary(players) {
 }
 
 async function requireClubForUser(user) {
-  if (!user || !user.default_club) {
+  if (!user || user.role === 'superadmin' || !user.default_club) {
     return null;
   }
   return getClubByName(user.default_club);

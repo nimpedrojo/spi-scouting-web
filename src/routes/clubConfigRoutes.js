@@ -80,7 +80,9 @@ function ensureAdmin(req, res, next) {
 
 router.get('/', ensureAdmin, async (req, res) => {
   const club = await resolveAdminClub(req);
-  if (!club) {
+  const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';
+
+  if (!club && !isSuperAdmin) {
     req.flash(
       'error',
       'Debes configurar primero el club por defecto en tu cuenta para acceder a la configuración del club.',
@@ -90,24 +92,26 @@ router.get('/', ensureAdmin, async (req, res) => {
 
   try {
     const [data, clubOptions] = await Promise.all([
-      getClubAdminData(club),
+      club ? getClubAdminData(club) : Promise.resolve(null),
       getClubAdminOptions(req),
     ]);
 
     return res.render('club/config', {
-      club: club.name,
+      club: club ? club.name : 'Selecciona un club',
       clubRecord: club,
       clubOptions,
-      selectedClubId: club.id,
-      users: data.users,
-      players: data.players,
-      reports: data.reports,
-      recommendations: data.recommendations,
-      v2Teams: data.v2Teams,
-      seasons: data.seasons,
-      modules: data.modules,
-      moduleSummary: data.moduleSummary,
-      modulePresets: data.modulePresets,
+      selectedClubId: club ? club.id : null,
+      users: data ? data.users : [],
+      players: data ? data.players : [],
+      reports: data ? data.reports : [],
+      recommendations: data ? data.recommendations : [],
+      v2Teams: data ? data.v2Teams : [],
+      seasons: data ? data.seasons : [],
+      modules: data ? data.modules : [],
+      moduleSummary: data ? data.moduleSummary : null,
+      modulePresets: data ? data.modulePresets : [],
+      requiresClubSelection: !club,
+      isSuperAdmin,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

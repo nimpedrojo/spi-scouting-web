@@ -541,6 +541,30 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Cuenta Tester');
   });
 
+  test('un superadmin ve su cuenta como administración global sin club ni equipo por defecto', async () => {
+    const club = await createTestClub(`Club Superadmin Account ${Date.now()}`);
+    const { email } = await createTestUser({
+      name: 'Superadmin Global',
+      role: 'superadmin',
+      defaultClub: club.name,
+      defaultTeam: 'Equipo Legacy',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ?, default_team = ? WHERE email = ?',
+      [club.id, club.name, 'Equipo Legacy', email],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const res = await agent.get('/account');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Rol de administración global');
+    expect(res.text).toContain('No trabaja con un club ni un equipo activos por defecto');
+    expect(res.text).not.toContain('Club por defecto');
+    expect(res.text).not.toContain('Equipo por defecto');
+  });
+
   test('dashboard para usuario normal muestra solo opciones de usuario', async () => {
     const { email } = await createTestUser({
       name: 'User Dashboard',
@@ -648,6 +672,41 @@ describe('Aplicación SoccerReport', () => {
     expect(rows[0].processiq_password).toBe('processiq-pass');
   });
 
+  test('un superadmin al guardar su cuenta mantiene club y equipo por defecto vacíos', async () => {
+    const club = await createTestClub(`Club Superadmin Save ${Date.now()}`);
+    const { email } = await createTestUser({
+      name: 'Superadmin Save',
+      role: 'superadmin',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ?, default_team = ?, default_team_id = NULL WHERE email = ?',
+      [club.id, club.name, 'Equipo Legacy', email],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const resPost = await agent.post('/account').send({
+      name: 'Superadmin Save',
+      email,
+      default_club: club.name,
+      default_team_id: '',
+      processiq_username: 'processiq-user',
+      processiq_password: 'processiq-pass',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/account');
+
+    const [rows] = await db.query(
+      'SELECT default_club, default_team, default_team_id, processiq_username FROM users WHERE email = ?',
+      [email],
+    );
+    expect(rows[0].default_club).toBeNull();
+    expect(rows[0].default_team).toBeNull();
+    expect(rows[0].default_team_id).toBeNull();
+    expect(rows[0].processiq_username).toBe('processiq-user');
+  });
+
   test('mi cuenta muestra acceso a la configuración de equipos del club', async () => {
     const { email } = await createTestUser({
       name: 'Account Teams Link',
@@ -739,6 +798,42 @@ describe('Aplicación SoccerReport', () => {
     );
     expect(rows[0].club).toBe('Club Manual');
     expect(rows[0].team).toBe('Equipo Manual');
+  });
+
+  test('superadmin crea informes sin heredar club o equipo legacy por defecto', async () => {
+    const club = await createTestClub(`Club Legacy Reports ${Date.now()}`);
+    const { email } = await createTestUser({
+      name: 'Superadmin Reports Global',
+      role: 'superadmin',
+    });
+    await db.query(
+      'UPDATE users SET club_id = ?, default_club = ?, default_team = ?, default_team_id = NULL WHERE email = ?',
+      [club.id, club.name, 'Equipo Legacy Reports', email],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const resForm = await agent.get('/reports/new');
+    expect(resForm.status).toBe(200);
+    expect(resForm.text).not.toContain('value="Stadium Venecia"');
+    expect(resForm.text).not.toContain(`value="${club.name}"`);
+    expect(resForm.text).not.toContain('value="Equipo Legacy Reports"');
+
+    const resPost = await agent.post('/reports/new').send({
+      player_name: 'Jugador Global',
+      player_surname: 'Sin Club',
+    });
+    expect(resPost.status).toBe(302);
+    expect(resPost.headers.location).toBe('/reports/new');
+
+    const [rows] = await db.query(
+      'SELECT club, team FROM reports WHERE player_name = ? AND player_surname = ? ORDER BY id DESC LIMIT 1',
+      ['Jugador Global', 'Sin Club'],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].club).toBeNull();
+    expect(rows[0].team).toBe('');
   });
 
   test('un admin puede ver la página de gestión de usuarios', async () => {
@@ -1731,6 +1826,26 @@ describe('Aplicación SoccerReport', () => {
     const res = await agent.get('/admin/club');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Configuración del club: Club Config');
+  });
+
+  test('un superadmin puede abrir configuración de club sin club por defecto y seleccionar uno explícitamente', async () => {
+    const club = await createTestClub(`Club Superadmin Config ${Date.now()}`);
+    const { email } = await createTestUser({
+      name: 'Superadmin Config Global',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email, password: 'password123' });
+
+    const resSelector = await agent.get('/admin/club');
+    expect(resSelector.status).toBe(200);
+    expect(resSelector.text).toContain('Configuración del club: Selecciona un club');
+    expect(resSelector.text).toContain('Selecciona primero un club para administrar su configuración');
+
+    const resClub = await agent.get(`/admin/club?club_id=${club.id}`);
+    expect(resClub.status).toBe(200);
+    expect(resClub.text).toContain(`Configuración del club: ${club.name}`);
   });
 
   test('la configuración de club muestra usuarios, jugadores e informes filtrados por club', async () => {

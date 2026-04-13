@@ -15,6 +15,22 @@ const logger = require('../services/logger');
 
 const router = express.Router();
 
+function buildSessionUser(user) {
+  const isSuperAdmin = user && user.role === 'superadmin';
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    club_id: isSuperAdmin ? null : (user.club_id || null),
+    default_club: isSuperAdmin ? null : user.default_club,
+    default_team: isSuperAdmin ? null : (user.default_team_name || user.default_team),
+    default_team_id: isSuperAdmin ? null : (user.default_team_id || null),
+    processiq_username: user.processiq_username || null,
+  };
+}
+
 function ensureGuest(req, res, next) {
   if (req.session.user) {
     return res.redirect('/dashboard');
@@ -52,17 +68,7 @@ router.post('/login', ensureGuest, async (req, res) => {
       req.flash('error', 'Usuario o contraseña incorrectos.');
       return res.redirect('/login');
     }
-    req.session.user = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      club_id: user.club_id || null,
-      default_club: user.default_club,
-      default_team: user.default_team_name || user.default_team,
-      default_team_id: user.default_team_id || null,
-      processiq_username: user.processiq_username || null,
-    };
+    req.session.user = buildSessionUser(user);
     logger.info('Login successful', {
       type: 'auth',
       action: 'login_success',
@@ -191,9 +197,12 @@ router.post('/logout', ensureAuth, (req, res) => {
 router.get('/account', ensureAuth, async (req, res) => {
   try {
     const user = await findUserById(req.session.user.id);
-    const resolvedClub = user.club_id
+    const isSuperAdmin = user && user.role === 'superadmin';
+    const resolvedClub = isSuperAdmin
+      ? null
+      : (user.club_id
       ? { id: user.club_id, name: user.club_name || user.default_club }
-      : (user.default_club ? await getClubByName(user.default_club) : null);
+      : (user.default_club ? await getClubByName(user.default_club) : null));
     const teamOptions = resolvedClub
       ? await getDefaultTeamOptionsForClub(resolvedClub.id)
       : [];
@@ -202,6 +211,7 @@ router.get('/account', ensureAuth, async (req, res) => {
       user,
       teams: teamOptions,
       resolvedClub,
+      isSuperAdmin,
     });
   } catch (err) {
     logger.error('Error loading account page', {
@@ -232,6 +242,7 @@ router.post('/account', ensureAuth, async (req, res) => {
 
   try {
     const currentUser = await findUserById(req.session.user.id);
+    const isSuperAdmin = currentUser && currentUser.role === 'superadmin';
     let defaultClubValue = default_club && default_club.trim()
       ? default_club.trim()
       : null;
@@ -246,15 +257,21 @@ router.post('/account', ensureAuth, async (req, res) => {
       ? processiq_password.trim()
       : (currentUser.processiq_password || null);
 
-    const resolvedClub = currentUser && currentUser.club_id
+    const resolvedClub = isSuperAdmin
+      ? null
+      : (currentUser && currentUser.club_id
       ? { id: currentUser.club_id, name: currentUser.club_name || currentUser.default_club }
-      : (defaultClubValue ? await getClubByName(defaultClubValue) : null);
+      : (defaultClubValue ? await getClubByName(defaultClubValue) : null));
 
-    if (currentUser && currentUser.club_id && currentUser.club_name) {
+    if (isSuperAdmin) {
+      defaultClubValue = null;
+      defaultTeamIdValue = null;
+      defaultTeamValue = null;
+    } else if (currentUser && currentUser.club_id && currentUser.club_name) {
       defaultClubValue = currentUser.club_name;
     }
 
-    if (defaultTeamIdValue) {
+    if (!isSuperAdmin && defaultTeamIdValue) {
       const selectedTeam = await findTeamById(defaultTeamIdValue);
       if (!selectedTeam || !resolvedClub || selectedTeam.club_id !== resolvedClub.id) {
         req.flash(
@@ -282,12 +299,11 @@ router.post('/account', ensureAuth, async (req, res) => {
     }
 
     // Actualizar los datos en sesión
-    req.session.user.name = name;
-    req.session.user.email = email;
-    req.session.user.default_club = defaultClubValue;
-    req.session.user.default_team = defaultTeamValue;
-    req.session.user.default_team_id = defaultTeamIdValue;
-    req.session.user.processiq_username = processIqUsernameValue;
+    const refreshedUser = await findUserById(req.session.user.id);
+    req.session.user = buildSessionUser({
+      ...refreshedUser,
+      processiq_username: processIqUsernameValue,
+    });
 
     logger.info('Account updated', {
       type: 'account',
