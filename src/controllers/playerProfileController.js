@@ -3,6 +3,7 @@ const { getAreaLabel } = require('../services/evaluationAreaHelper');
 const { getReportsForPlayerProfile } = require('../models/reportModel');
 const { getPlayerById } = require('../models/playerModel');
 const { buildPlayerPdfReport } = require('../services/pdfReportService');
+const { canAccessPlayer, canManageMultipleTeams } = require('../services/userScopeService');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -74,9 +75,9 @@ async function renderProfile(req, res) {
     const activeSeason = req.context ? req.context.activeSeason : null;
     const player = await getPlayerById(req.params.id, club.name);
 
-    if (!player) {
+    if (!player || !(await canAccessPlayer(req.session.user, req.params.id))) {
       req.flash('error', 'Jugador no encontrado.');
-      return res.redirect('/admin/players');
+      return res.redirect('/teams');
     }
 
     const analytics = await getPlayerAnalytics(player.id, club.id, seasonId);
@@ -118,12 +119,13 @@ async function renderProfile(req, res) {
       },
       areaLabelHelper: getAreaLabel,
       activeSeason,
+      canManageMultipleTeams: canManageMultipleTeams(req.session.user),
     });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error loading player profile', err);
     req.flash('error', 'Ha ocurrido un error al cargar el perfil del jugador.');
-    return res.redirect('/admin/players');
+    return res.redirect('/teams');
   }
 }
 
@@ -139,7 +141,7 @@ module.exports = {
 
       if (!report) {
         req.flash('error', 'Jugador no encontrado.');
-        return res.redirect('/admin/players');
+        return res.redirect('/teams');
       }
 
       return res.render('players/pdf', {
@@ -165,7 +167,7 @@ module.exports = {
 
       if (!report) {
         req.flash('error', 'Jugador no encontrado.');
-        return res.redirect('/admin/players');
+        return res.redirect('/teams');
       }
 
       return res.render('players/pdf', {

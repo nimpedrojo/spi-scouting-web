@@ -25,8 +25,10 @@
       <div class="d-flex gap-2 flex-wrap">
         <a href="/evaluations?team_id=<%= team.id %>" class="btn btn-outline-secondary">Evaluaciones</a>
         <a href="/season-forecast/team/<%= team.id %>" class="btn btn-outline-secondary">Previsión 26/27</a>
-        <a href="/teams/<%= team.id %>/edit" class="btn btn-outline-secondary">Editar</a>
-        <% if (team.source === 'processiq' && team.external_id) { %>
+        <% if (canManageMultipleTeams) { %>
+          <a href="/teams/<%= team.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+        <% } %>
+        <% if (canManageMultipleTeams && team.source === 'processiq' && team.external_id) { %>
           <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" class="d-inline">
             <button type="submit" class="btn btn-outline-dark">Cargar jugadores ProcessIQ</button>
           </form>

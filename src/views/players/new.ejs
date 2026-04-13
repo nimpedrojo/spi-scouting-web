@@ -68,11 +68,14 @@
         <div class="col-md-5">
           <label for="team_id" class="form-label">Equipo</label>
           <select class="form-select" id="team_id" name="team_id">
-            <option value="">Sin asignar</option>
+            <% if (isSuperAdmin || (currentUser && currentUser.role === 'admin')) { %>
+              <option value="">Sin asignar</option>
+            <% } %>
             <% teamOptions.forEach((team) => { %>
               <option
                 value="<%= team.id %>"
                 data-category="<%= team.categoryName %>"
+                <%= String(activeTeamId || '') === String(team.id) ? 'selected' : '' %>
               >
                 <%= team.label %>
               </option>

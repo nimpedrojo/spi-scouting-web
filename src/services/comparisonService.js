@@ -4,6 +4,7 @@ const { getAllCategories } = require('../models/categoryModel');
 const { getTeamsByClubId } = require('../models/teamModel');
 const { requireClubForUser, getActiveSeasonByClub } = require('./teamService');
 const { getPlayersForComparison, getPlayersAnalyticsBatch } = require('./playerAnalyticsService');
+const { filterTeamsForUser, filterPlayersForUser } = require('./userScopeService');
 
 function normalizeSelectedPlayers(playerIds) {
   const selected = Array.isArray(playerIds) ? playerIds : [playerIds];
@@ -104,14 +105,18 @@ async function getComparisonFilters(user, selectedFilters = {}) {
     getPlayersForComparison(club.id, selectedFilters),
     getActiveSeasonByClub(club.id),
   ]);
+  const [visibleTeams, visiblePlayers] = await Promise.all([
+    filterTeamsForUser(user, teams),
+    filterPlayersForUser(user, players),
+  ]);
 
   return {
     club,
     seasons,
     sections,
     categories,
-    teams,
-    players,
+    teams: visibleTeams,
+    players: visiblePlayers,
     activeSeason,
   };
 }
@@ -130,11 +135,13 @@ async function buildComparison(user, payload = {}) {
   }
 
   const selectedPlayerIds = normalizeSelectedPlayers(payload.playerIds || []);
-  if (selectedPlayerIds.length < 2) {
+  const visiblePlayerIds = new Set((filterOptions.players || []).map((player) => Number(player.id)));
+  const filteredSelectedPlayerIds = selectedPlayerIds.filter((playerId) => visiblePlayerIds.has(playerId));
+  if (filteredSelectedPlayerIds.length < 2) {
     return {
       filterOptions,
       selectedFilters: filters,
-      selectedPlayerIds,
+      selectedPlayerIds: filteredSelectedPlayerIds,
       playersComparison: [],
       radarChartData: null,
       metricTable: [],
@@ -142,7 +149,11 @@ async function buildComparison(user, payload = {}) {
     };
   }
 
-  const analyticsBatch = await getPlayersAnalyticsBatch(selectedPlayerIds, filterOptions.club.id, filters.seasonId);
+  const analyticsBatch = await getPlayersAnalyticsBatch(
+    filteredSelectedPlayerIds,
+    filterOptions.club.id,
+    filters.seasonId,
+  );
   const playersComparison = analyticsBatch.map((player) => ({
     ...player,
     areaEntries: Object.values(player.groupedMetricBreakdown),
@@ -151,7 +162,7 @@ async function buildComparison(user, payload = {}) {
   return {
     filterOptions,
     selectedFilters: filters,
-    selectedPlayerIds,
+    selectedPlayerIds: filteredSelectedPlayerIds,
     playersComparison,
     radarChartData: buildRadarChartData(playersComparison),
     metricTable: buildMetricComparisonTable(playersComparison),

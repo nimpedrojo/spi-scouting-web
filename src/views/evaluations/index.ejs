@@ -62,19 +62,21 @@
   </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <form method="POST" action="/evaluations/import" enctype="multipart/form-data" class="row g-3 align-items-end">
-      <div class="col-md-8">
-        <label for="file" class="form-label">Importar multiples evaluaciones desde Excel</label>
-        <input type="file" id="file" name="file" class="form-control" accept=".xlsx,.xls" required />
-      </div>
-      <div class="col-md-4">
-        <button type="submit" class="btn btn-primary w-100">Importar multiples Excel</button>
-      </div>
-    </form>
+<% if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST" action="/evaluations/import" enctype="multipart/form-data" class="row g-3 align-items-end">
+        <div class="col-md-8">
+          <label for="file" class="form-label">Importar multiples evaluaciones desde Excel</label>
+          <input type="file" id="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-primary w-100">Importar multiples Excel</button>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
+<% } %>
 
 <% if (!groupedEvaluations || !groupedEvaluations.length) { %>
   <div class="card shadow-sm">

@@ -17,6 +17,10 @@ const { findTeamById } = require('../models/teamModel');
 const { getPlayersByTeamId } = require('../models/teamPlayerModel');
 const { buildReportRadarComparison } = require('../services/reportComparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
+const {
+  getActiveTeamScope,
+  isPrivilegedUser,
+} = require('../services/userScopeService');
 
 const router = express.Router();
 
@@ -61,13 +65,23 @@ async function getReportPlayersForContext(clubName, defaultTeamId = null) {
   return players.map(normalizeReportPlayerOption);
 }
 
+function reportBelongsToTeamScope(report, teamScope) {
+  if (!teamScope) {
+    return true;
+  }
+
+  return Boolean(report && String(report.team || '').trim() === String(teamScope.name || '').trim());
+}
+
 router.get('/new', ensureAuth, async (req, res) => {
   const defaultClub =
     (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
   const defaultTeamId =
     (req.session.user && req.session.user.default_team_id) || null;
   const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
-  const defaultTeam = defaultTeamRecord ? defaultTeamRecord.name : '';
+  const defaultTeam = defaultTeamRecord
+    ? defaultTeamRecord.name
+    : ((req.session.user && req.session.user.default_team) || '');
 
   const clubFilter = defaultClub || null;
   let players = await getReportPlayersForContext(clubFilter, defaultTeamId);
@@ -162,6 +176,7 @@ router.post('/new', ensureAuth, async (req, res) => {
   try {
     const sessionDefaultTeamId = (req.session.user && req.session.user.default_team_id) || null;
     const defaultTeamRecord = sessionDefaultTeamId ? await findTeamById(sessionDefaultTeamId) : null;
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
 
     // calcular medias de cada bloque a partir de sus sub-valores
     const toNumber = (v) => {
@@ -265,11 +280,27 @@ router.post('/new', ensureAuth, async (req, res) => {
       });
     }
 
+    if (activeTeamScope) {
+      const allowedPlayers = await getReportPlayersForContext(
+        req.session.user.default_club || null,
+        activeTeamScope.id,
+      );
+      const canCreateForPlayer = allowedPlayers.some((player) => (
+        String(player.first_name || '').trim().toLowerCase() === String(player_name || '').trim().toLowerCase()
+        && String(player.last_name || '').trim().toLowerCase() === String(player_surname || '').trim().toLowerCase()
+      ));
+
+      if (!canCreateForPlayer) {
+        req.flash('error', 'Solo puedes crear informes para jugadores de tu equipo activo.');
+        return res.redirect('/reports/new');
+      }
+    }
+
     // Valores por defecto de club/equipo desde la sesión (si no se ha rellenado nada)
     const finalClub =
       club || (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
     const finalTeam =
-      team || (defaultTeamRecord ? defaultTeamRecord.name : '');
+      (activeTeamScope ? activeTeamScope.name : team) || (defaultTeamRecord ? defaultTeamRecord.name : '');
 
     await createReport({
       player_name,
@@ -354,12 +385,16 @@ router.post('/new', ensureAuth, async (req, res) => {
   }
 });
 
-// Listado de informes (solo admin)
-router.get('/', ensureAdmin, async (req, res) => {
+// Listado de informes
+router.get('/', ensureAuth, async (req, res) => {
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
-    const reports = await getAllReports(clubFilter);
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
+    let reports = await getAllReports(clubFilter);
+    if (activeTeamScope) {
+      reports = reports.filter((report) => reportBelongsToTeamScope(report, activeTeamScope));
+    }
     logPageView(req, 'reports_list', {
       reportCount: reports.length,
       scopeClub: clubFilter,
@@ -491,7 +526,7 @@ router.get('/:id/excel', ensureAdmin, async (req, res) => {
 });
 
 // API JSON con todos los datos del informe (para Excel / integraciones)
-router.get('/api/:id', async (req, res) => {
+router.get('/api/:id', ensureAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const isSuperAdmin = req.session.user
@@ -499,8 +534,9 @@ router.get('/api/:id', async (req, res) => {
     const clubFilter = isSuperAdmin
       ? null
       : (req.session.user && req.session.user.default_club) || null;
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
     const report = await getReportById(id, clubFilter);
-    if (!report) {
+    if (!report || !reportBelongsToTeamScope(report, activeTeamScope)) {
       return res.status(404).json({ error: 'Informe no encontrado' });
     }
     // Devolvemos el objeto completo que viene de la BD (todas las columnas de reports + datos del autor)
@@ -512,14 +548,15 @@ router.get('/api/:id', async (req, res) => {
   }
 });
 
-// Detalle de informe (solo admin)
-router.get('/:id', ensureAdmin, async (req, res) => {
+// Detalle de informe
+router.get('/:id', ensureAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
     const report = await getReportById(id, clubFilter);
-    if (!report) {
+    if (!report || !reportBelongsToTeamScope(report, activeTeamScope)) {
       req.flash('error', 'Informe no encontrado.');
       return res.redirect('/reports');
     }

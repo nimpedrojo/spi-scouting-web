@@ -12,12 +12,17 @@ const {
 } = require('../models/playerModel');
 const { getClubByName } = require('../models/clubModel');
 const { getTeamsByClubId } = require('../models/teamModel');
-const { ensureAdmin } = require('../middleware/auth');
+const { ensureAuth, ensureAdmin } = require('../middleware/auth');
 const {
   createPlayerWithAssignment,
   updatePlayerWithAssignment,
 } = require('../services/playerAdminService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
+const {
+  isPrivilegedUser,
+  getActiveTeamScope,
+  canAccessPlayer,
+} = require('../services/userScopeService');
 
 const router = express.Router();
 const playerPhotosDir = path.join(__dirname, '..', 'public', 'uploads', 'players');
@@ -138,17 +143,30 @@ async function getTeamOptionsForClubName(clubName) {
   }));
 }
 
+async function getVisiblePlayersForUser(user) {
+  const isSuperAdmin = user && user.role === 'superadmin';
+  const clubFilter = isSuperAdmin ? null : user.default_club || null;
+  let players = await getAllPlayers(clubFilter);
+
+  if (!isPrivilegedUser(user) && user && user.default_team_id) {
+    players = players.filter((player) => String(player.current_team_id) === String(user.default_team_id));
+  }
+
+  return players;
+}
+
 // Listado de jugadores
-router.get('/', ensureAdmin, async (req, res) => {
+router.get('/', ensureAuth, async (req, res) => {
   try {
-    const isSuperAdmin = req.session.user.role === 'superadmin';
-    const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
-    const players = await getAllPlayers(clubFilter);
+    const players = await getVisiblePlayersForUser(req.session.user);
     logPageView(req, 'players_list', {
       playerCount: players.length,
-      scopeClub: clubFilter,
+      scopeClub: req.session.user.default_club || null,
     });
-    return res.render('players/list', { players });
+    return res.render('players/list', {
+      players,
+      canManageClubPlayers: isPrivilegedUser(req.session.user),
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener jugadores:', err);
@@ -313,11 +331,15 @@ router.post(
 );
 
 // Formulario de nuevo jugador
-router.get('/new', ensureAdmin, async (req, res) => {
+router.get('/new', ensureAuth, async (req, res) => {
   const { user } = req.session;
   const isSuperAdmin = user && user.role === 'superadmin';
+  const teamScope = await getActiveTeamScope(user);
   const clubName = !isSuperAdmin && user ? user.default_club || null : null;
-  const teamOptions = await getTeamOptionsForClubName(clubName);
+  let teamOptions = await getTeamOptionsForClubName(clubName);
+  if (!isPrivilegedUser(user) && teamScope) {
+    teamOptions = teamOptions.filter((team) => String(team.id) === String(teamScope.id));
+  }
   logPageView(req, 'player_new_form', {
     teamOptionsCount: teamOptions.length,
     scopeClub: clubName,
@@ -325,10 +347,11 @@ router.get('/new', ensureAdmin, async (req, res) => {
   res.render('players/new', {
     isSuperAdmin,
     teamOptions,
+    activeTeamId: teamScope ? teamScope.id : null,
   });
 });
 
-router.post('/new', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
+router.post('/new', ensureAuth, uploadPlayerPhoto, async (req, res) => {
   const {
     first_name,
     last_name,
@@ -353,18 +376,24 @@ router.post('/new', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
 
   try {
     const { user } = req.session;
+    const activeTeamScope = await getActiveTeamScope(user);
     let clubValue = null;
     if (user && user.role === 'superadmin') {
       clubValue = club && club.trim() ? club.trim() : null;
     } else if (user && user.role === 'admin') {
       clubValue = user.default_club || null;
+    } else if (user) {
+      clubValue = user.default_club || null;
     }
+    const teamIdValue = isPrivilegedUser(user)
+      ? (team_id || null)
+      : (activeTeamScope ? activeTeamScope.id : null);
 
     await createPlayerWithAssignment({
       firstName: first_name,
       lastName: last_name,
       club: clubValue,
-      teamId: team_id || null,
+      teamId: teamIdValue,
       dorsal: dorsal || null,
       positions: positions || null,
       birthDate: birth_date || null,
@@ -381,7 +410,7 @@ router.post('/new', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
     logAuditEvent(req, 'create', 'player', {
       firstName: first_name,
       lastName: last_name,
-      teamId: team_id || null,
+      teamId: teamIdValue,
       scopeClub: clubValue,
     });
 
@@ -397,32 +426,40 @@ router.post('/new', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
 });
 
 // Formulario de edición de jugador
-router.get('/:id/edit', ensureAdmin, async (req, res) => {
+router.get('/:id/edit', ensureAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const player = await getPlayerById(id, clubFilter);
-    if (!player) {
+    if (!player || !(await canAccessPlayer(req.session.user, id))) {
       req.flash('error', 'Jugador no encontrado.');
-      return res.redirect('/admin/players');
+      return res.redirect('/teams');
     }
-    const teamOptions = await getTeamOptionsForClubName(player.club || null);
+    let teamOptions = await getTeamOptionsForClubName(player.club || null);
+    const teamScope = await getActiveTeamScope(req.session.user);
+    if (!isPrivilegedUser(req.session.user) && teamScope) {
+      teamOptions = teamOptions.filter((team) => String(team.id) === String(teamScope.id));
+    }
     logPageView(req, 'player_edit_form', {
       playerId: Number(id),
       scopeClub: player.club || null,
       teamOptionsCount: teamOptions.length,
     });
-    return res.render('players/edit', { player, teamOptions });
+    return res.render('players/edit', {
+      player,
+      teamOptions,
+      canManageClubPlayers: isPrivilegedUser(req.session.user),
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al cargar jugador para edición:', err);
     req.flash('error', 'Ha ocurrido un error al cargar el jugador.');
-    return res.redirect('/admin/players');
+    return res.redirect('/teams');
   }
 });
 
-router.post('/:id/edit', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
+router.post('/:id/edit', ensureAuth, uploadPlayerPhoto, async (req, res) => {
   const { id } = req.params;
   const {
     first_name,
@@ -450,11 +487,12 @@ router.post('/:id/edit', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const player = await getPlayerById(id, clubFilter);
-    if (!player) {
+    if (!player || !(await canAccessPlayer(req.session.user, id))) {
       await deletePlayerPhoto(req.file ? `/uploads/players/${req.file.filename}` : null);
       req.flash('error', 'Jugador no encontrado.');
-      return res.redirect('/admin/players');
+      return res.redirect('/teams');
     }
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
 
     let nextPhotoPath = player.photo_path || null;
     if (remove_photo === '1') {
@@ -468,7 +506,9 @@ router.post('/:id/edit', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
       firstName: first_name,
       lastName: last_name,
       club: player.club || null,
-      teamId: team_id || null,
+      teamId: isPrivilegedUser(req.session.user)
+        ? (team_id || null)
+        : (activeTeamScope ? activeTeamScope.id : player.current_team_id || null),
       dorsal: dorsal || null,
       positions: positions || null,
       birthDate: birth_date || null,
@@ -512,7 +552,7 @@ router.post('/:id/edit', ensureAdmin, uploadPlayerPhoto, async (req, res) => {
 });
 
 // Borrado individual de jugador
-router.post('/:id/delete', ensureAdmin, async (req, res) => {
+router.post('/:id/delete', ensureAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const isSuperAdmin = req.session.user.role === 'superadmin';
@@ -521,9 +561,9 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     let player = null;
     if (!isSuperAdmin) {
       player = await getPlayerById(id, clubFilter);
-      if (!player) {
+      if (!player || !(await canAccessPlayer(req.session.user, id))) {
         req.flash('error', 'No se ha podido borrar el jugador.');
-        return res.redirect('/admin/players');
+        return res.redirect('/teams');
       }
     } else {
       player = await getPlayerById(id, null);
@@ -544,7 +584,7 @@ router.post('/:id/delete', ensureAdmin, async (req, res) => {
     // eslint-disable-next-line no-console
     console.error('Error al borrar jugador:', err);
     req.flash('error', 'Ha ocurrido un error al borrar el jugador.');
-    return res.redirect('/admin/players');
+    return res.redirect('/teams');
   }
 });
 

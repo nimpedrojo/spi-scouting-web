@@ -159,7 +159,9 @@
           <h3 class="h5 mb-0">Evaluaciones</h3>
           <div class="d-flex gap-2 flex-wrap">
             <a href="/evaluations/new" class="btn btn-sm btn-primary">Nueva evaluación</a>
-            <a href="/evaluations" class="btn btn-sm btn-outline-secondary">Importar Excel</a>
+            <% if (canManageMultipleTeams) { %>
+              <a href="/evaluations" class="btn btn-sm btn-outline-secondary">Importar Excel</a>
+            <% } %>
           </div>
         </div>
 

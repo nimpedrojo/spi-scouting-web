@@ -20,6 +20,12 @@ const {
   listTemplates,
   getTemplateDetail,
 } = require('./evaluationTemplateService');
+const {
+  canAccessPlayer,
+  canAccessTeam,
+  filterPlayersForUser,
+  filterTeamsForUser,
+} = require('./userScopeService');
 
 const MIN_SCORE = 0;
 const MAX_SCORE = 10;
@@ -127,6 +133,12 @@ async function createEvaluationWithScores(user, payload, options = {}) {
   if (!payload.evaluationDate) {
     validationErrors.push('La fecha de evaluacion es obligatoria.');
   }
+  if (!(await canAccessTeam(user, payload.teamId))) {
+    validationErrors.push('No tienes permisos sobre el equipo seleccionado.');
+  }
+  if (!(await canAccessPlayer(user, payload.playerId))) {
+    validationErrors.push('No tienes permisos sobre el jugador seleccionado.');
+  }
 
   const scoreValidation = validateScores(payload.groupedScores, template.metrics);
   validationErrors.push(...scoreValidation.errors);
@@ -181,8 +193,17 @@ async function listEvaluations(user, filters = {}) {
     getSeasonsByClubId(club.id),
     getActiveSeasonByClub(club.id),
   ]);
+  const [visibleTeams, visiblePlayers] = await Promise.all([
+    filterTeamsForUser(user, teams),
+    filterPlayersForUser(user, players),
+  ]);
+  const visibleTeamIds = new Set(visibleTeams.map((team) => String(team.id)));
+  const visiblePlayerIds = new Set(visiblePlayers.map((player) => String(player.id)));
+  const visibleRows = rows.filter((row) => (
+    visibleTeamIds.has(String(row.team_id)) && visiblePlayerIds.has(String(row.player_id))
+  ));
 
-  const groupedMap = rows.reduce((map, row) => {
+  const groupedMap = visibleRows.reduce((map, row) => {
     if (!map.has(row.team_id)) {
       map.set(row.team_id, {
         teamId: row.team_id,
@@ -201,12 +222,12 @@ async function listEvaluations(user, filters = {}) {
   }, new Map());
 
   return {
-    items: rows,
+    items: visibleRows,
     groupedByTeam: Array.from(groupedMap.values()),
     filterOptions: {
-      teams,
-      players,
-      authors: authors.filter((author) => author.role === 'admin' || author.role === 'superadmin'),
+      teams: visibleTeams,
+      players: visiblePlayers,
+      authors,
       seasons,
       activeSeason,
     },
@@ -232,6 +253,9 @@ async function getPlayerEvaluationsHistory(user, playerId) {
   if (!player) {
     return null;
   }
+  if (!(await canAccessPlayer(user, playerId))) {
+    return null;
+  }
 
   return {
     player: {
@@ -249,6 +273,9 @@ async function getEvaluationDetail(user, evaluationId) {
   }
   const evaluation = await findEvaluationById(evaluationId);
   if (!evaluation || evaluation.club_id !== club.id) {
+    return null;
+  }
+  if (!(await canAccessTeam(user, evaluation.team_id)) || !(await canAccessPlayer(user, evaluation.player_id))) {
     return null;
   }
   const scores = await getScoresByEvaluationId(evaluationId);
@@ -280,6 +307,10 @@ async function getEvaluationFormData(user, options = {}) {
     getActiveSeasonByClub(club.id),
     listTemplates(user),
   ]);
+  const [visibleTeams, visiblePlayers] = await Promise.all([
+    filterTeamsForUser(user, teams),
+    filterPlayersForUser(user, players),
+  ]);
 
   let resolvedTemplate = null;
   if (options.templateId) {
@@ -294,8 +325,8 @@ async function getEvaluationFormData(user, options = {}) {
 
   return {
     club,
-    teams,
-    players,
+    teams: visibleTeams,
+    players: visiblePlayers,
     seasons,
     activeSeason,
     template: resolvedTemplate.metrics,

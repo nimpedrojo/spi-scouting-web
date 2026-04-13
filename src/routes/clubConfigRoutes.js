@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const { randomUUID } = require('crypto');
 
@@ -17,6 +18,8 @@ const {
 
 const router = express.Router();
 const clubCrestsDir = path.join(__dirname, '..', 'public', 'uploads', 'clubs');
+
+fs.mkdirSync(clubCrestsDir, { recursive: true });
 
 const crestUpload = multer({
   storage: multer.diskStorage({
@@ -38,6 +41,28 @@ const crestUpload = multer({
 
 function buildClubConfigRedirect(club) {
   return club && club.id ? `/admin/club?club_id=${club.id}` : '/admin/club';
+}
+
+function uploadClubCrest(req, res, next) {
+  crestUpload.single('crest_file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    const clubId = req.body && req.body.club_id ? req.body.club_id : null;
+    const fallbackClub = clubId ? { id: clubId } : null;
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      req.flash('error', 'El escudo no puede superar los 2MB.');
+    } else if (err.message === 'INVALID_IMAGE_TYPE') {
+      req.flash('error', 'El escudo debe ser una imagen válida.');
+    } else {
+      req.flash('error', 'No se ha podido procesar el archivo del escudo.');
+    }
+
+    res.redirect(buildClubConfigRedirect(fallbackClub));
+  });
 }
 
 function ensureAdmin(req, res, next) {
@@ -91,7 +116,7 @@ router.get('/', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/branding', ensureAdmin, crestUpload.single('crest_file'), async (req, res) => {
+router.post('/branding', ensureAdmin, uploadClubCrest, async (req, res) => {
   const club = await resolveAdminClub(req);
   if (!club) {
     req.flash(

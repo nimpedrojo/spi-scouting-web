@@ -1,5 +1,5 @@
 const express = require('express');
-const { ensureAdmin } = require('../middleware/auth');
+const { ensureAuth } = require('../middleware/auth');
 const {
   renderProfile,
   renderPdf,
@@ -8,8 +8,8 @@ const {
 
 const router = express.Router();
 
-router.get('/players/:id', ensureAdmin, renderProfile);
-router.get('/players/:id/pdf', ensureAdmin, renderPdf);
-router.get('/players/:id/pdf/preview', ensureAdmin, renderPdfPreview);
+router.get('/players/:id', ensureAuth, renderProfile);
+router.get('/players/:id/pdf', ensureAuth, renderPdf);
+router.get('/players/:id/pdf/preview', ensureAuth, renderPdfPreview);
 
 module.exports = router;

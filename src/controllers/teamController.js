@@ -17,6 +17,11 @@ const {
 } = require('../services/processIqTeamImportService');
 const { importPlayersFromProcessIq } = require('../services/processIqPlayerImportService');
 const { findUserById } = require('../models/userModel');
+const {
+  canAccessTeam,
+  getActiveTeamScope,
+  canManageMultipleTeams,
+} = require('../services/userScopeService');
 
 function summarizeProcessIqError(err) {
   if (!err) {
@@ -67,10 +72,30 @@ async function renderIndex(req, res) {
     const activeSection = req.query.section || 'Masculina';
     const activeCategory = req.query.category || '';
     const activeSeason = req.context ? req.context.activeSeason : null;
-    const groupedTeams = await getTeamsGroupedBySectionAndCategory(club.id, {
+    let groupedTeams = await getTeamsGroupedBySectionAndCategory(club.id, {
       section: activeSection,
       category: activeCategory || null,
     });
+    const activeTeamScope = await getActiveTeamScope(req.session.user);
+
+    if (activeTeamScope) {
+      groupedTeams = Object.keys(groupedTeams || {}).reduce((acc, sectionName) => {
+        const categories = groupedTeams[sectionName] || {};
+        const filteredCategories = Object.keys(categories).reduce((categoryAcc, categoryName) => {
+          const visibleTeams = (categories[categoryName] || [])
+            .filter((team) => String(team.id) === String(activeTeamScope.id));
+          if (visibleTeams.length) {
+            categoryAcc[categoryName] = visibleTeams;
+          }
+          return categoryAcc;
+        }, {});
+
+        if (Object.keys(filteredCategories).length) {
+          acc[sectionName] = filteredCategories;
+        }
+        return acc;
+      }, {});
+    }
     logPageView(req, 'teams_index', {
       section: activeSection,
       category: activeCategory || null,
@@ -84,6 +109,7 @@ async function renderIndex(req, res) {
       activeSection,
       activeCategory,
       groupedTeams,
+      canManageMultipleTeams: canManageMultipleTeams(req.session.user),
       availableSections: ['Masculina', 'Femenina'],
       availableCategories: [
         'Juvenil',
@@ -108,7 +134,8 @@ async function renderShow(req, res) {
     const club = req.context ? req.context.club : null;
     const team = await getTeamDetail(req.params.id);
     const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
-    if (!club || !team || team.club_id !== club.id) {
+    const canAccessRequestedTeam = await canAccessTeam(req.session.user, req.params.id);
+    if (!club || !team || team.club_id !== club.id || !canAccessRequestedTeam) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
     }
@@ -123,6 +150,7 @@ async function renderShow(req, res) {
       pageTitle: team.name,
       team,
       viewMode,
+      canManageMultipleTeams: canManageMultipleTeams(req.session.user),
     });
   } catch (err) {
     // eslint-disable-next-line no-console

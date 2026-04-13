@@ -22,11 +22,12 @@ async function createTestUser({
   role = 'user',
   defaultClub = null,
   defaultTeam = null,
+  defaultTeamId = null,
 }) {
   const userEmail =
     email || `user_${Date.now()}_${Math.random().toString(16).slice(2)}@local`;
   const [result] = await db.query(
-    'INSERT INTO users (name, email, password_hash, role, default_club, default_team) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO users (name, email, password_hash, role, default_club, default_team, default_team_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       name,
       userEmail,
@@ -35,6 +36,7 @@ async function createTestUser({
       role,
       defaultClub,
       defaultTeam,
+      defaultTeamId,
     ],
   );
   return { id: result.insertId, email: userEmail, password };
@@ -366,7 +368,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Evaluaciones estructuradas');
     expect(res.text).toContain('/reports');
     expect(res.text).toContain('/evaluations');
-    expect(res.text).not.toContain('Crear evaluacion');
+    expect(res.text).toContain('Crear evaluacion');
   });
 
   test('un usuario puede actualizar sus valores por defecto en cuenta', async () => {
@@ -757,18 +759,23 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('/uploads/players/listado-test.png');
   });
 
-  test('un no admin no puede acceder a la gestión de jugadores', async () => {
-    const { email } = await createTestUser({
+  test('un usuario normal con equipo activo puede acceder a la gestión acotada de sus jugadores', async () => {
+    const context = await createEvaluationContext('User Scoped Players');
+    const user = await createTestUser({
       name: 'User Players',
       role: 'user',
+      defaultClub: context.club.name,
+      defaultTeam: 'Juvenil Eval',
+      defaultTeamId: context.teamId,
     });
 
     const agent = request.agent(app);
-    await agent.post('/login').send({ email, password: 'password123' });
+    await agent.post('/login').send({ email: user.email, password: 'password123' });
 
     const res = await agent.get('/admin/players');
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Base de jugadores');
+    expect(res.text).toContain('Mario');
   });
 
   test('un no admin no puede acceder a la gestión de usuarios', async () => {
@@ -1225,7 +1232,13 @@ describe('Aplicación SoccerReport', () => {
   });
 
   test('la API de report devuelve 404 si el informe no existe', async () => {
-    const res = await request(app).get('/reports/api/999999');
+    const admin = await createTestUser({
+      name: 'Admin Report API',
+      role: 'admin',
+    });
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: admin.email, password: 'password123' });
+    const res = await agent.get('/reports/api/999999');
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
   });
@@ -1283,26 +1296,26 @@ describe('Aplicación SoccerReport', () => {
   });
 
   test('un admin puede crear y gestionar equipos de su club', async () => {
-    const clubName = 'Club Equipos';
-    const admin = await createTestUser({
-      name: 'Club Admin Equipos',
-      role: 'admin',
-      defaultClub: clubName,
-    });
+    const context = await createTeamContext('Club Equipos');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Equipo A',
+      ],
+    );
 
     const agent = request.agent(app);
     await agent
       .post('/login')
-      .send({ email: admin.email, password: 'password123' });
+      .send({ email: context.admin.email, password: 'password123' });
 
-    // Crear equipo
-    const resCreate = await agent.post('/admin/club/teams').send({
-      name: 'Equipo A',
-    });
-    expect(resCreate.status).toBe(302);
-    expect(resCreate.headers.location).toBe('/admin/club');
-
-    // Página debería mostrar el equipo
     const resConfig = await agent.get('/admin/club');
     expect(resConfig.status).toBe(200);
     expect(resConfig.text).toContain('Equipo A');
@@ -2286,6 +2299,50 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('Perfil');
   });
 
+  test('usuario normal solo ve su equipo activo en plantillas', async () => {
+    const context = await createTeamContext('Club Scoped Teams');
+    const visibleTeamId = randomUUID();
+    const hiddenTeamId = randomUUID();
+
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      [
+        visibleTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Visible',
+        hiddenTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Oculto',
+      ],
+    );
+
+    const user = await createTestUser({
+      name: 'Scoped Team User',
+      role: 'user',
+      defaultClub: context.club.name,
+      defaultTeam: 'Juvenil Visible',
+      defaultTeamId: visibleTeamId,
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: user.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/teams');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Juvenil Visible');
+    expect(res.text).not.toContain('Cadete Oculto');
+  });
+
   test('update team actualiza una plantilla', async () => {
     const context = await createTeamContext();
     const teamId = randomUUID();
@@ -2386,6 +2443,65 @@ describe('Aplicación SoccerReport', () => {
       [context.playerId],
     );
     expect(scoreRows[0].total).toBe(20);
+  });
+
+  test('usuario normal puede crear evaluaciones solo para su equipo activo', async () => {
+    const context = await createEvaluationContext('Club User Eval');
+    const otherTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        otherTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Ajeno',
+      ],
+    );
+    const [otherPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      ['Pepe', 'Ajeno', context.club.name, context.club.id, otherTeamId, 'Cadete Ajeno'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), otherTeamId, otherPlayerResult.insertId, '4', 'CENTRAL'],
+    );
+
+    const user = await createTestUser({
+      name: 'Scoped Eval User',
+      role: 'user',
+      defaultClub: context.club.name,
+      defaultTeam: 'Juvenil Eval',
+      defaultTeamId: context.teamId,
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: user.email,
+      password: 'password123',
+    });
+
+    const okRes = await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: context.season.id,
+      team_id: context.teamId,
+      player_id: context.playerId,
+    }));
+    expect(okRes.status).toBe(302);
+    expect(okRes.headers.location).toMatch(/^\/evaluations\//);
+
+    const forbiddenRes = await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: context.season.id,
+      team_id: otherTeamId,
+      player_id: otherPlayerResult.insertId,
+      title: 'Intento fuera de alcance',
+    }));
+    expect(forbiddenRes.status).toBe(422);
+    expect(forbiddenRes.text).toContain('No tienes permisos sobre el equipo seleccionado');
   });
 
   test('reject invalid score values devuelve validacion', async () => {
@@ -2771,7 +2887,7 @@ describe('Aplicación SoccerReport', () => {
     expect(res.text).toContain('1.00');
     expect(res.text).toContain('Informes emitidos');
     expect(res.text).toContain('Equipos activos');
-    expect(res.text).toContain('Entrar al módulo unificado de scouting y seguimiento.');
+    expect(res.text).toContain('Acceso unificado a informes scouting y evaluaciones estructuradas.');
   });
 
   test('pending evaluations table renders correctly', async () => {
