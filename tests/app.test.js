@@ -509,6 +509,111 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     }
   }
 
+  async function seedTeamBenchmarkFixture(context, options = {}) {
+    const secondPlayerName = options.secondPlayerName || ['Luis', 'Medio'];
+    const thirdPlayerName = options.thirdPlayerName || ['Pablo', 'Base'];
+
+    const [secondPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [secondPlayerName[0], secondPlayerName[1], context.club.name, context.club.id, context.teamId, 'Juvenil Eval'],
+    );
+    const [thirdPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [thirdPlayerName[0], thirdPlayerName[1], context.club.name, context.club.id, context.teamId, 'Juvenil Eval'],
+    );
+
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+      [
+        randomUUID(), context.teamId, secondPlayerResult.insertId, '8', 'MC',
+        randomUUID(), context.teamId, thirdPlayerResult.insertId, '6', 'CENTRAL',
+      ],
+    );
+
+    const evaluations = [
+      {
+        id: randomUUID(),
+        playerId: context.playerId,
+        date: '2026-03-20',
+        title: 'Jugador objetivo',
+        overall: 7.8,
+        scores: {
+          tecnica_control: 8,
+          tecnica_pase: 8,
+          tactica_posicionamiento: 8,
+          fisica_velocidad: 7,
+          psicologica_concentracion: 8,
+          personalidad_compromiso: 9,
+        },
+      },
+      {
+        id: randomUUID(),
+        playerId: secondPlayerResult.insertId,
+        date: '2026-03-18',
+        title: 'Jugador medio',
+        overall: 6.9,
+        scores: {
+          tecnica_control: 7,
+          tecnica_pase: 7,
+          tactica_posicionamiento: 7,
+          fisica_velocidad: 7,
+          psicologica_concentracion: 7,
+          personalidad_compromiso: 7,
+        },
+      },
+      {
+        id: randomUUID(),
+        playerId: thirdPlayerResult.insertId,
+        date: '2026-03-16',
+        title: 'Jugador base',
+        overall: 6.2,
+        scores: {
+          tecnica_control: 6,
+          tecnica_pase: 6,
+          tactica_posicionamiento: 6,
+          fisica_velocidad: 6,
+          psicologica_concentracion: 6,
+          personalidad_compromiso: 6,
+        },
+      },
+    ];
+
+    for (const evaluation of evaluations) {
+      // eslint-disable-next-line no-await-in-loop
+      await db.query(
+        `INSERT INTO evaluations (
+          id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+          source, title, notes, overall_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          evaluation.id,
+          context.club.id,
+          context.season.id,
+          context.teamId,
+          evaluation.playerId,
+          context.admin.id,
+          evaluation.date,
+          'manual',
+          evaluation.title,
+          'Benchmark',
+          evaluation.overall,
+        ],
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await seedEvaluationScoresForEvaluation(evaluation.id, evaluation.scores);
+    }
+
+    return {
+      secondPlayerId: secondPlayerResult.insertId,
+      thirdPlayerId: thirdPlayerResult.insertId,
+    };
+  }
+
   test('redirección inicial a /login si no hay sesión', async () => {
     const res = await request(app).get('/');
     expect(res.status).toBe(302);
@@ -3272,6 +3377,70 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).not.toContain('SPI Scouting Teams');
   });
 
+  test('team detail en pmv muestra estado actual del equipo cuando hay base suficiente', async () => {
+    const context = await createEvaluationContext('Club Team Benchmark PMV');
+    await seedTeamBenchmarkFixture(context);
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/teams/${context.teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Estado actual del equipo');
+    expect(res.text).toContain('Jugadores evaluados');
+    expect(res.text).toContain('Evaluaciones usadas');
+    expect(res.text).toContain('Media global');
+    expect(res.text).toContain('Por encima de la media');
+    expect(res.text).toContain('Con margen de mejora');
+  });
+
+  test('team detail en pmv oculta benchmark si no hay mínimo de jugadores evaluados', async () => {
+    const context = await createEvaluationContext('Club Team Benchmark Empty');
+    const evaluationId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-12',
+        'manual',
+        'Base insuficiente',
+        'Notas',
+        7.1,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationId);
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/teams/${context.teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Estado actual del equipo');
+    expect(res.text).toContain('Aún no hay suficientes evaluaciones para mostrar una visión útil del equipo.');
+  });
+
   test('planning bloquea el acceso cuando el módulo no está activo', async () => {
     const context = await createTeamContext('Club Planning Disabled');
     const teamId = randomUUID();
@@ -4384,6 +4553,30 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).not.toContain('Contexto futbolistico');
   });
 
+  test('player profile en pmv muestra comparativa con la media del equipo', async () => {
+    const context = await createEvaluationContext('Club Perfil Benchmark PMV');
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+    await seedTeamBenchmarkFixture(context);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/players/${context.playerId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Jugador vs media del equipo');
+    expect(res.text).toContain('Media global jugador');
+    expect(res.text).toContain('Media global equipo');
+    expect(res.text).toContain('Diferencia global');
+    expect(res.text).toContain('Tecnica');
+    expect(res.text).toContain('El jugador se sitúa por encima de la media del equipo');
+  });
+
   test('player profile empty state without evaluations', async () => {
     const context = await createEvaluationContext('Club Perfil Empty');
     const agent = request.agent(app);
@@ -4396,6 +4589,46 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('No hay evaluaciones registradas para este jugador');
     expect(res.text).not.toContain('playerRadarChart');
+  });
+
+  test('player profile en pmv oculta comparativa si el equipo no tiene base suficiente', async () => {
+    const context = await createEvaluationContext('Club Perfil Benchmark Empty');
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+    const evaluationId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-10',
+        'manual',
+        'Solo una',
+        'Notas',
+        7.1,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationId);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/players/${context.playerId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Jugador vs media del equipo');
+    expect(res.text).toContain('Aún no hay suficientes evaluaciones para comparar al jugador con su equipo.');
   });
 
   test('player profile muestra informes y evaluaciones deshabilitados si scouting players no está activo', async () => {

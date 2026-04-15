@@ -229,7 +229,11 @@ async function renderShow(req, res) {
     const club = req.context ? req.context.club : null;
     const activeModuleKeys = req.context ? req.context.activeModuleKeys || [] : [];
     const productMode = req.context ? req.context.productMode || null : null;
-    const team = await getTeamWorkspaceData(req.params.id, { activeModuleKeys });
+    const activeSeason = req.context ? req.context.activeSeason || null : null;
+    const team = await getTeamWorkspaceData(req.params.id, {
+      activeModuleKeys,
+      activeSeasonId: activeSeason ? activeSeason.id : null,
+    });
     const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
     const canAccessRequestedTeam = await canAccessTeam(req.session.user, req.params.id);
     const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';

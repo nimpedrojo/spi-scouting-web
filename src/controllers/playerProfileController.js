@@ -5,6 +5,7 @@ const { getPlayerById } = require('../models/playerModel');
 const { buildPlayerPdfReport } = require('../services/pdfReportService');
 const { canAccessPlayer, canManageMultipleTeams } = require('../services/userScopeService');
 const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { getPlayerBenchmark } = require('../services/playerBenchmarkService');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -145,6 +146,10 @@ async function renderProfile(req, res) {
 
     const positionsList = normalizePositions(playerSummary.positions);
     const teamProfileHref = player.current_team_id ? `/teams/${player.current_team_id}` : null;
+    const benchmarkSeasonId = activeSeason ? activeSeason.id : null;
+    const playerBenchmark = scoutingPlayersEnabled && player.current_team_id && benchmarkSeasonId
+      ? await getPlayerBenchmark(player.id, player.current_team_id, club.id, benchmarkSeasonId)
+      : null;
 
     return res.render('players/show', {
       pageTitle: `${player.first_name} ${player.last_name}`,
@@ -169,6 +174,7 @@ async function renderProfile(req, res) {
       activeSeason,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
       teamProfileHref,
+      playerBenchmark,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

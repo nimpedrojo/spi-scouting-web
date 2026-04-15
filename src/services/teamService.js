@@ -31,6 +31,7 @@ const {
   listRecentScoutingTeamReportsByOwnTeam,
 } = require('../modules/scoutingTeams/models/scoutingTeamReportModel');
 const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { getTeamBenchmark } = require('./teamBenchmarkService');
 
 function normalizePlayerPreview(player) {
   return {
@@ -373,6 +374,7 @@ async function getTeamWorkspaceData(teamId, options = {}) {
   const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
   const planningEnabled = activeModuleKeys.includes(MODULE_KEYS.PLANNING);
   const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
+  const activeSeasonId = options.activeSeasonId || null;
 
   const [
     evaluationCount,
@@ -381,6 +383,7 @@ async function getTeamWorkspaceData(teamId, options = {}) {
     recentEvaluations,
     recentReports,
     recentScoutingTeamReports,
+    teamBenchmark,
   ] = await Promise.all([
     scoutingPlayersEnabled ? countEvaluationsByTeam(team.club_id, team.id) : Promise.resolve(0),
     scoutingPlayersEnabled
@@ -398,6 +401,9 @@ async function getTeamWorkspaceData(teamId, options = {}) {
     scoutingTeamsEnabled
       ? listRecentScoutingTeamReportsByOwnTeam(team.club_id, team.id, 3)
       : Promise.resolve([]),
+    scoutingPlayersEnabled && activeSeasonId
+      ? getTeamBenchmark(team.id, team.club_id, activeSeasonId)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -433,6 +439,7 @@ async function getTeamWorkspaceData(teamId, options = {}) {
         authorName: entry.authorName || '',
       })),
     },
+    teamBenchmark,
   };
 }
 
