@@ -456,6 +456,7 @@ Important nuance:
   - quick summary of status and latest activity
   - visible evaluation/report history
   - simple evolution view instead of an overloaded administrative layout
+  - simple benchmark against current team average when there is enough evaluation base
 
 ### 10.4 Reports
 
@@ -477,6 +478,38 @@ Characteristics:
 - still important to current product behavior
 
 This subsystem is more legacy-shaped than evaluations.
+
+### 10.3.1 PMV benchmark layer
+
+The PMV now includes a lightweight comparative reading layer built from evaluations.
+
+Team benchmark rules:
+
+- context is strictly limited to current club, current team, active season, and players currently assigned to that team
+- for each player, use up to the last 3 valid evaluations in the active season
+- compute player area averages first
+- compute team area averages by averaging player averages, not by averaging all raw evaluation rows directly
+- team benchmark is shown only when at least 3 players have valid evaluation data
+
+Player vs team rules:
+
+- player profile can compare the player against the current team average in PMV mode
+- comparison is shown only when:
+  - the player has at least 1 valid evaluation
+  - the team benchmark is valid
+
+Areas used:
+
+- tecnica
+- tactica
+- fisica
+- psicologica
+- personalidad
+
+Global average rule:
+
+- player global average: simple average of available player area averages
+- team global average: simple average of available team area averages
 
 ### 10.5 Evaluations
 
