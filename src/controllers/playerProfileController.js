@@ -4,6 +4,7 @@ const { getReportsForPlayerProfile } = require('../models/reportModel');
 const { getPlayerById } = require('../models/playerModel');
 const { buildPlayerPdfReport } = require('../services/pdfReportService');
 const { canAccessPlayer, canManageMultipleTeams } = require('../services/userScopeService');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -63,6 +64,20 @@ function normalizePositions(positionsValue) {
     .filter((position) => supportedPositions.has(position))));
 }
 
+function buildEmptyAnalytics() {
+  return {
+    summary: null,
+    overallAverage: 0,
+    averageByArea: [],
+    groupedMetricBreakdown: {},
+    radarChartData: { labels: [], datasets: [] },
+    history: {
+      totalEvaluations: 0,
+      lastEvaluationDate: null,
+    },
+  };
+}
+
 async function renderProfile(req, res) {
   try {
     const club = req.context ? req.context.club : null;
@@ -80,12 +95,22 @@ async function renderProfile(req, res) {
       return res.redirect('/teams');
     }
 
-    const analytics = await getPlayerAnalytics(player.id, club.id, seasonId);
-    const reports = await getReportsForPlayerProfile({
-      clubName: club.name,
-      firstName: player.first_name,
-      lastName: player.last_name,
-    });
+    const scoutingPlayersEnabled = Boolean(
+      req.context
+      && Array.isArray(req.context.activeModuleKeys)
+      && req.context.activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS),
+    );
+
+    const analytics = scoutingPlayersEnabled
+      ? await getPlayerAnalytics(player.id, club.id, seasonId)
+      : buildEmptyAnalytics();
+    const reports = scoutingPlayersEnabled
+      ? await getReportsForPlayerProfile({
+        clubName: club.name,
+        firstName: player.first_name,
+        lastName: player.last_name,
+      })
+      : [];
 
     const playerSummary = {
       ...analytics.summary,
@@ -117,6 +142,7 @@ async function renderProfile(req, res) {
         areaEntries: Object.values(analytics.groupedMetricBreakdown || {}),
         radarChartJson: JSON.stringify(analytics.radarChartData),
       },
+      scoutingPlayersEnabled,
       areaLabelHelper: getAreaLabel,
       activeSeason,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),

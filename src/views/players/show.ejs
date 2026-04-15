@@ -28,7 +28,11 @@
       </div>
       <div class="col-lg-4">
         <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
-          <a href="/players/<%= player.id %>/pdf/preview" class="btn btn-outline-secondary" target="_blank" rel="noopener">PDF</a>
+          <% if (scoutingPlayersEnabled) { %>
+            <a href="/players/<%= player.id %>/pdf/preview" class="btn btn-outline-secondary" target="_blank" rel="noopener">PDF</a>
+          <% } else { %>
+            <button type="button" class="btn btn-outline-secondary" disabled title="Disponible con Scouting Players">PDF</button>
+          <% } %>
           <a href="/admin/players/<%= player.id %>/edit" class="btn btn-primary">Editar</a>
         </div>
       </div>
@@ -126,9 +130,18 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h3 class="h5 mb-0">Informes</h3>
-          <a href="/reports/new" class="btn btn-sm btn-primary">Nuevo informe</a>
+          <% if (scoutingPlayersEnabled) { %>
+            <a href="/reports/new" class="btn btn-sm btn-primary">Nuevo informe</a>
+          <% } else { %>
+            <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nuevo informe</button>
+          <% } %>
         </div>
-        <% if (!reports.length) { %>
+        <% if (!scoutingPlayersEnabled) { %>
+          <div class="border rounded-3 bg-light p-3">
+            <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+            <p class="text-muted mb-0">Aquí verás los informes individuales del jugador y el acceso para crear nuevos seguimientos.</p>
+          </div>
+        <% } else if (!reports.length) { %>
           <p class="text-muted mb-0">No hay informes asociados a este jugador.</p>
         <% } else { %>
           <div class="list-group list-group-flush">
@@ -158,14 +171,25 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h3 class="h5 mb-0">Evaluaciones</h3>
           <div class="d-flex gap-2 flex-wrap">
-            <a href="/evaluations/new" class="btn btn-sm btn-primary">Nueva evaluación</a>
-            <% if (canManageMultipleTeams) { %>
+            <% if (scoutingPlayersEnabled) { %>
+              <a href="/evaluations/new" class="btn btn-sm btn-primary">Nueva evaluación</a>
+            <% } else { %>
+              <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nueva evaluación</button>
+            <% } %>
+            <% if (scoutingPlayersEnabled && canManageMultipleTeams) { %>
               <a href="/evaluations" class="btn btn-sm btn-outline-secondary">Importar Excel</a>
+            <% } else if (!scoutingPlayersEnabled && canManageMultipleTeams) { %>
+              <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Importar Excel</button>
             <% } %>
           </div>
         </div>
 
-        <% if (!analytics.history.totalEvaluations) { %>
+        <% if (!scoutingPlayersEnabled) { %>
+          <div class="border rounded-3 bg-light p-3">
+            <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+            <p class="text-muted mb-0">En este bloque aparecerán las evaluaciones del jugador, medias por área, radar de evolución e importación de datos.</p>
+          </div>
+        <% } else if (!analytics.history.totalEvaluations) { %>
           <p class="text-muted mb-0">No hay evaluaciones registradas para este jugador.</p>
         <% } else { %>
           <div class="row g-4 mb-4">

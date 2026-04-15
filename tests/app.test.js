@@ -4064,6 +4064,26 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).not.toContain('playerRadarChart');
   });
 
+  test('player profile muestra informes y evaluaciones deshabilitados si scouting players no está activo', async () => {
+    const context = await createEvaluationContext('Club Perfil Module Off');
+    await setModuleEnabledForClub(context.club.id, 'scouting_players', false);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/players/${context.playerId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Mario Sanz');
+    expect(res.text).toContain('Disponible con el módulo Scouting Players');
+    expect(res.text).toContain('Aquí verás los informes individuales del jugador');
+    expect(res.text).toContain('En este bloque aparecerán las evaluaciones del jugador');
+    expect(res.text).toContain('button type="button" class="btn btn-outline-secondary" disabled');
+    expect(res.text).not.toContain('playerRadarChart');
+  });
+
   test('dashboard renders analytics layer', async () => {
     const context = await createEvaluationContext('Club Dashboard Render');
     const agent = request.agent(app);

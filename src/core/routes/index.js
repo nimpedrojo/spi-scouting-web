@@ -6,6 +6,7 @@ const clubAdminRoutes = require('../../routes/clubAdminRoutes');
 const clubConfigRoutes = require('../../routes/clubConfigRoutes');
 const teamRoutes = require('../../routes/teamRoutes');
 const playerAdminRoutes = require('../../routes/playerAdminRoutes');
+const playerProfileRoutes = require('../../routes/playerProfileRoutes');
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use('/clubs', clubAdminRoutes);
 router.use('/admin/club', clubConfigRoutes);
 router.use('/teams', teamRoutes);
 router.use('/admin/players', playerAdminRoutes);
+router.use('/', playerProfileRoutes);
 
 module.exports = router;
