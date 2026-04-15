@@ -55,6 +55,64 @@ function normalizeReportPlayerOption(player) {
   };
 }
 
+function resolveReportFlowContext(players, query = {}, formData = {}) {
+  const requestedPlayerId = (query.player_id || formData.player_id || '').toString().trim();
+  const requestedTeamId = (query.team_id || formData.team_id || '').toString().trim();
+  const selectedPlayer = requestedPlayerId
+    ? players.find((player) => String(player.id) === requestedPlayerId)
+    : null;
+
+  return {
+    requestedPlayerId: selectedPlayer ? String(selectedPlayer.id) : requestedPlayerId || '',
+    requestedTeamId,
+    selectedPlayer,
+    returnToPlayerHref: selectedPlayer ? `/players/${selectedPlayer.id}` : '',
+    returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+  };
+}
+
+function populateReportFormFromSelectedPlayer(formData, selectedPlayer, defaultClub, defaultTeamName) {
+  if (!selectedPlayer) {
+    return formData;
+  }
+
+  return {
+    ...formData,
+    player_id: String(selectedPlayer.id),
+    player_name: formData.player_name || selectedPlayer.first_name || '',
+    player_surname: formData.player_surname || selectedPlayer.last_name || '',
+    team: formData.team || selectedPlayer.relational_team_name || defaultTeamName || '',
+    club: formData.club || defaultClub || '',
+    year: formData.year || selectedPlayer.birth_year || '',
+    laterality: formData.laterality || selectedPlayer.laterality || '',
+  };
+}
+
+async function loadRecommendationConfig(clubName) {
+  let recommendationConfig = {};
+  try {
+    let rows = await getRecommendationsByClub(clubName);
+    if (!rows || !rows.length) {
+      rows = await getRecommendationsByClub('DEFAULT');
+    }
+    recommendationConfig = rows.reduce((acc, r) => {
+      const opts = (r.options || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s);
+      if (opts.length) {
+        acc[r.year] = opts;
+      }
+      return acc;
+    }, {});
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Error obteniendo recomendaciones de club:', e);
+  }
+
+  return recommendationConfig;
+}
+
 async function getReportPlayersForContext(clubName, defaultTeamId = null) {
   if (defaultTeamId) {
     const players = await getPlayersByTeamId(defaultTeamId);
@@ -118,35 +176,19 @@ router.get('/new', ensureAuth, async (req, res) => {
     players = await getReportPlayersForContext(clubFilter, null);
   }
 
-  let recommendationConfig = {};
-  try {
-    let rows = await getRecommendationsByClub(defaultClub);
-    if (!rows || !rows.length) {
-      rows = await getRecommendationsByClub('DEFAULT');
-    }
-    recommendationConfig = rows.reduce((acc, r) => {
-      const opts = (r.options || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s);
-      if (opts.length) {
-        acc[r.year] = opts;
-      }
-      return acc;
-    }, {});
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error('Error obteniendo recomendaciones de club:', e);
-  }
+  const flowContext = resolveReportFlowContext(players, req.query);
+  const recommendationConfig = await loadRecommendationConfig(defaultClub || 'DEFAULT');
 
   res.render('reports/new', {
-    formData: {
+    formData: populateReportFormFromSelectedPlayer({
       club: defaultClub,
       team: resolvedDefaultTeam,
-    },
+      team_id: resolvedTeamId || '',
+    }, flowContext.selectedPlayer, defaultClub, resolvedDefaultTeam),
     validationErrors: {},
     players,
     recommendationConfig,
+    flowContext,
   });
   logPageView(req, 'report_new_form', {
     playerCount: players.length,
@@ -279,27 +321,8 @@ router.post('/new', ensureAuth, async (req, res) => {
         clubFilter,
         sessionDefaultTeamId,
       );
-      let recommendationConfig = {};
-      try {
-        const clubForRec = sessionDefaultClub || clubFilter || 'DEFAULT';
-        let rows = await getRecommendationsByClub(clubForRec);
-        if (!rows || !rows.length) {
-          rows = await getRecommendationsByClub('DEFAULT');
-        }
-        recommendationConfig = rows.reduce((acc, r) => {
-          const opts = (r.options || '')
-            .split(',')
-            .map((s) => s.trim())
-            .filter((s) => s);
-          if (opts.length) {
-            acc[r.year] = opts;
-          }
-          return acc;
-        }, {});
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Error obteniendo recomendaciones de club:', e);
-      }
+      const flowContext = resolveReportFlowContext(playersForForm, req.body, req.body);
+      const recommendationConfig = await loadRecommendationConfig(sessionDefaultClub || clubFilter || 'DEFAULT');
       return res.status(400).render('reports/new', {
         formData: req.body,
         validationErrors: {
@@ -308,6 +331,7 @@ router.post('/new', ensureAuth, async (req, res) => {
         },
         players: playersForForm,
         recommendationConfig,
+        flowContext,
       });
     }
 
@@ -332,7 +356,7 @@ router.post('/new', ensureAuth, async (req, res) => {
     const finalTeam =
       (activeTeamScope ? activeTeamScope.name : team) || (defaultTeamRecord ? defaultTeamRecord.name : '');
 
-    await createReport({
+    const reportId = await createReport({
       player_name,
       player_surname,
       year: year || null,
@@ -394,7 +418,7 @@ router.post('/new', ensureAuth, async (req, res) => {
       overallRating: overallRating != null ? Number(overallRating.toFixed(2)) : null,
     });
     req.flash('success', 'Informe creado correctamente.');
-    return res.redirect('/reports/new');
+    return res.redirect(`/reports/${reportId}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al crear informe:', err);
@@ -408,10 +432,13 @@ router.post('/new', ensureAuth, async (req, res) => {
       clubFilter,
       defaultTeamId,
     );
+    const flowContext = resolveReportFlowContext(playersForForm, req.body, req.body);
     return res.status(500).render('reports/new', {
       formData: req.body,
       validationErrors: {},
       players: playersForForm,
+      recommendationConfig: await loadRecommendationConfig(defaultClub || clubFilter || 'DEFAULT'),
+      flowContext,
     });
   }
 });
@@ -601,6 +628,12 @@ router.get('/:id', ensureAuth, async (req, res) => {
       req.flash('error', 'Informe no encontrado.');
       return res.redirect('/reports');
     }
+    const clubPlayers = report.club ? await getAllPlayers(report.club) : [];
+    const linkedPlayer = clubPlayers.find((player) => (
+      String(player.first_name || '').trim().toLowerCase() === String(report.player_name || '').trim().toLowerCase()
+      && String(player.last_name || '').trim().toLowerCase() === String(report.player_surname || '').trim().toLowerCase()
+      && (!report.team || !player.relational_team_name || String(player.relational_team_name).trim() === String(report.team).trim())
+    )) || null;
     const radarChartData = await buildReportRadarComparison(report);
     const reportClub = report.club ? await getClubByName(report.club) : null;
     logPageView(req, 'report_detail', {
@@ -613,6 +646,7 @@ router.get('/:id', ensureAuth, async (req, res) => {
       report,
       reportClub,
       radarChartJson: JSON.stringify(radarChartData),
+      linkedPlayer,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

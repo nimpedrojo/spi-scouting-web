@@ -60,10 +60,12 @@ async function renderIndex(req, res) {
 async function renderNew(req, res) {
   try {
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const requestedTeamId = req.query.team_id || null;
+    const requestedPlayerId = req.query.player_id || null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.query.template_id || null,
-      teamId: req.query.team_id || null,
-      playerId: req.query.player_id || null,
+      teamId: requestedTeamId,
+      playerId: requestedPlayerId,
       seasonId: req.query.season_id || (activeSeason ? activeSeason.id : null),
     });
     if (!formData) {
@@ -81,6 +83,10 @@ async function renderNew(req, res) {
       formData,
       formValues: {},
       errors: [],
+      flowContext: {
+        returnToPlayerHref: requestedPlayerId ? `/players/${requestedPlayerId}` : '',
+        returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+      },
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -93,10 +99,12 @@ async function renderNew(req, res) {
 async function create(req, res) {
   try {
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const requestedTeamId = req.body.team_id || null;
+    const requestedPlayerId = req.body.player_id || null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.body.template_id || null,
-      teamId: req.body.team_id || null,
-      playerId: req.body.player_id || null,
+      teamId: requestedTeamId,
+      playerId: requestedPlayerId,
       seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
     });
     const groupedScores = buildGroupedScoresFromBody(req.body, formData.template);
@@ -120,6 +128,10 @@ async function create(req, res) {
         formData,
         formValues: req.body,
         errors: result.errors,
+        flowContext: {
+          returnToPlayerHref: requestedPlayerId ? `/players/${requestedPlayerId}` : '',
+          returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+        },
       });
     }
 

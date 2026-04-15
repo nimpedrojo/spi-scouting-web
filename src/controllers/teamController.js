@@ -24,6 +24,24 @@ const {
 } = require('../services/userScopeService');
 const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
 
+function getRequestedOperationalClubId(req) {
+  if (!req || !req.session || !req.session.user || req.session.user.role !== 'superadmin') {
+    return null;
+  }
+
+  const rawClubId = (req.query && req.query.club_id) || (req.body && req.body.club_id) || null;
+  if (!rawClubId) {
+    return null;
+  }
+
+  const numericClubId = Number(rawClubId);
+  return Number.isInteger(numericClubId) ? numericClubId : null;
+}
+
+function buildTeamRedirectSuffix(clubId) {
+  return clubId ? `?club_id=${encodeURIComponent(clubId)}` : '';
+}
+
 function buildTeamCoreActions(team, canManageMultipleTeamsForUser) {
   const actions = [
     {
@@ -52,8 +70,9 @@ function buildTeamCoreActions(team, canManageMultipleTeamsForUser) {
   return actions;
 }
 
-function buildTeamModuleEntries(team, activeModuleKeys) {
+function buildTeamModuleEntries(team, activeModuleKeys, productMode) {
   const entries = [];
+  const isPmvPlayerTracking = Boolean(productMode && productMode.isPmvPlayerTracking);
 
   if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS)) {
     entries.push({
@@ -68,7 +87,7 @@ function buildTeamModuleEntries(team, activeModuleKeys) {
     });
   }
 
-  if (activeModuleKeys.includes(MODULE_KEYS.PLANNING)) {
+  if (!isPmvPlayerTracking && activeModuleKeys.includes(MODULE_KEYS.PLANNING)) {
     entries.push({
       key: MODULE_KEYS.PLANNING,
       title: 'SPI Planning',
@@ -80,7 +99,7 @@ function buildTeamModuleEntries(team, activeModuleKeys) {
     });
   }
 
-  if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS)) {
+  if (!isPmvPlayerTracking && activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS)) {
     entries.push({
       key: MODULE_KEYS.SCOUTING_TEAMS,
       title: 'SPI Scouting Teams',
@@ -136,7 +155,9 @@ async function runProcessIqPlayerImport(team, user, req) {
 
 async function renderIndex(req, res) {
   try {
-    const club = req.context ? req.context.club : null;
+    const requestedClubId = getRequestedOperationalClubId(req);
+    const club = (req.context && req.context.club)
+      || await requireClubForUser(req.session.user, { clubId: requestedClubId });
     if (!club) {
       req.flash('error', 'Configura primero un club por defecto para usar Plantillas.');
       return res.redirect('/dashboard');
@@ -178,6 +199,7 @@ async function renderIndex(req, res) {
     return res.render('teams/index', {
       pageTitle: 'Plantillas',
       clubName: club.name,
+      selectedClubId: club.id,
       activeSeason,
       activeSection,
       activeCategory,
@@ -206,10 +228,13 @@ async function renderShow(req, res) {
   try {
     const club = req.context ? req.context.club : null;
     const activeModuleKeys = req.context ? req.context.activeModuleKeys || [] : [];
+    const productMode = req.context ? req.context.productMode || null : null;
     const team = await getTeamWorkspaceData(req.params.id, { activeModuleKeys });
     const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
     const canAccessRequestedTeam = await canAccessTeam(req.session.user, req.params.id);
-    if (!club || !team || team.club_id !== club.id || !canAccessRequestedTeam) {
+    const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';
+    const hasClubAccess = isSuperAdmin ? Boolean(team) : Boolean(club && team && team.club_id === club.id);
+    if (!team || !hasClubAccess || !canAccessRequestedTeam) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
     }
@@ -224,9 +249,11 @@ async function renderShow(req, res) {
       pageTitle: team.name,
       team,
       viewMode,
+      productMode,
+      selectedClubId: team.club_id,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
       coreActions: buildTeamCoreActions(team, canManageMultipleTeams(req.session.user)),
-      moduleEntries: buildTeamModuleEntries(team, activeModuleKeys),
+      moduleEntries: buildTeamModuleEntries(team, activeModuleKeys, productMode),
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -238,7 +265,8 @@ async function renderShow(req, res) {
 
 async function renderNew(req, res) {
   try {
-    const formData = await getTeamFormData(req.session.user);
+    const requestedClubId = getRequestedOperationalClubId(req);
+    const formData = await getTeamFormData(req.session.user, { clubId: requestedClubId });
     if (!formData) {
       req.flash('error', 'Configura primero un club por defecto para crear equipos.');
       return res.redirect('/dashboard');
@@ -249,6 +277,7 @@ async function renderNew(req, res) {
       team: null,
       formData,
       formAction: '/teams',
+      selectedClubId: formData.club.id,
       submitLabel: 'Crear plantilla',
     });
   } catch (err) {
@@ -261,16 +290,18 @@ async function renderNew(req, res) {
 
 async function create(req, res) {
   try {
+    const requestedClubId = getRequestedOperationalClubId(req);
     const payload = {
       name: req.body.name,
       seasonId: req.body.season_id,
       sectionId: req.body.section_id,
       categoryId: req.body.category_id,
+      clubId: requestedClubId,
     };
     const validationError = await validateTeamPayload(req.session.user, payload);
     if (validationError) {
       req.flash('error', validationError);
-      return res.redirect('/teams/new');
+      return res.redirect(`/teams/new${buildTeamRedirectSuffix(requestedClubId)}`);
     }
 
     const team = await createTeamForUser(req.session.user, payload);
@@ -282,19 +313,20 @@ async function create(req, res) {
       categoryId: payload.categoryId,
     });
     req.flash('success', 'Plantilla creada correctamente.');
-    return res.redirect(`/teams/${team.id}`);
+    return res.redirect(`/teams/${team.id}${buildTeamRedirectSuffix(requestedClubId)}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error creating team', err);
     req.flash('error', 'Ha ocurrido un error al crear la plantilla.');
-    return res.redirect('/teams/new');
+    return res.redirect(`/teams/new${buildTeamRedirectSuffix(getRequestedOperationalClubId(req))}`);
   }
 }
 
 async function renderEdit(req, res) {
   try {
+    const requestedClubId = getRequestedOperationalClubId(req);
     const [formData, team] = await Promise.all([
-      getTeamFormData(req.session.user),
+      getTeamFormData(req.session.user, { clubId: requestedClubId }),
       findTeamById(req.params.id),
     ]);
     if (!formData || !team || team.club_id !== formData.club.id) {
@@ -307,6 +339,7 @@ async function renderEdit(req, res) {
       team,
       formData,
       formAction: `/teams/${team.id}/update`,
+      selectedClubId: formData.club.id,
       submitLabel: 'Guardar cambios',
     });
   } catch (err) {
@@ -319,16 +352,18 @@ async function renderEdit(req, res) {
 
 async function update(req, res) {
   try {
+    const requestedClubId = getRequestedOperationalClubId(req);
     const payload = {
       name: req.body.name,
       seasonId: req.body.season_id,
       sectionId: req.body.section_id,
       categoryId: req.body.category_id,
+      clubId: requestedClubId,
     };
     const validationError = await validateTeamPayload(req.session.user, payload);
     if (validationError) {
       req.flash('error', validationError);
-      return res.redirect(`/teams/${req.params.id}/edit`);
+      return res.redirect(`/teams/${req.params.id}/edit${buildTeamRedirectSuffix(requestedClubId)}`);
     }
 
     const affected = await updateTeamForUser(req.session.user, req.params.id, payload);
@@ -345,18 +380,19 @@ async function update(req, res) {
       categoryId: payload.categoryId,
     });
     req.flash('success', 'Plantilla actualizada correctamente.');
-    return res.redirect(`/teams/${req.params.id}`);
+    return res.redirect(`/teams/${req.params.id}${buildTeamRedirectSuffix(requestedClubId)}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error updating team', err);
     req.flash('error', 'Ha ocurrido un error al actualizar la plantilla.');
-    return res.redirect(`/teams/${req.params.id}/edit`);
+    return res.redirect(`/teams/${req.params.id}/edit${buildTeamRedirectSuffix(getRequestedOperationalClubId(req))}`);
   }
 }
 
 async function remove(req, res) {
   try {
-    const affected = await deleteTeamForUser(req.session.user, req.params.id);
+    const requestedClubId = getRequestedOperationalClubId(req);
+    const affected = await deleteTeamForUser(req.session.user, req.params.id, { clubId: requestedClubId });
     if (!affected) {
       req.flash('error', 'Equipo no encontrado.');
       return res.redirect('/teams');
@@ -365,7 +401,7 @@ async function remove(req, res) {
       teamId: req.params.id,
     });
     req.flash('success', 'Plantilla eliminada correctamente.');
-    return res.redirect('/teams');
+    return res.redirect(`/teams${buildTeamRedirectSuffix(requestedClubId)}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error deleting team', err);

@@ -25,6 +25,38 @@ function buildRadarChartData(areaAverages) {
   };
 }
 
+function buildTrendSummary(recentEvaluations) {
+  if (!Array.isArray(recentEvaluations) || recentEvaluations.length < 2) {
+    return null;
+  }
+
+  const latestScore = recentEvaluations[0].overall_score != null
+    ? Number(recentEvaluations[0].overall_score)
+    : null;
+  const previousScore = recentEvaluations[1].overall_score != null
+    ? Number(recentEvaluations[1].overall_score)
+    : null;
+
+  if (latestScore === null || previousScore === null) {
+    return null;
+  }
+
+  const delta = Number((latestScore - previousScore).toFixed(2));
+  const direction = delta > 0.1 ? 'up' : (delta < -0.1 ? 'down' : 'stable');
+
+  return {
+    latestScore,
+    previousScore,
+    delta,
+    direction,
+    label: direction === 'up'
+      ? 'Mejora respecto a la evaluación anterior'
+      : direction === 'down'
+        ? 'Baja respecto a la evaluación anterior'
+        : 'Se mantiene estable respecto a la evaluación anterior',
+  };
+}
+
 async function getPlayerSummary(playerId, clubId) {
   const [rows] = await db.query(
     `SELECT
@@ -145,13 +177,44 @@ async function getEvaluationHistorySummary(playerId, seasonId = null) {
   };
 }
 
+async function getRecentEvaluations(playerId, seasonId = null, limit = 5) {
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 5;
+  const params = [playerId];
+  const seasonClause = buildSeasonFilterClause(seasonId, params);
+  const [rows] = await db.query(
+    `SELECT
+        e.id,
+        e.evaluation_date,
+        e.title,
+        e.notes,
+        e.overall_score,
+        t.name AS team_name,
+        s.name AS season_name,
+        u.name AS author_name
+      FROM evaluations e
+      INNER JOIN teams t ON t.id = e.team_id
+      INNER JOIN seasons s ON s.id = e.season_id
+      INNER JOIN users u ON u.id = e.author_id
+      WHERE e.player_id = ?${seasonClause}
+      ORDER BY e.evaluation_date DESC, e.created_at DESC
+      LIMIT ${safeLimit}`,
+    params,
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    overall_score: row.overall_score != null ? Number(row.overall_score) : null,
+  }));
+}
+
 async function getPlayerAnalytics(playerId, clubId, seasonId = null) {
-  const [summary, overallAverage, averageByArea, groupedMetricBreakdown, history] = await Promise.all([
+  const [summary, overallAverage, averageByArea, groupedMetricBreakdown, history, recentEvaluations] = await Promise.all([
     getPlayerSummary(playerId, clubId),
     getOverallAverage(playerId, seasonId),
     getAverageByArea(playerId, seasonId),
     getGroupedMetricBreakdown(playerId, seasonId),
     getEvaluationHistorySummary(playerId, seasonId),
+    getRecentEvaluations(playerId, seasonId),
   ]);
 
   return {
@@ -160,7 +223,11 @@ async function getPlayerAnalytics(playerId, clubId, seasonId = null) {
     averageByArea,
     groupedMetricBreakdown,
     radarChartData: buildRadarChartData(averageByArea),
-    history,
+    history: {
+      ...history,
+      recentEvaluations,
+      trend: buildTrendSummary(recentEvaluations),
+    },
   };
 }
 
@@ -229,6 +296,7 @@ module.exports = {
   getGroupedMetricBreakdown,
   buildRadarChartData,
   getEvaluationHistorySummary,
+  getRecentEvaluations,
   getPlayerAnalytics,
   getPlayersForComparison,
   getPlayersAnalyticsBatch,

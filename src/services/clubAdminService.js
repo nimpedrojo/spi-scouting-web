@@ -9,6 +9,7 @@ const {
   getClubModules,
   getClubModulePresets,
 } = require('../shared/services/clubModuleService');
+const { getPlatformProductSettings, resolveEffectiveProductMode } = require('../shared/services/productModeService');
 
 async function resolveAdminClub(req, explicitClubId = null) {
   const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';
@@ -58,6 +59,8 @@ async function getClubAdminData(club) {
     getSeasonsByClubId(club.id),
     getClubModules(club.id),
   ]);
+  const productMode = await resolveEffectiveProductMode(club);
+  const platformProductSettings = await getPlatformProductSettings();
 
   const moduleSummary = {
     total: modules.length,
@@ -76,6 +79,8 @@ async function getClubAdminData(club) {
     modules,
     moduleSummary,
     modulePresets: getClubModulePresets(),
+    productMode,
+    platformProductSettings,
   };
 }
 

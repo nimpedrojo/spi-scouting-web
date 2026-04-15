@@ -1,6 +1,12 @@
+<% const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking; %>
 <header class="app-topbar">
   <div>
-    <h1 class="h4 mb-1"><%= pageTitle || 'SoccerProcessIQ Suite' %></h1>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+      <h1 class="h4 mb-0"><%= pageTitle || 'SoccerProcessIQ Suite' %></h1>
+      <% if (productModeInfo && productModeInfo.effectiveMeta && !isPmvMode) { %>
+        <span class="badge text-bg-light border"><%= productModeInfo.effectiveMeta.label %></span>
+      <% } %>
+    </div>
     <% if (typeof pageDescription !== 'undefined' && pageDescription) { %>
       <p class="text-muted mb-0"><%= pageDescription %></p>
     <% } %>

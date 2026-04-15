@@ -13,7 +13,7 @@ function buildCoreEntries(user, dashboard) {
   const entries = [
     {
       title: 'Equipos',
-      description: 'Estructura deportiva, plantillas y acceso a equipos del club.',
+      description: 'Entrada principal para controlar plantillas, actividad y seguimiento por equipo.',
       href: '/teams',
       meta: dashboard && dashboard.metrics
         ? `${dashboard.metrics.activeTeams} equipos activos`
@@ -21,7 +21,7 @@ function buildCoreEntries(user, dashboard) {
     },
     {
       title: 'Jugadores',
-      description: 'Perfiles, altas y seguimiento de plantilla en el entorno común.',
+      description: 'Perfiles de jugador, histórico y acceso rápido al trabajo individual.',
       href: '/admin/players',
       meta: dashboard && dashboard.metrics
         ? `${dashboard.metrics.totalActivePlayers} jugadores activos`
@@ -48,6 +48,12 @@ function buildCoreEntries(user, dashboard) {
 
   if (isSuperAdminUser(user)) {
     entries.push({
+      title: 'Plataforma',
+      description: 'Gobierno global de producto, clubes y configuración general de la aplicación.',
+      href: '/admin/platform',
+      meta: 'Administración global',
+    });
+    entries.push({
       title: 'Clubes',
       description: 'Administración global de clubes dentro de la suite.',
       href: '/clubs',
@@ -58,18 +64,21 @@ function buildCoreEntries(user, dashboard) {
   return entries;
 }
 
-function buildModuleEntries(activeModuleKeys, dashboard, activeSeason) {
+function buildModuleEntries(activeModuleKeys, dashboard, activeSeason, productMode) {
   const pendingTeams = dashboard && Array.isArray(dashboard.pendingByTeam)
     ? dashboard.pendingByTeam.filter((team) => team.pendingPlayers > 0).length
     : 0;
   const entries = [];
+  const isPmvPlayerTracking = Boolean(productMode && productMode.isPmvPlayerTracking);
 
   if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS)) {
     entries.push({
       key: MODULE_KEYS.SCOUTING_PLAYERS,
       title: 'SPI Scouting Players',
       strapline: 'Seguimiento individual y evaluación de talento',
-      description: 'Informes, valoraciones y lectura operativa de jugadores dentro de la temporada activa.',
+      description: isPmvPlayerTracking
+        ? 'Flujo diario de seguimiento: crear informes, evaluar jugadores y revisar el histórico reciente.'
+        : 'Informes, valoraciones y lectura operativa de jugadores dentro de la temporada activa.',
       meta: [
         activeSeason ? `Temporada ${activeSeason.name}` : 'Sin temporada activa',
         dashboard && dashboard.metrics
@@ -78,14 +87,14 @@ function buildModuleEntries(activeModuleKeys, dashboard, activeSeason) {
         pendingTeams > 0 ? `${pendingTeams} equipos con pendientes` : 'Sin pendientes detectados',
       ].filter(Boolean),
       actions: [
-        { label: 'Nuevo informe', href: '/reports/new', variant: 'primary' },
-        { label: 'Ver informes', href: '/reports', variant: 'outline-secondary' },
-        { label: 'Valoraciones', href: '/assessments', variant: 'outline-secondary' },
+        { label: isPmvPlayerTracking ? 'Crear informe' : 'Nuevo informe', href: '/reports/new', variant: 'primary' },
+        { label: isPmvPlayerTracking ? 'Nueva evaluación' : 'Valoraciones', href: isPmvPlayerTracking ? '/evaluations/new' : '/assessments', variant: 'outline-secondary' },
+        { label: isPmvPlayerTracking ? 'Histórico de informes' : 'Ver informes', href: '/reports', variant: 'outline-secondary' },
       ],
     });
   }
 
-  if (activeModuleKeys.includes(MODULE_KEYS.PLANNING)) {
+  if (!isPmvPlayerTracking && activeModuleKeys.includes(MODULE_KEYS.PLANNING)) {
     entries.push({
       key: MODULE_KEYS.PLANNING,
       title: 'SPI Planning',
@@ -101,7 +110,7 @@ function buildModuleEntries(activeModuleKeys, dashboard, activeSeason) {
     });
   }
 
-  if (activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS)) {
+  if (!isPmvPlayerTracking && activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS)) {
     entries.push({
       key: MODULE_KEYS.SCOUTING_TEAMS,
       title: 'SPI Scouting Teams',
@@ -126,6 +135,7 @@ async function renderDashboard(req, res) {
   try {
     const club = req.context ? req.context.club : null;
     const activeModuleKeys = req.context ? req.context.activeModuleKeys || [] : [];
+    const productMode = req.context ? req.context.productMode || null : null;
     const currentUser = req.session ? req.session.user : null;
     if (!club) {
       return res.render('dashboard/index', {
@@ -133,8 +143,9 @@ async function renderDashboard(req, res) {
         dashboard: null,
         activeSeason: null,
         activeModuleKeys,
+        productMode,
         coreEntries: buildCoreEntries(currentUser, null),
-        moduleEntries: buildModuleEntries(activeModuleKeys, null, null),
+        moduleEntries: buildModuleEntries(activeModuleKeys, null, null, productMode),
       });
     }
 
@@ -146,8 +157,9 @@ async function renderDashboard(req, res) {
       dashboard,
       activeSeason,
       activeModuleKeys,
+      productMode,
       coreEntries: buildCoreEntries(currentUser, dashboard),
-      moduleEntries: buildModuleEntries(activeModuleKeys, dashboard, activeSeason),
+      moduleEntries: buildModuleEntries(activeModuleKeys, dashboard, activeSeason, productMode),
     });
   } catch (err) {
     // eslint-disable-next-line no-console

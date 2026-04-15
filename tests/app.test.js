@@ -305,6 +305,11 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       }
     }
 
+    await db.query(
+      'UPDATE platform_settings SET default_product_mode = ? WHERE id = 1',
+      ['suite'],
+    );
+
     testState = null;
   });
 
@@ -575,13 +580,44 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     const res = await agent.get('/account');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Rol de administración global');
+    expect(res.text).toContain('Administrador de plataforma');
     expect(res.text).toContain('No trabaja con un club ni un equipo activos por defecto');
     expect(res.text).not.toContain('Club por defecto');
     expect(res.text).not.toContain('Equipo por defecto');
   });
 
+  test('un superadmin puede gestionar el modo global de producto desde plataforma', async () => {
+    const superadmin = await createTestUser({
+      name: 'Platform Superadmin',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const resPage = await agent.get('/admin/platform');
+    expect(resPage.status).toBe(200);
+    expect(resPage.text).toContain('Administración de plataforma');
+    expect(resPage.text).toContain('Modo de producto global');
+    expect(resPage.text).toContain('SPI Player Tracking');
+
+    const resUpdate = await agent.post('/admin/platform/product-mode').send({
+      default_product_mode: 'pmv_player_tracking',
+    });
+    expect(resUpdate.status).toBe(302);
+    expect(resUpdate.headers.location).toBe('/admin/platform');
+
+    const [[settingsRow]] = await db.query(
+      'SELECT default_product_mode FROM platform_settings WHERE id = 1',
+    );
+    expect(settingsRow.default_product_mode).toBe('pmv_player_tracking');
+  });
+
   test('dashboard para usuario normal muestra solo opciones de usuario', async () => {
+    await db.query(
+      'UPDATE platform_settings SET default_product_mode = ? WHERE id = 1',
+      ['suite'],
+    );
     const { email } = await createTestUser({
       name: 'User Dashboard',
       role: 'user',
@@ -813,7 +849,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       team: 'Equipo Manual',
     });
     expect(resPost.status).toBe(302);
-    expect(resPost.headers.location).toBe('/reports/new');
+    expect(resPost.headers.location).toMatch(/^\/reports\/\d+$/);
 
     const [rows] = await db.query(
       'SELECT club, team FROM reports ORDER BY id DESC LIMIT 1',
@@ -847,7 +883,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       player_surname: 'Sin Club',
     });
     expect(resPost.status).toBe(302);
-    expect(resPost.headers.location).toBe('/reports/new');
+    expect(resPost.headers.location).toMatch(/^\/reports\/\d+$/);
 
     const [rows] = await db.query(
       'SELECT club, team FROM reports WHERE player_name = ? AND player_surname = ? ORDER BY id DESC LIMIT 1',
@@ -2887,6 +2923,31 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(rowsAfterPreset.every((row) => row.enabled === 1)).toBe(true);
   });
 
+  test('la configuración de club permite definir un override de modo de producto', async () => {
+    const context = await createTeamContext('Club Product Mode Override');
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const resConfig = await agent.get('/admin/club');
+    expect(resConfig.status).toBe(200);
+    expect(resConfig.text).toContain('Modo de producto del club');
+    expect(resConfig.text).toContain('Heredar modo global');
+
+    const resUpdate = await agent.post('/admin/club/product-mode').send({
+      club_id: String(context.club.id),
+      product_mode: 'pmv_player_tracking',
+    });
+    expect(resUpdate.status).toBe(302);
+    expect(resUpdate.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [[clubRow]] = await db.query(
+      'SELECT product_mode FROM clubs WHERE id = ?',
+      [context.club.id],
+    );
+    expect(clubRow.product_mode).toBe('pmv_player_tracking');
+  });
+
   test('session-based operational context still works for /teams', async () => {
     const context = await createTeamContext('Club Session Ops');
     await db.query(
@@ -2902,6 +2963,27 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Plantillas');
     expect(res.text).toContain('Session Team');
+  });
+
+  test('superadmin puede operar plantillas de un club seleccionado mediante club_id', async () => {
+    const context = await createTeamContext('Club Superadmin Teams');
+    const superadmin = await createTestUser({
+      name: 'Superadmin Teams',
+      role: 'superadmin',
+    });
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const resIndex = await agent.get(`/teams?club_id=${context.club.id}`);
+    expect(resIndex.status).toBe(200);
+    expect(resIndex.text).toContain(context.club.name);
+    expect(resIndex.text).toContain(`/teams/new?club_id=${context.club.id}`);
+
+    const resForm = await agent.get(`/teams/new?club_id=${context.club.id}`);
+    expect(resForm.status).toBe(200);
+    expect(resForm.text).toContain('Nueva plantilla');
+    expect(resForm.text).toContain(`name="club_id" value="${context.club.id}"`);
   });
 
   test('un admin puede configurar recomendaciones por año para su club', async () => {
@@ -3120,6 +3202,74 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('SPI Scouting Teams');
     expect(res.text).toContain(`/planning?team_id=${teamId}`);
     expect(res.text).toContain(`/scouting-teams?team_id=${teamId}`);
+  });
+
+  test('dashboard en modo pmv_player_tracking prioriza player tracking y oculta planning y scouting teams', async () => {
+    const context = await createTeamContext('Club Dashboard PMV');
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/dashboard');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('¿Qué quieres hacer ahora?');
+    expect(res.text).toContain('Entrar por equipo');
+    expect(res.text).toContain('Evaluar jugador');
+    expect(res.text).toContain('Ver historial de informes');
+    expect(res.text).toContain('Actividad reciente');
+    expect(res.text).not.toContain('Estado de la suite');
+    expect(res.text).not.toContain('Capacidades visibles');
+    expect(res.text).not.toContain('SPI Core');
+    expect(res.text).not.toContain('PMV vendible');
+    expect(res.text).not.toContain('SPI Planning');
+    expect(res.text).not.toContain('SPI Scouting Teams');
+  });
+
+  test('team detail en modo pmv_player_tracking oculta planning y scouting teams de la UI principal', async () => {
+    const context = await createTeamContext('Club Team PMV');
+    const teamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        teamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil PMV',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+    await setModuleEnabledForClub(context.club.id, 'scouting_teams', true);
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/teams/${teamId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('SPI Player Tracking');
+    expect(res.text).toContain('Accesos rápidos');
+    expect(res.text).toContain(`/evaluations/new?team_id=${teamId}`);
+    expect(res.text).toContain(`/reports/new?team_id=${teamId}`);
+    expect(res.text).not.toContain('SPI Planning');
+    expect(res.text).not.toContain('SPI Scouting Teams');
   });
 
   test('planning bloquea el acceso cuando el módulo no está activo', async () => {
@@ -3678,6 +3828,90 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(scoreRows[0].total).toBe(20);
   });
 
+  test('evaluation form muestra solo jugadores del equipo seleccionado', async () => {
+    const context = await createEvaluationContext('Club Eval Filter Team');
+    const otherTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        otherTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Filtro',
+      ],
+    );
+    const [otherPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      ['Pepe', 'Ajeno', context.club.name, context.club.id, otherTeamId, 'Cadete Filtro'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), otherTeamId, otherPlayerResult.insertId, '4', 'CENTRAL'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/evaluations/new?team_id=${context.teamId}`);
+    expect(res.status).toBe(200);
+
+    const playerSelectMatch = res.text.match(/<select id="player_id"[\s\S]*?>([\s\S]*?)<\/select>/);
+    expect(playerSelectMatch).toBeTruthy();
+    expect(playerSelectMatch[1]).toContain('Mario Sanz');
+    expect(playerSelectMatch[1]).not.toContain('Pepe Ajeno');
+  });
+
+  test('evaluation form muestra todos los jugadores si no hay equipo seleccionado', async () => {
+    const context = await createEvaluationContext('Club Eval Filter All');
+    const otherTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        otherTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Todos',
+      ],
+    );
+    const [otherPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      ['Pepe', 'Ajeno', context.club.name, context.club.id, otherTeamId, 'Cadete Todos'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), otherTeamId, otherPlayerResult.insertId, '5', 'MC'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get('/evaluations/new');
+    expect(res.status).toBe(200);
+
+    const playerSelectMatch = res.text.match(/<select id="player_id"[\s\S]*?>([\s\S]*?)<\/select>/);
+    expect(playerSelectMatch).toBeTruthy();
+    expect(playerSelectMatch[1]).toContain('Mario Sanz');
+    expect(playerSelectMatch[1]).toContain('Pepe Ajeno');
+  });
+
   test('usuario normal puede crear evaluaciones solo para su equipo activo', async () => {
     const context = await createEvaluationContext('Club User Eval');
     const otherTeamId = randomUUID();
@@ -3943,6 +4177,10 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
   test('player profile renders', async () => {
     const context = await createEvaluationContext('Club Perfil');
     await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['suite', context.club.id],
+    );
+    await db.query(
       `INSERT INTO reports (
         player_name, player_surname, club, team, overall_rating, created_by
       ) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -3961,6 +4199,28 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('Informacion personal');
     expect(res.text).toContain('Contexto futbolistico');
     expect(res.text).toContain('Informes');
+    expect(res.text).toContain(`/evaluations/new?team_id=${context.teamId}&player_id=${context.playerId}`);
+    expect(res.text).toContain(`/reports/new?team_id=${context.teamId}&player_id=${context.playerId}`);
+  });
+
+  test('reports new precontextualiza el jugador en flujo pmv', async () => {
+    const context = await createEvaluationContext('Club Report Flow');
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/reports/new?team_id=${context.teamId}&player_id=${context.playerId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('SPI Player Tracking');
+    expect(res.text).toContain('Estás creando un informe para <strong>Mario Sanz</strong>');
+    expect(res.text).toContain(`name="player_id" value="${context.playerId}"`);
   });
 
   test('player profile muestra la foto del jugador cuando existe', async () => {
@@ -4014,6 +4274,10 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
   test('player profile with evaluations renders analytics and chart', async () => {
     const context = await createEvaluationContext('Club Perfil Eval');
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['suite', context.club.id],
+    );
     const evaluationId = randomUUID();
     await db.query(
       `INSERT INTO evaluations (
@@ -4050,6 +4314,76 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('Tecnica');
   });
 
+  test('player profile en modo pmv prioriza resumen, evolución e histórico', async () => {
+    const context = await createEvaluationContext('Club Perfil PMV');
+    await db.query(
+      'UPDATE clubs SET product_mode = ? WHERE id = ?',
+      ['pmv_player_tracking', context.club.id],
+    );
+
+    const firstEvaluationId = randomUUID();
+    const secondEvaluationId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        firstEvaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-02',
+        'manual',
+        'Seguimiento febrero',
+        'Notas 1',
+        6.8,
+        secondEvaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-18',
+        'manual',
+        'Seguimiento marzo',
+        'Notas 2',
+        7.4,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(firstEvaluationId);
+    await seedEvaluationScoresForEvaluation(secondEvaluationId);
+    await db.query(
+      `INSERT INTO reports (
+        player_name, player_surname, club, team, overall_rating, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ['Mario', 'Sanz', context.club.name, 'Juvenil Eval', 7.2, context.admin.id, '2026-03-20 10:00:00'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/players/${context.playerId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Resumen del jugador');
+    expect(res.text).toContain('Cómo va');
+    expect(res.text).toContain('Evolución simple');
+    expect(res.text).toContain('Historial de evaluaciones');
+    expect(res.text).toContain('Historial de informes');
+    expect(res.text).toContain('Seguimiento marzo');
+    expect(res.text).toContain('Nueva evaluación');
+    expect(res.text).toContain('Nuevo informe');
+    expect(res.text).toContain('Volver al equipo');
+    expect(res.text).toContain('playerRadarChart');
+    expect(res.text).not.toContain('Informacion personal');
+    expect(res.text).not.toContain('Contexto futbolistico');
+  });
+
   test('player profile empty state without evaluations', async () => {
     const context = await createEvaluationContext('Club Perfil Empty');
     const agent = request.agent(app);
@@ -4082,6 +4416,63 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('En este bloque aparecerán las evaluaciones del jugador');
     expect(res.text).toContain('button type="button" class="btn btn-outline-secondary" disabled');
     expect(res.text).not.toContain('playerRadarChart');
+  });
+
+  test('evaluation detail ofrece vuelta a la ficha del jugador', async () => {
+    const context = await createEvaluationContext('Club Evaluation Detail Flow');
+    const evaluationId = randomUUID();
+    await db.query(
+      `INSERT INTO evaluations (
+        id, club_id, season_id, team_id, player_id, author_id, evaluation_date,
+        source, title, notes, overall_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        evaluationId,
+        context.club.id,
+        context.season.id,
+        context.teamId,
+        context.playerId,
+        context.admin.id,
+        '2026-03-06',
+        'manual',
+        'Detalle PMV',
+        'Notas',
+        7.4,
+      ],
+    );
+    await seedEvaluationScoresForEvaluation(evaluationId);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/evaluations/${evaluationId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(`/players/${context.playerId}`);
+    expect(res.text).toContain('Ver ficha del jugador');
+  });
+
+  test('report detail enlaza a la ficha del jugador cuando puede resolverla', async () => {
+    const context = await createEvaluationContext('Club Report Detail Flow');
+    const [insertResult] = await db.query(
+      `INSERT INTO reports (
+        player_name, player_surname, club, team, overall_rating, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ['Mario', 'Sanz', context.club.name, 'Juvenil Eval', 7.8, context.admin.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const res = await agent.get(`/reports/${insertResult.insertId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(`/players/${context.playerId}`);
+    expect(res.text).toContain('Ver ficha del jugador');
   });
 
   test('dashboard renders analytics layer', async () => {

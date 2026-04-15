@@ -230,6 +230,39 @@ Module behavior:
 
 The dashboard and team detail pages are module-aware and build action cards dynamically based on active modules.
 
+## 6.1 Product mode system
+
+The suite now supports a product exposure layer that is separate from club modules.
+
+Current product modes:
+
+- `suite`
+- `pmv_player_tracking`
+
+Intended meaning:
+
+- `suite`: full modular SoccerProcessIQ Suite experience
+- `pmv_player_tracking`: simplified experience focused on SPI Player Tracking without removing underlying functionality
+
+PMV intent:
+
+- present a sellable, simpler experience for player tracking
+- reinforce the operational flow `team -> player -> report/evaluation -> player profile`
+- reduce visible noise while keeping suite compatibility
+
+Resolution model:
+
+- there is a global platform default product mode
+- each club can optionally override that value
+- if a club has no override, the global default applies
+
+Important distinction:
+
+- modules control functional availability
+- product mode controls product exposure, navigation, and prioritization
+
+That means a route can still exist and a module can still be active, while the PMV mode hides that capability from the main UI.
+
 ## 7. Roles and access model
 
 Main roles:
@@ -243,6 +276,12 @@ Simplified behavior:
 - `superadmin`: global platform administration
 - `admin`: club-level administration
 - `user`: usually scoped to a default team
+
+Updated product interpretation:
+
+- `superadmin` is not just another privileged end user
+- `superadmin` acts as platform administrator
+- platform administration includes clubs, product mode defaults, club configuration access, and global navigation governance
 
 Important service:
 
@@ -347,6 +386,12 @@ Purpose:
 
 It is module-aware and context-aware.
 
+It is also now product-mode-aware:
+
+- in `suite` mode it behaves as the modular suite dashboard
+- in `pmv_player_tracking` it prioritizes recent activity, player tracking value, and simpler entry points
+- in `pmv_player_tracking` it should feel like a work dashboard, not just a navigation hub
+
 ### 10.2 Teams / Plantillas
 
 Routes:
@@ -375,6 +420,10 @@ Capabilities:
 
 This area is operationally central. Many other flows use `team_id` as a context anchor.
 
+Recent platform-oriented nuance:
+
+- superadmin can now work with team management through explicit club selection, instead of requiring a default operational club
+
 ### 10.3 Players
 
 Admin routes:
@@ -396,6 +445,17 @@ Important nuance:
 
 - player profile blends core player data with premium scouting/evaluation data when that module is active
 - if `scouting_players` is disabled, premium sections must degrade gracefully rather than crash
+- in `pmv_player_tracking`, the player profile is one of the primary value screens and should be treated as a flagship view
+- PMV flow expectation:
+  - open team
+  - enter player profile
+  - create report/evaluation with player context preserved when possible
+  - return clearly to player profile to review history and summary
+- PMV player profile priorities:
+  - clean header with immediate actions
+  - quick summary of status and latest activity
+  - visible evaluation/report history
+  - simple evolution view instead of an overloaded administrative layout
 
 ### 10.4 Reports
 
@@ -715,6 +775,21 @@ Examples:
 Sidebar, dashboard, and team workspaces expose only relevant module actions.
 
 UI actions should respect `activeModules`.
+
+### 17.10 Product mode is now a first-class concern
+
+When changing navigation, dashboard composition, or visible entry points, consider:
+
+- effective product mode
+- active modules
+- user role
+- club/team scope
+
+The correct order of reasoning is usually:
+
+1. can the user access it
+2. is the module enabled
+3. should it be prominently visible in this product mode
 
 ## 18. Suggested mental model for another AI
 

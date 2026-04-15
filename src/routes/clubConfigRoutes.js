@@ -11,6 +11,7 @@ const {
 } = require('../models/clubRecommendationModel');
 const { updateClubBranding } = require('../models/clubModel');
 const { updateClubModules } = require('../shared/services/clubModuleService');
+const { setClubProductMode } = require('../shared/services/productModeService');
 const {
   resolveAdminClub,
   getClubAdminData,
@@ -110,6 +111,8 @@ router.get('/', ensureAdmin, async (req, res) => {
       modules: data ? data.modules : [],
       moduleSummary: data ? data.moduleSummary : null,
       modulePresets: data ? data.modulePresets : [],
+      productMode: data ? data.productMode : null,
+      platformProductSettings: data ? data.platformProductSettings : null,
       requiresClubSelection: !club,
       isSuperAdmin,
     });
@@ -196,6 +199,34 @@ router.post('/modules', ensureAdmin, async (req, res) => {
     // eslint-disable-next-line no-console
     console.error('Error al actualizar módulos del club:', err);
     req.flash('error', 'Ha ocurrido un error al guardar la configuración de módulos.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
+});
+
+router.post('/product-mode', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club que quieres administrar.',
+    );
+    return res.redirect('/admin/club');
+  }
+
+  const selectedMode = req.body && req.body.product_mode
+    ? String(req.body.product_mode).trim()
+    : '';
+  const overrideMode = selectedMode === 'inherit' ? null : selectedMode;
+
+  try {
+    await setClubProductMode(club.id, overrideMode);
+    req.session.clubContext = null;
+    req.flash('success', 'Modo de producto del club actualizado correctamente.');
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al actualizar modo de producto del club:', err);
+    req.flash('error', 'Ha ocurrido un error al guardar el modo de producto del club.');
   }
 
   return res.redirect(buildClubConfigRedirect(club));

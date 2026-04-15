@@ -1,244 +1,604 @@
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <div class="row g-4 align-items-center">
-      <div class="col-lg-8">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-          <% if (player.photo_path) { %>
-            <img
-              src="<%= player.photo_path %>"
-              alt="Foto de <%= player.full_name %>"
-              class="player-avatar player-avatar--photo"
-            />
-          <% } else { %>
-            <div class="player-avatar" style="<%= player.avatar_color ? 'background:' + player.avatar_color : '' %>">
-              <%= player.initials %>
-            </div>
-          <% } %>
-          <div>
-            <h2 class="mb-1"><%= player.full_name %></h2>
-            <div class="d-flex gap-2 flex-wrap">
-              <span class="badge text-bg-light">#<%= player.dorsal || '-' %></span>
-              <span class="badge text-bg-light"><%= player.team_name || 'Sin equipo' %></span>
-              <span class="badge text-bg-light"><%= player.category_name || 'Sin categoria' %></span>
-              <span class="badge text-bg-light"><%= player.section_name || 'Sin seccion' %></span>
-              <span class="badge text-bg-primary"><%= player.primary_position || 'Sin posicion' %></span>
+<%
+  const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
+  const recentEvaluations = analytics && analytics.history && analytics.history.recentEvaluations
+    ? analytics.history.recentEvaluations
+    : [];
+  const trendSummary = trackingSummary && trackingSummary.trend ? trackingSummary.trend : null;
+  const latestEvaluationDate = trackingSummary && trackingSummary.lastEvaluationDate
+    ? new Date(trackingSummary.lastEvaluationDate)
+    : null;
+  const latestReportDate = trackingSummary && trackingSummary.lastReportDate
+    ? new Date(trackingSummary.lastReportDate)
+    : null;
+  const latestActivityDate = latestEvaluationDate && latestReportDate
+    ? (latestEvaluationDate > latestReportDate ? latestEvaluationDate : latestReportDate)
+    : (latestEvaluationDate || latestReportDate || null);
+  const hasEvaluationHistory = analytics && analytics.history && analytics.history.totalEvaluations;
+%>
+
+<% if (isPmvMode) { %>
+  <div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <% if (teamProfileHref) { %>
+      <a href="<%= teamProfileHref %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+        <span aria-hidden="true">←</span>
+        <span>Volver al equipo</span>
+      </a>
+    <% } %>
+  </div>
+
+  <section class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4 p-lg-5">
+      <div class="row g-4 align-items-center">
+        <div class="col-lg-7">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <% if (player.photo_path) { %>
+              <img
+                src="<%= player.photo_path %>"
+                alt="Foto de <%= player.full_name %>"
+                class="player-avatar player-avatar--photo"
+              />
+            <% } else { %>
+              <div class="player-avatar" style="<%= player.avatar_color ? 'background:' + player.avatar_color : '' %>">
+                <%= player.initials %>
+              </div>
+            <% } %>
+            <div>
+              <h1 class="h2 mb-2"><%= player.full_name %></h1>
+              <div class="text-muted mb-3">
+                <%= player.team_name || 'Sin equipo' %><% if (player.category_name) { %> · <%= player.category_name %><% } %><% if (player.primary_position) { %> · <%= player.primary_position %><% } %>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <span class="badge text-bg-light">Dorsal: <%= player.dorsal || '-' %></span>
+                <span class="badge text-bg-light">Edad: <%= player.age != null ? player.age : '-' %></span>
+                <span class="badge text-bg-light">Lateralidad: <%= player.laterality || '-' %></span>
+                <span class="badge text-bg-light">Temporada: <%= player.season_name || (activeSeason ? activeSeason.name : '-') %></span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="col-lg-4">
-        <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
-          <% if (scoutingPlayersEnabled) { %>
-            <a href="/players/<%= player.id %>/pdf/preview" class="btn btn-outline-secondary" target="_blank" rel="noopener">PDF</a>
-          <% } else { %>
-            <button type="button" class="btn btn-outline-secondary" disabled title="Disponible con Scouting Players">PDF</button>
-          <% } %>
-          <a href="/admin/players/<%= player.id %>/edit" class="btn btn-primary">Editar</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="row g-4 mb-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h3 class="h5 mb-3">Informacion personal</h3>
-        <div class="profile-info-grid">
-          <div><span class="text-muted">Fecha nacimiento</span><strong><%= player.birth_date ? new Date(player.birth_date).toISOString().slice(0, 10) : '-' %></strong></div>
-          <div><span class="text-muted">Edad</span><strong><%= player.age != null ? player.age : '-' %></strong></div>
-          <div><span class="text-muted">Nacionalidad</span><strong><%= player.nationality || '-' %></strong></div>
-          <div><span class="text-muted">Telefono</span><strong><%= player.phone || '-' %></strong></div>
-          <div><span class="text-muted">Email</span><strong><%= player.email || '-' %></strong></div>
-          <div><span class="text-muted">Lateralidad</span><strong><%= player.laterality || '-' %></strong></div>
+        <div class="col-lg-5">
+          <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+            <% if (scoutingPlayersEnabled) { %>
+              <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-primary">Nueva evaluación</a>
+              <a href="/reports/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-outline-primary">Nuevo informe</a>
+            <% } else { %>
+              <button type="button" class="btn btn-outline-secondary" disabled>Nueva evaluación</button>
+              <button type="button" class="btn btn-outline-secondary" disabled>Nuevo informe</button>
+            <% } %>
+          </div>
+
+          <div class="d-flex gap-3 justify-content-lg-end flex-wrap mt-3">
+            <% if (scoutingPlayersEnabled) { %>
+              <a href="/players/<%= player.id %>/pdf/preview" class="small text-decoration-none" target="_blank" rel="noopener">Ver PDF</a>
+            <% } %>
+            <a href="/players/<%= player.id %>/evaluations" class="small text-decoration-none">Historial completo</a>
+            <a href="/admin/players/<%= player.id %>/edit" class="small text-decoration-none">Editar ficha</a>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h3 class="h5 mb-3">Contexto futbolistico</h3>
-        <div class="profile-info-grid mb-4">
-          <div><span class="text-muted">Temporada</span><strong><%= player.season_name || (activeSeason ? activeSeason.name : '-') %></strong></div>
-          <div><span class="text-muted">Equipo</span><strong><%= player.team_name || '-' %></strong></div>
-          <div><span class="text-muted">Categoria</span><strong><%= player.category_name || '-' %></strong></div>
-          <div><span class="text-muted">Dorsal</span><strong><%= player.dorsal || '-' %></strong></div>
-          <div><span class="text-muted">Posicion principal</span><strong><%= player.primary_position || '-' %></strong></div>
-          <div><span class="text-muted">Posiciones</span><strong><%= player.positions || '-' %></strong></div>
+  </section>
+
+  <section class="mb-4">
+    <div class="row g-4">
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="small text-uppercase text-muted">Evaluaciones</div>
+            <div class="display-6 fw-semibold"><%= trackingSummary.totalEvaluations %></div>
+          </div>
         </div>
-        <div class="report-pitch-panel report-pitch-panel--compact">
-          <div class="report-pitch report-pitch--compact">
-            <div class="report-pitch__field">
-              <svg class="report-pitch__svg" viewBox="0 0 320 440" aria-hidden="true">
-                <defs>
-                  <linearGradient id="playerPitchGrass" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#1d7a3f" />
-                    <stop offset="100%" stop-color="#166236" />
-                  </linearGradient>
-                </defs>
-                <rect x="0" y="0" width="320" height="440" rx="16" fill="url(#playerPitchGrass)" />
-                <rect x="14" y="14" width="292" height="412" rx="10" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="3" />
-                <line x1="14" y1="220" x2="306" y2="220" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <circle cx="160" cy="220" r="34" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <circle cx="160" cy="220" r="2.5" fill="rgba(255,255,255,0.92)" />
-                <rect x="72" y="14" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <rect x="112" y="14" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <circle cx="160" cy="88" r="2.5" fill="rgba(255,255,255,0.92)" />
-                <path d="M128 88a32 32 0 0 0 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <rect x="72" y="352" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <rect x="112" y="398" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-                <circle cx="160" cy="352" r="2.5" fill="rgba(255,255,255,0.92)" />
-                <path d="M128 352a32 32 0 0 1 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
-              </svg>
-              <% if (player.positions_list && player.positions_list.length) { %>
-                <% player.positions_list.forEach((position, index) => { %>
-                  <div class="report-pitch__marker <%= index === 0 ? 'selected' : 'secondary' %> pos-<%= position.toLowerCase() %>">
-                    <%= position %>
-                  </div>
-                <% }) %>
-              <% } else { %>
-                <div class="report-pitch__marker selected pos-mc">MC</div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="small text-uppercase text-muted">Informes</div>
+            <div class="display-6 fw-semibold"><%= trackingSummary.totalReports %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="small text-uppercase text-muted">Última actividad</div>
+            <div class="fw-semibold mt-2"><%= latestActivityDate ? latestActivityDate.toISOString().slice(0, 10) : 'Sin datos' %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="small text-uppercase text-muted">Media global</div>
+            <div class="display-6 fw-semibold"><%= trackingSummary.overallAverage !== null ? trackingSummary.overallAverage.toFixed(2) : '-' %></div>
+            <% if (trendSummary) { %>
+              <div class="small mt-2 <%= trendSummary.direction === 'up' ? 'text-success' : trendSummary.direction === 'down' ? 'text-danger' : 'text-muted' %>">
+                <%= trendSummary.delta > 0 ? '+' : '' %><%= trendSummary.delta.toFixed(2) %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-4">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h2 class="h5 mb-3">Resumen del jugador</h2>
+            <div class="profile-info-grid">
+              <div><span class="text-muted">Equipo</span><strong><%= player.team_name || '-' %></strong></div>
+              <div><span class="text-muted">Categoria</span><strong><%= player.category_name || '-' %></strong></div>
+              <div><span class="text-muted">Posición</span><strong><%= player.primary_position || '-' %></strong></div>
+              <div><span class="text-muted">Edad</span><strong><%= player.age != null ? player.age : '-' %></strong></div>
+              <div><span class="text-muted">Lateralidad</span><strong><%= player.laterality || '-' %></strong></div>
+              <div><span class="text-muted">Temporada</span><strong><%= player.season_name || (activeSeason ? activeSeason.name : '-') %></strong></div>
+            </div>
+
+            <% if (!scoutingPlayersEnabled) { %>
+              <div class="border rounded-3 bg-light p-3 mt-4">
+                <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+                <p class="text-muted mb-0">Activa el módulo para ver evolución, informes y evaluaciones del jugador.</p>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <h2 class="h5 mb-0">Cómo va</h2>
+              <% if (trendSummary) { %>
+                <span class="badge <%= trendSummary.direction === 'up' ? 'text-bg-success' : trendSummary.direction === 'down' ? 'text-bg-danger' : 'text-bg-secondary' %>">
+                  <%= trendSummary.label %>
+                </span>
               <% } %>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <h3 class="h5 mb-3">Estadisticas</h3>
-    <div class="profile-info-grid">
-      <div><span class="text-muted">Convocados</span><strong><%= player.stats && player.stats.callups != null ? player.stats.callups : '-' %></strong></div>
-      <div><span class="text-muted">Titular</span><strong><%= player.stats && player.stats.starts != null ? player.stats.starts : '-' %></strong></div>
-      <div><span class="text-muted">Suplente</span><strong><%= player.stats && player.stats.substituteAppearances != null ? player.stats.substituteAppearances : '-' %></strong></div>
-      <div><span class="text-muted">S/Jugar</span><strong><%= player.stats && player.stats.unusedCallups != null ? player.stats.unusedCallups : '-' %></strong></div>
-      <div><span class="text-muted">No convocado</span><strong><%= player.stats && player.stats.notCalledUp != null ? player.stats.notCalledUp : '-' %></strong></div>
-      <div><span class="text-muted">Minutos</span><strong><%= player.stats && player.stats.minutes != null ? player.stats.minutes : '-' %></strong></div>
-      <div><span class="text-muted">Goles</span><strong><%= player.stats && player.stats.goals != null ? player.stats.goals : '-' %></strong></div>
-    </div>
-  </div>
-</div>
-
-<div class="row g-4">
-  <div class="col-xl-5">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h3 class="h5 mb-0">Informes</h3>
-          <% if (scoutingPlayersEnabled) { %>
-            <a href="/reports/new" class="btn btn-sm btn-primary">Nuevo informe</a>
-          <% } else { %>
-            <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nuevo informe</button>
-          <% } %>
-        </div>
-        <% if (!scoutingPlayersEnabled) { %>
-          <div class="border rounded-3 bg-light p-3">
-            <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
-            <p class="text-muted mb-0">Aquí verás los informes individuales del jugador y el acceso para crear nuevos seguimientos.</p>
-          </div>
-        <% } else if (!reports.length) { %>
-          <p class="text-muted mb-0">No hay informes asociados a este jugador.</p>
-        <% } else { %>
-          <div class="list-group list-group-flush">
-            <% reports.forEach((report) => { %>
-              <a href="/reports/<%= report.id %>" class="list-group-item list-group-item-action px-0">
-                <div class="d-flex justify-content-between gap-3">
-                  <div>
-                    <div class="fw-semibold">Informe #<%= report.id %></div>
-                    <div class="small text-muted"><%= report.team || '-' %> · <%= report.created_by_name || 'Sin autor' %></div>
-                  </div>
-                  <div class="text-end">
-                    <div><%= report.created_at ? report.created_at.toISOString().slice(0, 10) : '' %></div>
-                    <div class="small text-muted"><%= report.overall_rating != null ? Number(report.overall_rating).toFixed(2) : '-' %></div>
+            <% if (!scoutingPlayersEnabled) { %>
+              <p class="text-muted mb-0">La evolución aparecerá aquí cuando el módulo de seguimiento esté activo.</p>
+            <% } else if (!hasEvaluationHistory) { %>
+              <p class="text-muted mb-3">Todavía no hay evaluaciones registradas para este jugador.</p>
+              <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-primary">Crear primera evaluación</a>
+            <% } else { %>
+              <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100">
+                    <div class="small text-uppercase text-muted">Última evaluación</div>
+                    <div class="fw-semibold mt-1"><%= trackingSummary.lastEvaluationDate ? new Date(trackingSummary.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></div>
                   </div>
                 </div>
-              </a>
-            <% }) %>
-          </div>
-        <% } %>
-      </div>
-    </div>
-  </div>
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100">
+                    <div class="small text-uppercase text-muted">Último informe</div>
+                    <div class="fw-semibold mt-1"><%= trackingSummary.lastReportDate ? new Date(trackingSummary.lastReportDate).toISOString().slice(0, 10) : '-' %></div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="border rounded-3 p-3 h-100">
+                    <div class="small text-uppercase text-muted">Tendencia</div>
+                    <div class="fw-semibold mt-1">
+                      <%= trendSummary ? `${trendSummary.delta > 0 ? '+' : ''}${trendSummary.delta.toFixed(2)}` : 'Sin dato suficiente' %>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-  <div class="col-xl-7">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <h3 class="h5 mb-0">Evaluaciones</h3>
-          <div class="d-flex gap-2 flex-wrap">
-            <% if (scoutingPlayersEnabled) { %>
-              <a href="/evaluations/new" class="btn btn-sm btn-primary">Nueva evaluación</a>
-            <% } else { %>
-              <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nueva evaluación</button>
-            <% } %>
-            <% if (scoutingPlayersEnabled && canManageMultipleTeams) { %>
-              <a href="/evaluations" class="btn btn-sm btn-outline-secondary">Importar Excel</a>
-            <% } else if (!scoutingPlayersEnabled && canManageMultipleTeams) { %>
-              <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Importar Excel</button>
+              <% if (analytics.averageByArea && analytics.averageByArea.length) { %>
+                <div class="row g-3">
+                  <% analytics.averageByArea.forEach((area) => { %>
+                    <div class="col-md-6">
+                      <div class="border rounded-3 p-3 h-100">
+                        <div class="d-flex justify-content-between mb-2">
+                          <span><%= area.label %></span>
+                          <strong><%= area.average.toFixed(2) %></strong>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="<%= area.label %>" aria-valuenow="<%= area.average * 10 %>" aria-valuemin="0" aria-valuemax="100">
+                          <div class="progress-bar" style="width: <%= Math.max(0, Math.min(100, area.average * 10)) %>%"></div>
+                        </div>
+                      </div>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
             <% } %>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
 
-        <% if (!scoutingPlayersEnabled) { %>
-          <div class="border rounded-3 bg-light p-3">
-            <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
-            <p class="text-muted mb-0">En este bloque aparecerán las evaluaciones del jugador, medias por área, radar de evolución e importación de datos.</p>
-          </div>
-        <% } else if (!analytics.history.totalEvaluations) { %>
-          <p class="text-muted mb-0">No hay evaluaciones registradas para este jugador.</p>
-        <% } else { %>
-          <div class="row g-4 mb-4">
-            <div class="col-lg-6">
-              <div class="analytics-stat-grid">
-                <div><span class="text-muted">Media global</span><strong><%= analytics.overallAverage.toFixed(2) %></strong></div>
-                <div><span class="text-muted">Total evaluaciones</span><strong><%= analytics.history.totalEvaluations %></strong></div>
-                <div><span class="text-muted">Ultima evaluacion</span><strong><%= analytics.history.lastEvaluationDate ? new Date(analytics.history.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></strong></div>
-              </div>
-              <div class="mt-3">
-                <% analytics.averageByArea.forEach((area) => { %>
-                  <div class="d-flex justify-content-between border-bottom py-2">
-                    <span><%= area.label %></span>
-                    <strong><%= area.average.toFixed(2) %></strong>
-                  </div>
-                <% }) %>
-              </div>
+  <% if (scoutingPlayersEnabled && hasEvaluationHistory) { %>
+    <section class="mb-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Evolución simple</h2>
+              <p class="text-muted mb-0">Vista rápida del rendimiento medio del jugador por áreas.</p>
             </div>
+            <% if (trendSummary) { %>
+              <div class="small text-muted">
+                Últimas medias: <strong><%= trendSummary.latestScore.toFixed(2) %></strong> frente a <strong><%= trendSummary.previousScore.toFixed(2) %></strong>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="row g-4 align-items-stretch">
             <div class="col-lg-6">
-              <div class="chart-panel">
+              <div class="chart-panel h-100">
                 <canvas id="playerRadarChart" height="280"></canvas>
               </div>
             </div>
-          </div>
-
-          <div class="row g-3">
-            <% analytics.areaEntries.forEach((area) => { %>
-              <div class="col-md-6">
-                <div class="card border-0 bg-light h-100">
-                  <div class="card-body">
-                    <h4 class="h6 mb-3"><%= area.label %></h4>
-                    <% area.metrics.forEach((metric) => { %>
-                      <div class="d-flex justify-content-between border-bottom py-2">
-                        <span><%= metric.label %></span>
-                        <strong><%= metric.average.toFixed(2) %></strong>
+            <div class="col-lg-6">
+              <div class="row g-3">
+                <% analytics.areaEntries.forEach((area) => { %>
+                  <div class="col-md-6">
+                    <div class="card border-0 bg-light h-100">
+                      <div class="card-body">
+                        <h3 class="h6 mb-3"><%= area.label %></h3>
+                        <% area.metrics.slice(0, 4).forEach((metric) => { %>
+                          <div class="d-flex justify-content-between border-bottom py-2">
+                            <span><%= metric.label %></span>
+                            <strong><%= metric.average.toFixed(2) %></strong>
+                          </div>
+                        <% }) %>
                       </div>
-                    <% }) %>
+                    </div>
                   </div>
-                </div>
+                <% }) %>
               </div>
-            <% }) %>
+            </div>
           </div>
-        <% } %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="mb-4">
+    <div class="row g-4">
+      <div class="col-xl-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <h2 class="h5 mb-0">Historial de evaluaciones</h2>
+              <% if (scoutingPlayersEnabled) { %>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-sm btn-primary">Nueva evaluación</a>
+                  <a href="/players/<%= player.id %>/evaluations" class="btn btn-sm btn-outline-secondary">Ver historial</a>
+                </div>
+              <% } %>
+            </div>
+
+            <% if (!scoutingPlayersEnabled) { %>
+              <div class="border rounded-3 bg-light p-3">
+                <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+                <p class="text-muted mb-0">En este bloque aparecerá el histórico de evaluaciones del jugador.</p>
+              </div>
+            <% } else if (!recentEvaluations.length) { %>
+              <p class="text-muted mb-0">No hay evaluaciones registradas para este jugador.</p>
+            <% } else { %>
+              <div class="list-group list-group-flush">
+                <% recentEvaluations.forEach((evaluation) => { %>
+                  <a href="/evaluations/<%= evaluation.id %>" class="list-group-item list-group-item-action px-0">
+                    <div class="d-flex justify-content-between gap-3">
+                      <div>
+                        <div class="fw-semibold"><%= evaluation.title || 'Evaluación manual' %></div>
+                        <div class="small text-muted"><%= evaluation.team_name || '-' %> · <%= evaluation.author_name || 'Sin autor' %></div>
+                      </div>
+                      <div class="text-end">
+                        <div><%= evaluation.evaluation_date ? new Date(evaluation.evaluation_date).toISOString().slice(0, 10) : '' %></div>
+                        <div class="small text-muted"><%= evaluation.overall_score !== null ? Number(evaluation.overall_score).toFixed(2) : '-' %></div>
+                      </div>
+                    </div>
+                  </a>
+                <% }) %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <h2 class="h5 mb-0">Historial de informes</h2>
+              <% if (scoutingPlayersEnabled) { %>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a href="/reports/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-sm btn-primary">Nuevo informe</a>
+                  <a href="/reports" class="btn btn-sm btn-outline-secondary">Ver listado</a>
+                </div>
+              <% } %>
+            </div>
+
+            <% if (!scoutingPlayersEnabled) { %>
+              <div class="border rounded-3 bg-light p-3">
+                <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+                <p class="text-muted mb-0">Aquí verás los informes individuales del jugador y el acceso para crear nuevos seguimientos.</p>
+              </div>
+            <% } else if (!reports.length) { %>
+              <p class="text-muted mb-0">No hay informes asociados a este jugador.</p>
+            <% } else { %>
+              <div class="list-group list-group-flush">
+                <% reports.forEach((report) => { %>
+                  <a href="/reports/<%= report.id %>" class="list-group-item list-group-item-action px-0">
+                    <div class="d-flex justify-content-between gap-3">
+                      <div>
+                        <div class="fw-semibold">Informe #<%= report.id %></div>
+                        <div class="small text-muted"><%= report.team || '-' %> · <%= report.created_by_name || 'Sin autor' %></div>
+                      </div>
+                      <div class="text-end">
+                        <div><%= report.created_at ? report.created_at.toISOString().slice(0, 10) : '' %></div>
+                        <div class="small text-muted"><%= report.overall_rating != null ? Number(report.overall_rating).toFixed(2) : '-' %></div>
+                      </div>
+                    </div>
+                  </a>
+                <% }) %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+<% } else { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-4 align-items-center">
+        <div class="col-lg-8">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <% if (player.photo_path) { %>
+              <img
+                src="<%= player.photo_path %>"
+                alt="Foto de <%= player.full_name %>"
+                class="player-avatar player-avatar--photo"
+              />
+            <% } else { %>
+              <div class="player-avatar" style="<%= player.avatar_color ? 'background:' + player.avatar_color : '' %>">
+                <%= player.initials %>
+              </div>
+            <% } %>
+            <div>
+              <h2 class="mb-1"><%= player.full_name %></h2>
+              <div class="d-flex gap-2 flex-wrap">
+                <span class="badge text-bg-light">#<%= player.dorsal || '-' %></span>
+                <span class="badge text-bg-light"><%= player.team_name || 'Sin equipo' %></span>
+                <span class="badge text-bg-light"><%= player.category_name || 'Sin categoria' %></span>
+                <span class="badge text-bg-light"><%= player.section_name || 'Sin seccion' %></span>
+                <span class="badge text-bg-primary"><%= player.primary_position || 'Sin posicion' %></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+            <% if (scoutingPlayersEnabled) { %>
+              <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-outline-secondary">Evaluar</a>
+              <a href="/reports/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-outline-secondary">Nuevo informe</a>
+            <% } %>
+            <% if (scoutingPlayersEnabled) { %>
+              <a href="/players/<%= player.id %>/pdf/preview" class="btn btn-outline-secondary" target="_blank" rel="noopener">PDF</a>
+            <% } else { %>
+              <button type="button" class="btn btn-outline-secondary" disabled title="Disponible con Scouting Players">PDF</button>
+            <% } %>
+            <a href="/admin/players/<%= player.id %>/edit" class="btn btn-primary">Editar</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<% if (analytics.history.totalEvaluations) { %>
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Informacion personal</h3>
+          <div class="profile-info-grid">
+            <div><span class="text-muted">Fecha nacimiento</span><strong><%= player.birth_date ? new Date(player.birth_date).toISOString().slice(0, 10) : '-' %></strong></div>
+            <div><span class="text-muted">Edad</span><strong><%= player.age != null ? player.age : '-' %></strong></div>
+            <div><span class="text-muted">Nacionalidad</span><strong><%= player.nationality || '-' %></strong></div>
+            <div><span class="text-muted">Telefono</span><strong><%= player.phone || '-' %></strong></div>
+            <div><span class="text-muted">Email</span><strong><%= player.email || '-' %></strong></div>
+            <div><span class="text-muted">Lateralidad</span><strong><%= player.laterality || '-' %></strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="h5 mb-3">Contexto futbolistico</h3>
+          <div class="profile-info-grid mb-4">
+            <div><span class="text-muted">Temporada</span><strong><%= player.season_name || (activeSeason ? activeSeason.name : '-') %></strong></div>
+            <div><span class="text-muted">Equipo</span><strong><%= player.team_name || '-' %></strong></div>
+            <div><span class="text-muted">Categoria</span><strong><%= player.category_name || '-' %></strong></div>
+            <div><span class="text-muted">Dorsal</span><strong><%= player.dorsal || '-' %></strong></div>
+            <div><span class="text-muted">Posicion principal</span><strong><%= player.primary_position || '-' %></strong></div>
+            <div><span class="text-muted">Posiciones</span><strong><%= player.positions || '-' %></strong></div>
+          </div>
+          <div class="report-pitch-panel report-pitch-panel--compact">
+            <div class="report-pitch report-pitch--compact">
+              <div class="report-pitch__field">
+                <svg class="report-pitch__svg" viewBox="0 0 320 440" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="playerPitchGrass" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#1d7a3f" />
+                      <stop offset="100%" stop-color="#166236" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="0" y="0" width="320" height="440" rx="16" fill="url(#playerPitchGrass)" />
+                  <rect x="14" y="14" width="292" height="412" rx="10" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="3" />
+                  <line x1="14" y1="220" x2="306" y2="220" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <circle cx="160" cy="220" r="34" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <circle cx="160" cy="220" r="2.5" fill="rgba(255,255,255,0.92)" />
+                  <rect x="72" y="14" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <rect x="112" y="14" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <circle cx="160" cy="88" r="2.5" fill="rgba(255,255,255,0.92)" />
+                  <path d="M128 88a32 32 0 0 0 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <rect x="72" y="352" width="176" height="74" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <rect x="112" y="398" width="96" height="28" rx="2" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                  <circle cx="160" cy="352" r="2.5" fill="rgba(255,255,255,0.92)" />
+                  <path d="M128 352a32 32 0 0 1 64 0" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" />
+                </svg>
+                <% if (player.positions_list && player.positions_list.length) { %>
+                  <% player.positions_list.forEach((position, index) => { %>
+                    <div class="report-pitch__marker <%= index === 0 ? 'selected' : 'secondary' %> pos-<%= position.toLowerCase() %>">
+                      <%= position %>
+                    </div>
+                  <% }) %>
+                <% } else { %>
+                  <div class="report-pitch__marker selected pos-mc">MC</div>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h3 class="h5 mb-3">Estadisticas</h3>
+      <div class="profile-info-grid">
+        <div><span class="text-muted">Convocados</span><strong><%= player.stats && player.stats.callups != null ? player.stats.callups : '-' %></strong></div>
+        <div><span class="text-muted">Titular</span><strong><%= player.stats && player.stats.starts != null ? player.stats.starts : '-' %></strong></div>
+        <div><span class="text-muted">Suplente</span><strong><%= player.stats && player.stats.substituteAppearances != null ? player.stats.substituteAppearances : '-' %></strong></div>
+        <div><span class="text-muted">S/Jugar</span><strong><%= player.stats && player.stats.unusedCallups != null ? player.stats.unusedCallups : '-' %></strong></div>
+        <div><span class="text-muted">No convocado</span><strong><%= player.stats && player.stats.notCalledUp != null ? player.stats.notCalledUp : '-' %></strong></div>
+        <div><span class="text-muted">Minutos</span><strong><%= player.stats && player.stats.minutes != null ? player.stats.minutes : '-' %></strong></div>
+        <div><span class="text-muted">Goles</span><strong><%= player.stats && player.stats.goals != null ? player.stats.goals : '-' %></strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="h5 mb-0">Informes</h3>
+            <% if (scoutingPlayersEnabled) { %>
+              <div class="d-flex gap-2 flex-wrap">
+                <a href="/reports/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-sm btn-primary">Nuevo informe</a>
+                <a href="/reports" class="btn btn-sm btn-outline-secondary">Ver historial</a>
+              </div>
+            <% } else { %>
+              <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nuevo informe</button>
+            <% } %>
+          </div>
+          <% if (!scoutingPlayersEnabled) { %>
+            <div class="border rounded-3 bg-light p-3">
+              <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+              <p class="text-muted mb-0">Aquí verás los informes individuales del jugador y el acceso para crear nuevos seguimientos.</p>
+            </div>
+          <% } else if (!reports.length) { %>
+            <p class="text-muted mb-0">No hay informes asociados a este jugador.</p>
+          <% } else { %>
+            <div class="list-group list-group-flush">
+              <% reports.forEach((report) => { %>
+                <a href="/reports/<%= report.id %>" class="list-group-item list-group-item-action px-0">
+                  <div class="d-flex justify-content-between gap-3">
+                    <div>
+                      <div class="fw-semibold">Informe #<%= report.id %></div>
+                      <div class="small text-muted"><%= report.team || '-' %> · <%= report.created_by_name || 'Sin autor' %></div>
+                    </div>
+                    <div class="text-end">
+                      <div><%= report.created_at ? report.created_at.toISOString().slice(0, 10) : '' %></div>
+                      <div class="small text-muted"><%= report.overall_rating != null ? Number(report.overall_rating).toFixed(2) : '-' %></div>
+                    </div>
+                  </div>
+                </a>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-7">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h3 class="h5 mb-0">Evaluaciones</h3>
+            <div class="d-flex gap-2 flex-wrap">
+              <% if (scoutingPlayersEnabled) { %>
+                <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-sm btn-primary">Nueva evaluación</a>
+              <% } else { %>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nueva evaluación</button>
+              <% } %>
+              <% if (scoutingPlayersEnabled && canManageMultipleTeams) { %>
+                <a href="/players/<%= player.id %>/evaluations" class="btn btn-sm btn-outline-secondary">Ver historial</a>
+                <a href="/evaluations" class="btn btn-sm btn-outline-secondary">Importar Excel</a>
+              <% } else if (!scoutingPlayersEnabled && canManageMultipleTeams) { %>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Importar Excel</button>
+              <% } else if (scoutingPlayersEnabled) { %>
+                <a href="/players/<%= player.id %>/evaluations" class="btn btn-sm btn-outline-secondary">Ver historial</a>
+              <% } %>
+            </div>
+          </div>
+
+          <% if (!scoutingPlayersEnabled) { %>
+            <div class="border rounded-3 bg-light p-3">
+              <p class="fw-semibold mb-2">Disponible con el módulo Scouting Players</p>
+              <p class="text-muted mb-0">En este bloque aparecerán las evaluaciones del jugador, medias por área, radar de evolución e importación de datos.</p>
+            </div>
+          <% } else if (!analytics.history.totalEvaluations) { %>
+            <p class="text-muted mb-0">No hay evaluaciones registradas para este jugador.</p>
+          <% } else { %>
+            <div class="row g-4 mb-4">
+              <div class="col-lg-6">
+                <div class="analytics-stat-grid">
+                  <div><span class="text-muted">Media global</span><strong><%= analytics.overallAverage.toFixed(2) %></strong></div>
+                  <div><span class="text-muted">Total evaluaciones</span><strong><%= analytics.history.totalEvaluations %></strong></div>
+                  <div><span class="text-muted">Ultima evaluacion</span><strong><%= analytics.history.lastEvaluationDate ? new Date(analytics.history.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></strong></div>
+                </div>
+                <div class="mt-3">
+                  <% analytics.averageByArea.forEach((area) => { %>
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                      <span><%= area.label %></span>
+                      <strong><%= area.average.toFixed(2) %></strong>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="chart-panel">
+                  <canvas id="playerRadarChart" height="280"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <% analytics.areaEntries.forEach((area) => { %>
+                <div class="col-md-6">
+                  <div class="card border-0 bg-light h-100">
+                    <div class="card-body">
+                      <h4 class="h6 mb-3"><%= area.label %></h4>
+                      <% area.metrics.forEach((metric) => { %>
+                        <div class="d-flex justify-content-between border-bottom py-2">
+                          <span><%= metric.label %></span>
+                          <strong><%= metric.average.toFixed(2) %></strong>
+                        </div>
+                      <% }) %>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (hasEvaluationHistory) { %>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
     (function () {

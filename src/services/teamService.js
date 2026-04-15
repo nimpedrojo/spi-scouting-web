@@ -1,4 +1,4 @@
-const { getClubByName } = require('../models/clubModel');
+const { getClubByName, getClubById } = require('../models/clubModel');
 const {
   ensureActiveSeasonForClub,
   getSeasonsByClubId,
@@ -234,10 +234,22 @@ function buildTeamCardSummary(players) {
   };
 }
 
-async function requireClubForUser(user) {
-  if (!user || user.role === 'superadmin' || !user.default_club) {
+async function requireClubForUser(user, options = {}) {
+  if (!user) {
     return null;
   }
+
+  if (user.role === 'superadmin') {
+    if (!options.clubId) {
+      return null;
+    }
+    return getClubById(options.clubId);
+  }
+
+  if (!user.default_club) {
+    return null;
+  }
+
   return getClubByName(user.default_club);
 }
 
@@ -424,8 +436,8 @@ async function getTeamWorkspaceData(teamId, options = {}) {
   };
 }
 
-async function getTeamFormData(user) {
-  const club = await requireClubForUser(user);
+async function getTeamFormData(user, options = {}) {
+  const club = await requireClubForUser(user, options);
   if (!club) {
     return null;
   }
@@ -447,7 +459,7 @@ async function getTeamFormData(user) {
 }
 
 async function createTeamForUser(user, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -463,7 +475,7 @@ async function createTeamForUser(user, payload) {
 }
 
 async function updateTeamForUser(user, teamId, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -476,8 +488,8 @@ async function updateTeamForUser(user, teamId, payload) {
   return updateTeam(teamId, payload);
 }
 
-async function deleteTeamForUser(user, teamId) {
-  const club = await requireClubForUser(user);
+async function deleteTeamForUser(user, teamId, options = {}) {
+  const club = await requireClubForUser(user, options);
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -492,7 +504,7 @@ async function deleteTeamForUser(user, teamId) {
 }
 
 async function validateTeamPayload(user, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     return 'Debes tener un club activo para gestionar plantillas.';
   }

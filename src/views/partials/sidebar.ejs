@@ -2,21 +2,34 @@
   const scoutingPlayersEnabled = activeModules.includes('scouting_players');
   const planningEnabled = activeModules.includes('planning');
   const scoutingTeamsEnabled = activeModules.includes('scouting_teams');
+  const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
+  const productTitle = productModeInfo && productModeInfo.effectiveMeta
+    ? productModeInfo.effectiveMeta.productLabel
+    : 'SoccerProcessIQ Suite';
+  const productSubtitle = productModeInfo && productModeInfo.effectiveMeta
+    ? productModeInfo.effectiveMeta.productSubtitle
+    : 'Modular Football Club Platform';
+  const sidebarTitle = isPmvMode ? 'Seguimiento de jugadores' : productTitle;
+  const sidebarSubtitle = isPmvMode ? 'Trabajo diario del club' : productSubtitle;
+  const modeLabel = isPmvMode ? 'Trabajo diario' : 'Suite completa';
   const managementItems = [
     { label: 'Panel general', href: '/dashboard' },
     { label: 'Plantillas', href: '/teams' },
     { label: 'Jugadores', href: '/admin/players' },
-    { label: 'Previsión 2026/27', href: scoutingPlayersEnabled ? '/season-forecast' : '#', moduleKey: 'scouting_players' },
-    { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players' },
     { label: 'Valoraciones', href: scoutingPlayersEnabled ? '/assessments' : '#', moduleKey: 'scouting_players' },
-    { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning' },
-    { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams' },
+    ...(!isPmvMode ? [
+      { label: 'Previsión 2026/27', href: scoutingPlayersEnabled ? '/season-forecast' : '#', moduleKey: 'scouting_players' },
+      { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players' },
+      { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning' },
+      { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams' },
+    ] : []),
   ];
   const adminItems = [
     { label: 'Plantillas eval.', href: '/evaluation-templates' },
     { label: 'Admin. equipos', href: '/admin/club', adminOnly: true },
     { label: 'Usuarios', href: '/admin/users', adminOnly: true },
     { label: 'Clubes', href: '/clubs', superAdminOnly: true },
+    { label: 'Plataforma', href: '/admin/platform', superAdminOnly: true },
   ];
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   const isSuperAdminUser = currentUser && currentUser.role === 'superadmin';
@@ -51,13 +64,15 @@
     <a href="/dashboard" class="text-decoration-none text-reset d-flex align-items-center gap-2">
       <img src="/img/soccerreport-logo.png" alt="SoccerProcessIQ Suite" class="app-sidebar__logo" />
       <div>
-        <div class="app-sidebar__title">SoccerProcessIQ</div>
-        <div class="app-sidebar__subtitle">Modular Football Club Platform</div>
+        <div class="app-sidebar__title"><%= sidebarTitle %></div>
+        <div class="app-sidebar__subtitle"><%= sidebarSubtitle %></div>
       </div>
     </a>
   </div>
 
   <div class="app-sidebar__meta">
+    <div class="small text-uppercase text-muted">Modo</div>
+    <div class="fw-semibold"><%= modeLabel %></div>
     <div class="small text-uppercase text-muted">Club</div>
     <div class="fw-semibold"><%= activeClubName || 'Sin club asignado' %></div>
     <div class="small text-uppercase text-muted mt-3">Temporada</div>

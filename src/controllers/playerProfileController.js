@@ -78,6 +78,26 @@ function buildEmptyAnalytics() {
   };
 }
 
+function buildTrackingSummary(analytics, reports) {
+  const totalEvaluations = analytics && analytics.history ? Number(analytics.history.totalEvaluations || 0) : 0;
+  const totalReports = Array.isArray(reports) ? reports.length : 0;
+  const overallAverage = analytics && totalEvaluations && analytics.overallAverage != null
+    ? Number(analytics.overallAverage)
+    : null;
+  const lastEvaluationDate = analytics && analytics.history ? analytics.history.lastEvaluationDate : null;
+  const lastReportDate = totalReports && reports[0] ? reports[0].created_at : null;
+  const trend = analytics && analytics.history ? analytics.history.trend || null : null;
+
+  return {
+    totalEvaluations,
+    totalReports,
+    overallAverage,
+    lastEvaluationDate,
+    lastReportDate,
+    trend,
+  };
+}
+
 async function renderProfile(req, res) {
   try {
     const club = req.context ? req.context.club : null;
@@ -124,6 +144,7 @@ async function renderProfile(req, res) {
     };
 
     const positionsList = normalizePositions(playerSummary.positions);
+    const teamProfileHref = player.current_team_id ? `/teams/${player.current_team_id}` : null;
 
     return res.render('players/show', {
       pageTitle: `${player.first_name} ${player.last_name}`,
@@ -142,10 +163,12 @@ async function renderProfile(req, res) {
         areaEntries: Object.values(analytics.groupedMetricBreakdown || {}),
         radarChartJson: JSON.stringify(analytics.radarChartData),
       },
+      trackingSummary: buildTrackingSummary(analytics, reports),
       scoutingPlayersEnabled,
       areaLabelHelper: getAreaLabel,
       activeSeason,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
+      teamProfileHref,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

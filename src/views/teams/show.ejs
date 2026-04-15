@@ -2,10 +2,11 @@
   const workspaceSummary = team.workspaceSummary || {};
   const recentActivity = team.recentActivity || { evaluations: [], reports: [], scoutingTeams: [] };
   const hasRecentActivity = recentActivity.evaluations.length || recentActivity.reports.length || recentActivity.scoutingTeams.length;
+  const isPmvMode = productMode && productMode.isPmvPlayerTracking;
 %>
 
 <div class="mb-4">
-  <a href="/teams" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+  <a href="/teams<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
     <span aria-hidden="true">←</span>
     <span>Volver a Plantillas</span>
   </a>
@@ -18,8 +19,8 @@
         <div class="team-detail-hero__crest">SPI</div>
         <div>
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <span class="dashboard-kicker">SoccerProcessIQ Suite</span>
-            <span class="badge text-bg-light border">Team Workspace</span>
+            <span class="dashboard-kicker"><%= isPmvMode ? 'SPI Player Tracking' : 'SoccerProcessIQ Suite' %></span>
+            <span class="badge text-bg-light border"><%= isPmvMode ? 'Equipo activo' : 'Team Workspace' %></span>
           </div>
           <h1 class="team-detail-hero__title mb-2"><%= team.name %></h1>
           <div class="d-flex flex-wrap gap-2 mb-2">
@@ -29,18 +30,22 @@
             <span class="badge text-bg-light"><%= team.season_name %></span>
           </div>
           <p class="text-muted mb-0">
-            Centro operativo del equipo dentro de la suite modular. Desde aquí puedes entrar al core del equipo y a los módulos activos del club.
+            <% if (isPmvMode) { %>
+              Espacio operativo del equipo para seguir jugadores, registrar actividad y entrar rápido a informes y evaluaciones.
+            <% } else { %>
+              Centro operativo del equipo dentro de la suite modular. Desde aquí puedes entrar al core del equipo y a los módulos activos del club.
+            <% } %>
           </p>
         </div>
       </div>
 
       <div class="d-flex gap-2 flex-wrap">
         <% if (activeModules.includes('scouting_players')) { %>
-          <a href="/evaluations?team_id=<%= team.id %>" class="btn btn-outline-secondary">Evaluaciones</a>
-          <a href="/reports?team=<%= encodeURIComponent(team.name) %>" class="btn btn-outline-secondary">Informes</a>
+          <a href="/evaluations/new?team_id=<%= team.id %>" class="btn btn-primary"><%= isPmvMode ? 'Nueva evaluación' : 'Evaluaciones' %></a>
+          <a href="/reports/new?team_id=<%= team.id %>" class="btn btn-outline-secondary"><%= isPmvMode ? 'Nuevo informe' : 'Informes' %></a>
         <% } %>
         <% if (canManageMultipleTeams) { %>
-          <a href="/teams/<%= team.id %>/edit" class="btn btn-outline-secondary">Editar equipo</a>
+          <a href="/teams/<%= team.id %>/edit<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-outline-secondary">Editar equipo</a>
         <% } %>
         <% if (canManageMultipleTeams && team.source === 'processiq' && team.external_id) { %>
           <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" class="d-inline">
@@ -57,7 +62,7 @@
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
       <h2 class="h4 mb-1">Resumen rápido</h2>
-      <p class="text-muted mb-0">Indicadores disponibles del equipo con datos reales ya modelados en la plataforma.</p>
+      <p class="text-muted mb-0"><%= isPmvMode ? 'Indicadores esenciales para el seguimiento estructurado del equipo.' : 'Indicadores disponibles del equipo con datos reales ya modelados en la plataforma.' %></p>
     </div>
   </div>
 
@@ -91,7 +96,7 @@
         </div>
       </div>
     <% } %>
-    <% if (activeModules.includes('scouting_teams')) { %>
+    <% if (!isPmvMode && activeModules.includes('scouting_teams')) { %>
       <div class="col-12 col-md-6 col-xl-3">
         <div class="card dashboard-entry-card h-100 shadow-sm">
           <div class="card-body">
@@ -101,7 +106,7 @@
           </div>
         </div>
       </div>
-    <% } else if (activeModules.includes('planning')) { %>
+    <% } else if (!isPmvMode && activeModules.includes('planning')) { %>
       <div class="col-12 col-md-6 col-xl-3">
         <div class="card dashboard-entry-card h-100 shadow-sm">
           <div class="card-body">
@@ -118,8 +123,8 @@
 <section class="mb-4">
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
-      <h2 class="h4 mb-1">SPI Core</h2>
-      <p class="text-muted mb-0">Accesos base del equipo dentro del núcleo operativo de la suite.</p>
+      <h2 class="h4 mb-1"><%= isPmvMode ? 'Accesos rápidos' : 'SPI Core' %></h2>
+      <p class="text-muted mb-0"><%= isPmvMode ? 'Flujos principales para trabajar el seguimiento de jugadores desde este equipo.' : 'Accesos base del equipo dentro del núcleo operativo de la suite.' %></p>
     </div>
   </div>
 
@@ -141,6 +146,7 @@
   </div>
 </section>
 
+<% if (!isPmvMode) { %>
 <section class="mb-4">
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
@@ -185,6 +191,7 @@
     </div>
   <% } %>
 </section>
+<% } %>
 
 <% if (hasRecentActivity) { %>
   <section class="mb-4">
@@ -262,10 +269,10 @@
   <% if (activeModules.includes('scouting_players')) { %>
     <a href="/evaluations?team_id=<%= team.id %>" class="team-detail-tab">Evaluaciones</a>
   <% } %>
-  <% if (activeModules.includes('planning')) { %>
+  <% if (!isPmvMode && activeModules.includes('planning')) { %>
     <a href="/planning?team_id=<%= team.id %>" class="team-detail-tab">Planning</a>
   <% } %>
-  <% if (activeModules.includes('scouting_teams')) { %>
+  <% if (!isPmvMode && activeModules.includes('scouting_teams')) { %>
     <a href="/scouting-teams?team_id=<%= team.id %>" class="team-detail-tab">Scouting rival</a>
   <% } %>
 </div>
@@ -336,6 +343,9 @@
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
           <div>
             <h2 class="h4 mb-0">Plantilla del equipo</h2>
+            <% if (isPmvMode) { %>
+              <p class="text-muted mb-0 mt-1">Desde aquí puedes entrar al jugador, registrar actividad y volver rápido a su ficha.</p>
+            <% } %>
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <span class="badge text-bg-light"><%= team.players.length %> jugadores</span>
@@ -347,7 +357,10 @@
         </div>
 
         <% if (!team.players.length) { %>
-          <p class="mb-0 text-muted">No hay jugadores asignados a esta plantilla.</p>
+          <div class="border rounded-3 bg-light p-3">
+            <p class="mb-2 text-muted">No hay jugadores asignados a esta plantilla.</p>
+            <a href="/admin/players/new" class="btn btn-sm btn-primary">Añadir primer jugador</a>
+          </div>
         <% } else if (viewMode === 'cards') { %>
           <div class="row g-3">
             <% team.players.forEach((player, index) => { %>
@@ -370,6 +383,10 @@
                     </div>
                     <div class="d-flex gap-2 mt-3">
                       <a href="/players/<%= player.id %>" class="btn btn-sm btn-outline-secondary">Perfil</a>
+                      <% if (activeModules.includes('scouting_players')) { %>
+                        <a href="/evaluations/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Evaluar</a>
+                        <a href="/reports/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Informe</a>
+                      <% } %>
                       <a href="/admin/players/<%= player.id %>/edit" class="btn btn-sm btn-primary">Editar</a>
                     </div>
                   </div>
@@ -397,7 +414,7 @@
                       <span class="team-detail-table__rank"><%= player.dorsal || index + 1 %></span>
                     </td>
                     <td>
-                      <div class="fw-semibold"><%= player.full_name %></div>
+                      <div class="fw-semibold"><a href="/players/<%= player.id %>" class="text-decoration-none"><%= player.full_name %></a></div>
                       <div class="small text-muted"><%= player.laterality || '-' %></div>
                     </td>
                     <td><%= player.birth_year || '-' %></td>
@@ -406,6 +423,10 @@
                     <td class="text-end">
                       <div class="d-flex justify-content-end gap-2">
                         <a href="/players/<%= player.id %>" class="btn btn-sm btn-outline-secondary">Perfil</a>
+                        <% if (activeModules.includes('scouting_players')) { %>
+                          <a href="/evaluations/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Evaluar</a>
+                          <a href="/reports/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Informe</a>
+                        <% } %>
                         <a href="/admin/players/<%= player.id %>/edit" class="btn btn-sm btn-primary">Editar</a>
                       </div>
                     </td>

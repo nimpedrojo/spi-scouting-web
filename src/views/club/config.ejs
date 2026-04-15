@@ -35,6 +35,78 @@
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
+        Modo de producto del club
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Controla si este club hereda la experiencia global de plataforma o si debe mostrarse con una exposición específica de producto.
+        </p>
+
+        <form method="POST" action="/admin/club/product-mode">
+          <input type="hidden" name="club_id" value="<%= selectedClubId || '' %>" />
+
+          <div class="vstack gap-3 mb-4">
+            <label class="border rounded p-3 d-block">
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  name="product_mode"
+                  value="inherit"
+                  id="product_mode_inherit"
+                  <%= !clubRecord.product_mode ? 'checked' : '' %>
+                />
+                <span class="form-check-label fw-semibold">Heredar modo global</span>
+              </div>
+              <div class="small text-muted mt-2">
+                Usa el modo por defecto de la plataforma:
+                <strong><%= platformProductSettings && platformProductSettings.defaultModeMeta ? platformProductSettings.defaultModeMeta.label : 'Suite completa' %></strong>.
+              </div>
+            </label>
+
+            <% if (productMode && productMode.availableModes) { %>
+              <% productMode.availableModes.forEach((modeEntry) => { %>
+                <label class="border rounded p-3 d-block">
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="product_mode"
+                      value="<%= modeEntry.key %>"
+                      id="product_mode_<%= modeEntry.key %>"
+                      <%= clubRecord.product_mode === modeEntry.key ? 'checked' : '' %>
+                    />
+                    <span class="form-check-label fw-semibold"><%= modeEntry.label %></span>
+                  </div>
+                  <div class="small text-muted mt-2"><%= modeEntry.description %></div>
+                </label>
+              <% }) %>
+            <% } %>
+          </div>
+
+          <% if (productMode) { %>
+            <div class="border rounded bg-light p-3 mb-3">
+              <div class="small text-uppercase text-muted">Modo efectivo actual</div>
+              <div class="fw-semibold"><%= productMode.effectiveMeta.label %></div>
+              <div class="small text-muted">
+                <% if (productMode.clubOverride) { %>
+                  Override del club activo sobre la configuración global.
+                <% } else { %>
+                  Heredado de la plataforma.
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary">Guardar modo de producto</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
         Módulos activos del club
       </div>
       <div class="card-body">
@@ -244,15 +316,15 @@
                   <strong><%= t.name %></strong>
                   <small class="text-muted d-block"><%= t.season_name || '-' %> · <%= t.category_name || '-' %> · <%= t.section_name || '-' %></small>
                 </span>
-                <a href="/teams/<%= t.id %>" class="btn btn-sm btn-outline-primary">Abrir ficha</a>
+                <a href="/teams/<%= t.id %>?club_id=<%= selectedClubId %>" class="btn btn-sm btn-outline-primary">Abrir ficha</a>
               </li>
             <% }); %>
           </ul>
         <% } %>
 
         <div class="d-flex gap-2">
-          <a href="/teams" class="btn btn-sm btn-outline-secondary">Abrir Plantillas</a>
-          <a href="/teams/new" class="btn btn-sm btn-primary">Crear equipo v2</a>
+          <a href="/teams?club_id=<%= selectedClubId %>" class="btn btn-sm btn-outline-secondary">Abrir Plantillas</a>
+          <a href="/teams/new?club_id=<%= selectedClubId %>" class="btn btn-sm btn-primary">Crear equipo v2</a>
         </div>
       </div>
     </div>

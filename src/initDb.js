@@ -17,6 +17,10 @@ const {
   seedDefaultClubModules,
 } = require('./core/models/clubModuleModel');
 const {
+  createPlatformSettingsTable,
+  ensurePlatformSettingsRow,
+} = require('./core/models/platformSettingsModel');
+const {
   createScoutingTeamOpponentsTable,
 } = require('./modules/scoutingTeams/models/scoutingTeamOpponentModel');
 const {
@@ -51,6 +55,7 @@ async function initializeDatabase() {
   await createTeamsTable();
   await createUsersTable();
   await createClubModulesTable();
+  await createPlatformSettingsTable();
   await createSeasonPlansTable();
   await createPlanMicrocyclesTable();
   await createPlanSessionsTable();
@@ -69,6 +74,7 @@ async function initializeDatabase() {
   await seedDefaultCategories();
   await syncUserClubAssignments();
   await seedDefaultClubModules();
+  await ensurePlatformSettingsRow();
   await ensureAdminUser();
 }
 

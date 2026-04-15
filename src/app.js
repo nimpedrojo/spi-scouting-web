@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const expressLayouts = require('express-ejs-layouts');
 const { initDatabaseOnce } = require('./initDb');
 const { attachSessionContext } = require('./middleware/sessionContext');
+const { attachProductModeContext } = require('./middleware/productModeContext');
 const { attachModuleContext } = require('./middleware/moduleMiddleware');
 const logger = require('./services/logger');
 const { requestLogger } = require('./middleware/requestLogger');
@@ -43,6 +44,7 @@ app.use(
 );
 app.use(flash());
 app.use(attachSessionContext);
+app.use(attachProductModeContext);
 app.use(attachModuleContext);
 
 app.use((req, res, next) => {
@@ -62,6 +64,15 @@ app.use((req, res, next) => {
     : null;
   res.locals.pageTitle = 'SoccerProcessIQ Suite';
   res.locals.activeModules = req.context ? req.context.activeModuleKeys || [] : [];
+  res.locals.productModeInfo = req.context ? req.context.productMode || null : null;
+  res.locals.productMode = req.context && req.context.productMode
+    ? req.context.productMode.effectiveMode
+    : 'suite';
+  res.locals.isPmvPlayerTracking = Boolean(
+    req.context
+    && req.context.productMode
+    && req.context.productMode.isPmvPlayerTracking,
+  );
 
   next();
 });

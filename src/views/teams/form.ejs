@@ -1,6 +1,9 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <form method="POST" action="<%= formAction %>" class="row g-3">
+      <% if (selectedClubId) { %>
+        <input type="hidden" name="club_id" value="<%= selectedClubId %>" />
+      <% } %>
       <div class="col-12">
         <label for="name" class="form-label">Nombre del equipo</label>
         <input
@@ -52,7 +55,7 @@
 
       <div class="col-12 d-flex gap-2">
         <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
-        <a href="/teams" class="btn btn-outline-secondary">Cancelar</a>
+        <a href="/teams<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
   </div>
