@@ -1,4 +1,7 @@
 const multer = require('multer');
+const fs = require('fs').promises;
+const os = require('os');
+const path = require('path');
 const {
   createEvaluationWithScores,
   listEvaluations,
@@ -11,7 +14,10 @@ const { buildComparison } = require('../services/comparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  }),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
@@ -223,7 +229,15 @@ async function importMany(req, res) {
   }
 
   try {
-    const summary = await importEvaluationsFromWorkbook(req.session.user, req.file.buffer);
+    const filePath = req.file.path || (req.file && req.file.location);
+    const buffer = await fs.readFile(filePath);
+    const summary = await importEvaluationsFromWorkbook(req.session.user, buffer);
+    // remove temp file
+    try {
+      if (filePath && filePath.startsWith(os.tmpdir())) await fs.unlink(filePath);
+    } catch (e) {
+      // ignore unlink errors
+    }
     if (summary.errors.length) {
       req.flash('error', `Importacion completada con incidencias. Creadas: ${summary.created}. Omitidas: ${summary.skipped}.`);
     } else {
