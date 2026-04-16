@@ -14,49 +14,99 @@
 %>
 
 <% if (isPmvMode) { %>
-  <section class="mb-5">
-    <div class="card shadow-sm border-0">
+  <section class="pmv-dashboard-hero mb-5">
+    <div class="card pmv-surface-card pmv-surface-card--hero shadow-sm border-0">
       <div class="card-body p-4 p-lg-5">
-        <div class="mb-4 text-center text-lg-start">
-          <h1 class="h2 mb-2">¿Qué quieres hacer ahora?</h1>
-          <p class="text-muted mb-0">Elige una acción y sigue trabajando.</p>
-        </div>
-
-        <div class="row g-4">
-          <div class="col-12 col-lg-4">
-            <a href="/teams" class="text-decoration-none text-reset">
-              <div class="card h-100 shadow-sm border-0 bg-light">
-                <div class="card-body p-4">
-                  <h2 class="h4 mb-2">Entrar por equipo</h2>
-                  <p class="text-muted mb-4">Abre una plantilla y entra rápido al jugador con el que vas a trabajar.</p>
-                  <div class="btn btn-primary btn-lg w-100">Ver equipos</div>
-                </div>
+        <div class="row g-4 align-items-start">
+          <div class="col-12 col-xl-8">
+            <div class="mb-4 text-center text-lg-start">
+              <div class="d-inline-flex align-items-center gap-2 flex-wrap mb-3">
+                <span class="dashboard-kicker">SPI Player Tracking</span>
+                <span class="badge rounded-pill text-bg-light border">Trabajo diario</span>
               </div>
-            </a>
+              <h1 class="h2 mb-2">¿Qué quieres hacer ahora?</h1>
+              <p class="text-muted mb-0">Elige una acción principal y entra al flujo de trabajo del club.</p>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12 col-lg-4">
+                <a href="/teams" class="text-decoration-none text-reset">
+                  <div class="card pmv-action-card h-100 border-0">
+                    <div class="card-body p-4">
+                      <div class="pmv-action-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 20 20"><path d="M10 2 3 6v8l7 4 7-4V6zm0 2.2 4.8 2.74L10 9.68 5.2 6.94zM5 8.7l4 2.28v4.7l-4-2.28zm6 7v-4.7l4-2.28v4.7z"/></svg>
+                      </div>
+                      <div class="pmv-action-card__eyebrow">Ruta principal</div>
+                      <h2 class="h4 mb-2">Entrar por equipo</h2>
+                      <p class="text-muted mb-4">Abre una plantilla y entra al jugador con menos pasos.</p>
+                      <div class="btn btn-primary btn-lg w-100">Ver equipos</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+
+              <div class="col-12 col-lg-4">
+                <a href="/evaluations/new" class="text-decoration-none text-reset">
+                  <div class="card pmv-action-card h-100 border-0">
+                    <div class="card-body p-4">
+                      <div class="pmv-action-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 20 20"><path d="M4 3h12v2H4zm0 4h12v2H4zm0 4h8v2H4zm0 4h8v2H4zm10.6-1.4 2.8 2.8-1.4 1.4-2.8-2.8V14h1.4z"/></svg>
+                      </div>
+                      <div class="pmv-action-card__eyebrow">Acción directa</div>
+                      <h2 class="h4 mb-2">Evaluar jugador</h2>
+                      <p class="text-muted mb-4">Registra una nueva evaluación y sigue desde la ficha.</p>
+                      <div class="btn btn-primary btn-lg w-100">Nueva evaluación</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+
+              <div class="col-12 col-lg-4">
+                <a href="/reports" class="text-decoration-none text-reset">
+                  <div class="card pmv-action-card h-100 border-0">
+                    <div class="card-body p-4">
+                      <div class="pmv-action-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 20 20"><path d="M4 3h12v14H4zm2 2v2h8V5zm0 4v2h8V9zm0 4v2h5v-2z"/></svg>
+                      </div>
+                      <div class="pmv-action-card__eyebrow">Seguimiento</div>
+                      <h2 class="h4 mb-2">Ver historial de informes</h2>
+                      <p class="text-muted mb-4">Revisa lo último registrado y vuelve a cualquier jugador.</p>
+                      <div class="btn btn-primary btn-lg w-100">Abrir historial</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </div>
           </div>
 
-          <div class="col-12 col-lg-4">
-            <a href="/evaluations/new" class="text-decoration-none text-reset">
-              <div class="card h-100 shadow-sm border-0 bg-light">
-                <div class="card-body p-4">
-                  <h2 class="h4 mb-2">Evaluar jugador</h2>
-                  <p class="text-muted mb-4">Registra una nueva evaluación y continúa después desde la ficha del jugador.</p>
-                  <div class="btn btn-primary btn-lg w-100">Nueva evaluación</div>
+          <div class="col-12 col-xl-4">
+            <div class="pmv-hero-aside h-100">
+              <div class="pmv-hero-aside__title">Contexto de trabajo</div>
+              <div class="pmv-hero-aside__grid">
+                <div class="pmv-hero-aside__item">
+                  <span>Club</span>
+                  <strong><%= activeClubName || 'Sin club asignado' %></strong>
+                </div>
+                <div class="pmv-hero-aside__item">
+                  <span>Equipo por defecto</span>
+                  <strong><%= defaultTeamName || 'Sin equipo asignado' %></strong>
+                </div>
+                <div class="pmv-hero-aside__item">
+                  <span>Temporada</span>
+                  <strong><%= activeSeason ? activeSeason.name : 'Sin temporada activa' %></strong>
+                </div>
+                <div class="pmv-hero-aside__item">
+                  <span>Club activo</span>
+                  <strong><%= dashboard && dashboard.metrics ? dashboard.metrics.activeTeams : 0 %> equipos</strong>
                 </div>
               </div>
-            </a>
-          </div>
-
-          <div class="col-12 col-lg-4">
-            <a href="/reports" class="text-decoration-none text-reset">
-              <div class="card h-100 shadow-sm border-0 bg-light">
-                <div class="card-body p-4">
-                  <h2 class="h4 mb-2">Ver historial de informes</h2>
-                  <p class="text-muted mb-4">Consulta los últimos informes y vuelve a cualquier jugador en un clic.</p>
-                  <div class="btn btn-primary btn-lg w-100">Abrir historial</div>
+              <% if (dashboard && dashboard.metrics) { %>
+                <div class="pmv-inline-insights">
+                  <span class="badge rounded-pill text-bg-light border"><%= dashboard.metrics.totalActivePlayers %> jugadores activos</span>
+                  <span class="badge rounded-pill text-bg-light border"><%= dashboard.metrics.reportsInActiveSeason %> informes en temporada</span>
                 </div>
-              </div>
-            </a>
+              <% } %>
+            </div>
           </div>
         </div>
       </div>
@@ -71,13 +121,13 @@
 
     <div class="row g-4">
       <div class="col-12 col-xl-4">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-list-card shadow-sm h-100">
           <div class="card-body">
             <h3 class="h5 mb-3">Últimas evaluaciones</h3>
             <% if (recentActivity.evaluations.length) { %>
-              <ul class="list-unstyled mb-0">
+              <ul class="list-unstyled mb-0 pmv-activity-list">
                 <% recentActivity.evaluations.forEach((item) => { %>
-                  <li class="py-2 border-bottom">
+                  <li>
                     <div class="fw-semibold"><a href="/players/<%= item.playerId %>" class="text-decoration-none"><%= item.playerName %></a></div>
                     <div class="small text-muted"><%= item.teamName || '-' %> · <%= item.date ? new Date(item.date).toISOString().slice(0, 10) : '-' %></div>
                     <div class="small mt-1"><a href="/evaluations/<%= item.id %>" class="text-decoration-none">Abrir evaluación</a></div>
@@ -92,13 +142,13 @@
       </div>
 
       <div class="col-12 col-xl-4">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-list-card shadow-sm h-100">
           <div class="card-body">
             <h3 class="h5 mb-3">Últimos informes</h3>
             <% if (recentActivity.reports.length) { %>
-              <ul class="list-unstyled mb-0">
+              <ul class="list-unstyled mb-0 pmv-activity-list">
                 <% recentActivity.reports.forEach((item) => { %>
-                  <li class="py-2 border-bottom">
+                  <li>
                     <div class="fw-semibold"><a href="/reports/<%= item.id %>" class="text-decoration-none"><%= item.playerName %></a></div>
                     <div class="small text-muted"><%= item.teamName || '-' %> · <%= item.date ? new Date(item.date).toISOString().slice(0, 10) : '-' %></div>
                   </li>
@@ -112,13 +162,13 @@
       </div>
 
       <div class="col-12 col-xl-4">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-list-card shadow-sm h-100">
           <div class="card-body">
             <h3 class="h5 mb-3">Actividad por equipo</h3>
             <% if (recentActivity.teams.length) { %>
-              <ul class="list-unstyled mb-0">
+              <ul class="list-unstyled mb-0 pmv-activity-list">
                 <% recentActivity.teams.forEach((item) => { %>
-                  <li class="py-2 border-bottom">
+                  <li>
                     <div class="fw-semibold"><a href="/teams/<%= item.teamId %>" class="text-decoration-none"><%= item.teamName %></a></div>
                     <div class="small text-muted"><%= item.evaluationsCount %> evaluaciones · <%= item.reportsCount %> informes</div>
                     <div class="small mt-1"><a href="/teams/<%= item.teamId %>" class="text-decoration-none">Abrir equipo</a></div>
@@ -135,20 +185,36 @@
   </section>
 
   <section class="mb-4">
-    <div class="card shadow-sm border-0">
-      <div class="card-body py-3">
-        <div class="row g-3">
-          <div class="col-12 col-md-4">
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card pmv-insight-card shadow-sm h-100 border-0">
+          <div class="card-body">
             <div class="small text-uppercase text-muted">Club</div>
             <div class="fw-semibold"><%= activeClubName || 'Sin club asignado' %></div>
           </div>
-          <div class="col-12 col-md-4">
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card pmv-insight-card shadow-sm h-100 border-0">
+          <div class="card-body">
             <div class="small text-uppercase text-muted">Equipo por defecto</div>
             <div class="fw-semibold"><%= defaultTeamName || 'Sin equipo asignado' %></div>
           </div>
-          <div class="col-12 col-md-4">
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card pmv-insight-card shadow-sm h-100 border-0">
+          <div class="card-body">
             <div class="small text-uppercase text-muted">Temporada</div>
             <div class="fw-semibold"><%= activeSeason ? activeSeason.name : 'Sin temporada activa' %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card pmv-insight-card shadow-sm h-100 border-0">
+          <div class="card-body">
+            <div class="small text-uppercase text-muted">Estado</div>
+            <div class="fw-semibold"><%= dashboard && dashboard.metrics ? dashboard.metrics.activeTeams : 0 %> equipos · <%= dashboard && dashboard.metrics ? dashboard.metrics.totalActivePlayers : 0 %> jugadores</div>
           </div>
         </div>
       </div>

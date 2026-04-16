@@ -52,7 +52,7 @@
   </a>
 </div>
 
-<section class="team-workspace-hero card shadow-sm border-0 mb-4">
+<section class="team-workspace-hero card pmv-surface-card shadow-sm border-0 mb-4">
   <div class="card-body p-4 p-lg-5">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
       <div class="d-flex align-items-start gap-3">
@@ -227,7 +227,7 @@
 
   <div class="row g-4">
     <div class="col-12 col-md-6 col-xl-3">
-      <div class="card dashboard-entry-card h-100 shadow-sm">
+      <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
         <div class="card-body">
           <div class="dashboard-entry-eyebrow">Plantilla</div>
           <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.playerCount || 0 %></div>
@@ -237,7 +237,7 @@
     </div>
     <% if (activeModules.includes('scouting_players')) { %>
       <div class="col-12 col-md-6 col-xl-3">
-        <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
           <div class="card-body">
             <div class="dashboard-entry-eyebrow">SPI Scouting Players</div>
             <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.evaluationCount || 0 %></div>
@@ -246,7 +246,7 @@
         </div>
       </div>
       <div class="col-12 col-md-6 col-xl-3">
-        <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
           <div class="card-body">
             <div class="dashboard-entry-eyebrow">Informes de jugador</div>
             <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.scoutingPlayerReportCount || 0 %></div>
@@ -289,9 +289,9 @@
 
   <div class="row g-4">
     <% coreActions.forEach((entry) => { %>
-      <div class="col-12 col-md-6 col-xl-4">
-        <a href="<%= entry.href %>" class="text-decoration-none text-reset">
-          <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="col-12 col-md-6 col-xl-4">
+          <a href="<%= entry.href %>" class="text-decoration-none text-reset">
+          <div class="card <%= isPmvMode ? 'pmv-action-card pmv-action-card--compact' : 'dashboard-entry-card' %> h-100 shadow-sm">
             <div class="card-body">
               <div class="dashboard-entry-eyebrow">SPI Core</div>
               <h3 class="h5 mb-2"><%= entry.title %></h3>
@@ -364,7 +364,7 @@
     <div class="row g-4">
       <% if (recentActivity.evaluations.length) { %>
         <div class="col-12 col-lg-4">
-          <div class="card shadow-sm h-100">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
             <div class="card-body">
               <div class="dashboard-entry-eyebrow">Evaluaciones</div>
               <ul class="list-unstyled mb-0">
@@ -383,7 +383,7 @@
 
       <% if (recentActivity.reports.length) { %>
         <div class="col-12 col-lg-4">
-          <div class="card shadow-sm h-100">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
             <div class="card-body">
               <div class="dashboard-entry-eyebrow">Informes de jugador</div>
               <ul class="list-unstyled mb-0">
@@ -402,7 +402,7 @@
 
       <% if (recentActivity.scoutingTeams.length) { %>
         <div class="col-12 col-lg-4">
-          <div class="card shadow-sm h-100">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
             <div class="card-body">
               <div class="dashboard-entry-eyebrow">Scouting rival</div>
               <ul class="list-unstyled mb-0">
@@ -438,7 +438,7 @@
 
 <div class="row g-4">
   <div class="col-xl-4">
-    <div class="card shadow-sm h-100 team-detail-panel">
+    <div class="card <%= isPmvMode ? 'pmv-surface-card' : '' %> shadow-sm h-100 team-detail-panel">
       <div class="card-body">
         <div class="team-detail-panel__heading">Cobertura de posiciones</div>
 
@@ -497,7 +497,7 @@
   </div>
 
   <div class="col-xl-8" id="team-roster">
-    <div class="card shadow-sm h-100 team-detail-panel">
+    <div class="card <%= isPmvMode ? 'pmv-surface-card' : '' %> shadow-sm h-100 team-detail-panel">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
           <div>

@@ -22,20 +22,27 @@
       </style>
     <% } %>
   </head>
-  <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %>">
+  <%
+    const isPmvShell = typeof productModeInfo !== 'undefined'
+      && productModeInfo
+      && productModeInfo.isPmvPlayerTracking;
+  %>
+  <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %> <%= currentUser ? (isPmvShell ? 'mode-pmv' : 'mode-suite') : '' %>">
     <% if (currentUser) { %>
       <div class="app-frame">
         <%- include('partials/sidebar') %>
         <main class="app-main">
           <%- include('partials/topbar') %>
           <div class="app-content">
-            <% if (success && success.length) { %>
-              <div class="alert alert-success"><%= success %></div>
-            <% } %>
-            <% if (error && error.length) { %>
-              <div class="alert alert-danger"><%= error %></div>
-            <% } %>
-            <%- body %>
+            <div class="app-content__inner">
+              <% if (success && success.length) { %>
+                <div class="alert alert-success"><%= success %></div>
+              <% } %>
+              <% if (error && error.length) { %>
+                <div class="alert alert-danger"><%= error %></div>
+              <% } %>
+              <%- body %>
+            </div>
           </div>
         </main>
       </div>

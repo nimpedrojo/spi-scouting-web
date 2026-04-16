@@ -26,7 +26,7 @@
     <% } %>
   </div>
 
-  <section class="card shadow-sm border-0 mb-4">
+  <section class="card pmv-surface-card pmv-player-hero shadow-sm border-0 mb-4">
     <div class="card-body p-4 p-lg-5">
       <div class="row g-4 align-items-center">
         <div class="col-lg-7">
@@ -43,22 +43,28 @@
               </div>
             <% } %>
             <div>
+              <div class="d-inline-flex align-items-center gap-2 flex-wrap mb-2">
+                <span class="dashboard-kicker">Jugador activo</span>
+                <% if (player.primary_position) { %>
+                  <span class="badge rounded-pill text-bg-light border"><%= player.primary_position %></span>
+                <% } %>
+              </div>
               <h1 class="h2 mb-2"><%= player.full_name %></h1>
               <div class="text-muted mb-3">
                 <%= player.team_name || 'Sin equipo' %><% if (player.category_name) { %> · <%= player.category_name %><% } %><% if (player.primary_position) { %> · <%= player.primary_position %><% } %>
               </div>
               <div class="d-flex gap-2 flex-wrap">
-                <span class="badge text-bg-light">Dorsal: <%= player.dorsal || '-' %></span>
-                <span class="badge text-bg-light">Edad: <%= player.age != null ? player.age : '-' %></span>
-                <span class="badge text-bg-light">Lateralidad: <%= player.laterality || '-' %></span>
-                <span class="badge text-bg-light">Temporada: <%= player.season_name || (activeSeason ? activeSeason.name : '-') %></span>
+                <span class="badge rounded-pill text-bg-light border">Dorsal: <%= player.dorsal || '-' %></span>
+                <span class="badge rounded-pill text-bg-light border">Edad: <%= player.age != null ? player.age : '-' %></span>
+                <span class="badge rounded-pill text-bg-light border">Lateralidad: <%= player.laterality || '-' %></span>
+                <span class="badge rounded-pill text-bg-light border">Temporada: <%= player.season_name || (activeSeason ? activeSeason.name : '-') %></span>
               </div>
             </div>
           </div>
         </div>
 
         <div class="col-lg-5">
-          <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+          <div class="d-flex gap-2 justify-content-lg-end flex-wrap pmv-hero-actions">
             <% if (scoutingPlayersEnabled) { %>
               <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-primary">Nueva evaluación</a>
               <a href="/reports/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-outline-primary">Nuevo informe</a>
@@ -83,7 +89,7 @@
   <section class="mb-4">
     <div class="row g-4">
       <div class="col-6 col-lg-3">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-insight-card shadow-sm h-100">
           <div class="card-body">
             <div class="small text-uppercase text-muted">Evaluaciones</div>
             <div class="display-6 fw-semibold"><%= trackingSummary.totalEvaluations %></div>
@@ -91,7 +97,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-insight-card shadow-sm h-100">
           <div class="card-body">
             <div class="small text-uppercase text-muted">Informes</div>
             <div class="display-6 fw-semibold"><%= trackingSummary.totalReports %></div>
@@ -99,7 +105,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-insight-card shadow-sm h-100">
           <div class="card-body">
             <div class="small text-uppercase text-muted">Última actividad</div>
             <div class="fw-semibold mt-2"><%= latestActivityDate ? latestActivityDate.toISOString().slice(0, 10) : 'Sin datos' %></div>
@@ -107,7 +113,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-insight-card shadow-sm h-100">
           <div class="card-body">
             <div class="small text-uppercase text-muted">Media global</div>
             <div class="display-6 fw-semibold"><%= trackingSummary.overallAverage !== null ? trackingSummary.overallAverage.toFixed(2) : '-' %></div>
@@ -125,7 +131,7 @@
   <section class="mb-4">
     <div class="row g-4">
       <div class="col-lg-5">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-surface-card shadow-sm h-100">
           <div class="card-body">
             <h2 class="h5 mb-3">Resumen del jugador</h2>
             <div class="profile-info-grid">
@@ -148,7 +154,7 @@
       </div>
 
       <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-surface-card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <h2 class="h5 mb-0">Cómo va</h2>
@@ -167,19 +173,19 @@
             <% } else { %>
               <div class="row g-3 mb-4">
                 <div class="col-md-4">
-                  <div class="border rounded-3 p-3 h-100">
+                  <div class="pmv-inline-stat h-100">
                     <div class="small text-uppercase text-muted">Última evaluación</div>
                     <div class="fw-semibold mt-1"><%= trackingSummary.lastEvaluationDate ? new Date(trackingSummary.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></div>
                   </div>
                 </div>
                 <div class="col-md-4">
-                  <div class="border rounded-3 p-3 h-100">
+                  <div class="pmv-inline-stat h-100">
                     <div class="small text-uppercase text-muted">Último informe</div>
                     <div class="fw-semibold mt-1"><%= trackingSummary.lastReportDate ? new Date(trackingSummary.lastReportDate).toISOString().slice(0, 10) : '-' %></div>
                   </div>
                 </div>
                 <div class="col-md-4">
-                  <div class="border rounded-3 p-3 h-100">
+                  <div class="pmv-inline-stat h-100">
                     <div class="small text-uppercase text-muted">Tendencia</div>
                     <div class="fw-semibold mt-1">
                       <%= trendSummary ? `${trendSummary.delta > 0 ? '+' : ''}${trendSummary.delta.toFixed(2)}` : 'Sin dato suficiente' %>
@@ -192,7 +198,7 @@
                 <div class="row g-3">
                   <% analytics.averageByArea.forEach((area) => { %>
                     <div class="col-md-6">
-                      <div class="border rounded-3 p-3 h-100">
+                      <div class="pmv-inline-stat h-100">
                         <div class="d-flex justify-content-between mb-2">
                           <span><%= area.label %></span>
                           <strong><%= area.average.toFixed(2) %></strong>
@@ -214,7 +220,7 @@
 
   <% if (scoutingPlayersEnabled && hasEvaluationHistory) { %>
     <section class="mb-4">
-      <div class="card shadow-sm">
+      <div class="card pmv-surface-card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div>
@@ -238,7 +244,7 @@
               <div class="row g-3">
                 <% analytics.areaEntries.forEach((area) => { %>
                   <div class="col-md-6">
-                    <div class="card border-0 bg-light h-100">
+                    <div class="card pmv-list-card border-0 h-100">
                       <div class="card-body">
                         <h3 class="h6 mb-3"><%= area.label %></h3>
                         <% area.metrics.slice(0, 4).forEach((metric) => { %>
@@ -261,7 +267,7 @@
 
   <% if (scoutingPlayersEnabled) { %>
     <section class="mb-4">
-      <div class="card shadow-sm">
+      <div class="card pmv-surface-card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div>
@@ -275,19 +281,19 @@
           <% } else { %>
             <div class="row g-4 mb-4">
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 h-100">
+                <div class="pmv-inline-stat h-100">
                   <div class="small text-uppercase text-muted">Media global jugador</div>
                   <div class="h3 mb-1"><%= playerBenchmark.playerGlobalAverage != null ? playerBenchmark.playerGlobalAverage.toFixed(2) : '-' %></div>
                 </div>
               </div>
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 h-100">
+                <div class="pmv-inline-stat h-100">
                   <div class="small text-uppercase text-muted">Media global equipo</div>
                   <div class="h3 mb-1"><%= playerBenchmark.teamGlobalAverage != null ? playerBenchmark.teamGlobalAverage.toFixed(2) : '-' %></div>
                 </div>
               </div>
               <div class="col-md-4">
-                <div class="border rounded-3 p-3 h-100">
+                <div class="pmv-inline-stat h-100">
                   <div class="small text-uppercase text-muted">Diferencia global</div>
                   <div class="h3 mb-1 <%= playerBenchmark.globalDifference > 0 ? 'text-success' : playerBenchmark.globalDifference < 0 ? 'text-danger' : '' %>">
                     <%= playerBenchmark.globalDifference != null ? `${playerBenchmark.globalDifference > 0 ? '+' : ''}${playerBenchmark.globalDifference.toFixed(2)}` : '-' %>
@@ -322,7 +328,7 @@
             </div>
 
             <% if (playerBenchmark.strengthsText || playerBenchmark.improvementText) { %>
-              <div class="border rounded-3 bg-light p-3 mt-4">
+              <div class="pmv-note-box mt-4">
                 <% if (playerBenchmark.strengthsText) { %>
                   <p class="mb-2"><%= playerBenchmark.strengthsText %></p>
                 <% } %>
@@ -340,7 +346,7 @@
   <section class="mb-4">
     <div class="row g-4">
       <div class="col-xl-6">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-list-card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
               <h2 class="h5 mb-0">Historial de evaluaciones</h2>
@@ -360,7 +366,7 @@
             <% } else if (!recentEvaluations.length) { %>
               <p class="text-muted mb-0">No hay evaluaciones registradas para este jugador.</p>
             <% } else { %>
-              <div class="list-group list-group-flush">
+              <div class="list-group list-group-flush pmv-record-list">
                 <% recentEvaluations.forEach((evaluation) => { %>
                   <a href="/evaluations/<%= evaluation.id %>" class="list-group-item list-group-item-action px-0">
                     <div class="d-flex justify-content-between gap-3">
@@ -382,7 +388,7 @@
       </div>
 
       <div class="col-xl-6">
-        <div class="card shadow-sm h-100">
+        <div class="card pmv-list-card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
               <h2 class="h5 mb-0">Historial de informes</h2>
@@ -402,7 +408,7 @@
             <% } else if (!reports.length) { %>
               <p class="text-muted mb-0">No hay informes asociados a este jugador.</p>
             <% } else { %>
-              <div class="list-group list-group-flush">
+              <div class="list-group list-group-flush pmv-record-list">
                 <% reports.forEach((report) => { %>
                   <a href="/reports/<%= report.id %>" class="list-group-item list-group-item-action px-0">
                     <div class="d-flex justify-content-between gap-3">

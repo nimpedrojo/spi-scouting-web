@@ -12,24 +12,26 @@
   const sidebarTitle = isPmvMode ? 'Seguimiento de jugadores' : productTitle;
   const sidebarSubtitle = isPmvMode ? 'Trabajo diario del club' : productSubtitle;
   const modeLabel = isPmvMode ? 'Trabajo diario' : 'Suite completa';
+  const workSectionLabel = isPmvMode ? 'Trabajo' : 'Gestión';
+  const adminSectionLabel = isPmvMode ? 'Gestión' : 'Administración';
   const managementItems = [
-    { label: 'Panel general', href: '/dashboard' },
-    { label: 'Plantillas', href: '/teams' },
-    { label: 'Jugadores', href: '/admin/players' },
-    { label: 'Valoraciones', href: scoutingPlayersEnabled ? '/assessments' : '#', moduleKey: 'scouting_players' },
+    { label: 'Panel general', href: '/dashboard', icon: 'dashboard' },
+    { label: 'Plantillas', href: '/teams', icon: 'teams' },
+    { label: 'Jugadores', href: '/admin/players', icon: 'players' },
+    { label: 'Valoraciones', href: scoutingPlayersEnabled ? '/assessments' : '#', moduleKey: 'scouting_players', icon: 'assessments' },
     ...(!isPmvMode ? [
-      { label: 'Previsión 2026/27', href: scoutingPlayersEnabled ? '/season-forecast' : '#', moduleKey: 'scouting_players' },
-      { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players' },
-      { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning' },
-      { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams' },
+      { label: 'Previsión 2026/27', href: scoutingPlayersEnabled ? '/season-forecast' : '#', moduleKey: 'scouting_players', icon: 'forecast' },
+      { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players', icon: 'comparison' },
+      { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning', icon: 'planning' },
+      { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams', icon: 'scouting' },
     ] : []),
   ];
   const adminItems = [
-    { label: 'Plantillas eval.', href: '/evaluation-templates' },
-    { label: 'Admin. equipos', href: '/admin/club', adminOnly: true },
-    { label: 'Usuarios', href: '/admin/users', adminOnly: true },
-    { label: 'Clubes', href: '/clubs', superAdminOnly: true },
-    { label: 'Plataforma', href: '/admin/platform', superAdminOnly: true },
+    { label: 'Plantillas eval.', href: '/evaluation-templates', icon: 'templates' },
+    { label: 'Admin. equipos', href: '/admin/club', adminOnly: true, icon: 'club' },
+    { label: 'Usuarios', href: '/admin/users', adminOnly: true, icon: 'users' },
+    { label: 'Clubes', href: '/clubs', superAdminOnly: true, icon: 'clubs' },
+    { label: 'Plataforma', href: '/admin/platform', superAdminOnly: true, icon: 'platform' },
   ];
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   const isSuperAdminUser = currentUser && currentUser.role === 'superadmin';
@@ -57,6 +59,22 @@
 
     return activeRoute === item.href || activeRoute.startsWith(item.href + '/');
   };
+  const navIcons = {
+    dashboard: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3h6v6H3zM11 3h6v4h-6zM11 9h6v8h-6zM3 11h6v6H3z"/></svg>',
+    teams: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 3 6v8l7 4 7-4V6zm0 2.2 4.8 2.74L10 9.68 5.2 6.94zM5 8.7l4 2.28v4.7l-4-2.28zm6 7v-4.7l4-2.28v4.7z"/></svg>',
+    players: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 10a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 10 10zm0 2c-3 0-5.5 1.64-5.5 3.67V18h11v-2.33C15.5 13.64 13 12 10 12z"/></svg>',
+    assessments: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h12v2H4zm0 4h12v2H4zm0 4h8v2H4zm0 4h8v2H4zm10.6-1.4 2.8 2.8-1.4 1.4-2.8-2.8V14h1.4z"/></svg>',
+    forecast: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14v2H3zm1-2 3.2-4 2.4 2.4L13.8 6 17 9.2l-1.4 1.4-1.8-1.8-4.2 5.2-2.4-2.4L5.4 14.4z"/></svg>',
+    comparison: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h4v12H4zm8 4h4v8h-4z"/></svg>',
+    planning: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h2v2h6V2h2v2h2v14H3V4h2zm10 6H5v8h10z"/></svg>',
+    scouting: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 3a5.5 5.5 0 1 0 3.47 9.77l3.63 3.63 1.4-1.4-3.63-3.63A5.5 5.5 0 0 0 8.5 3zm0 2a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/></svg>',
+    templates: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h12v14H4zm2 2v2h8V5zm0 4v2h8V9zm0 4v2h5v-2z"/></svg>',
+    club: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 3 6v12h14V6zm0 2.2 4.5 2.25V8H5.5V6.45zM5 10h10v6H5z"/></svg>',
+    users: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 10a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm6 0a2.5 2.5 0 1 0-2.5-2.5A2.5 2.5 0 0 0 13 10zM2.5 17c0-2.2 2.2-4 4.5-4s4.5 1.8 4.5 4zm9 0c0-1.78 1.66-3.2 3.5-3.2 1.84 0 3.5 1.42 3.5 3.2z"/></svg>',
+    clubs: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17h14v1H3zm1-1V6l4-3 4 3v10h-2v-4H8v4zm9 0V9l3-2v9z"/></svg>',
+    platform: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 2 6v8l8 4 8-4V6zm0 2.2 5.4 2.7L10 9.6 4.6 6.9zM4 8.5l5 2.5v4.5l-5-2.5zm7 7V11l5-2.5v4.5z"/></svg>',
+  };
+  const renderNavIcon = (iconKey) => navIcons[iconKey] || navIcons.dashboard;
 %>
 
 <aside class="app-sidebar">
@@ -80,7 +98,7 @@
   </div>
 
   <nav class="nav flex-column app-sidebar__nav">
-    <div class="small text-uppercase text-muted mt-2 mb-1 px-3">Gestión</div>
+    <div class="app-sidebar__section-label"><%= workSectionLabel %></div>
     <% managementItems.forEach((item) => { %>
       <% const isDisabled = item.href === '#'; %>
       <% const isActive = isItemActive(item); %>
@@ -89,12 +107,13 @@
         class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
         <%= isDisabled ? 'tabindex="-1" aria-disabled="true"' : '' %>
       >
-        <%= item.label %>
+        <span class="app-sidebar__nav-icon" aria-hidden="true"><%- renderNavIcon(item.icon) %></span>
+        <span class="app-sidebar__nav-text"><%= item.label %></span>
       </a>
     <% }) %>
 
     <% if (visibleAdminItems.length) { %>
-      <div class="small text-uppercase text-muted mt-3 mb-1 px-3">Administración</div>
+      <div class="app-sidebar__section-label app-sidebar__section-label--secondary"><%= adminSectionLabel %></div>
       <% visibleAdminItems.forEach((item) => { %>
         <% const isDisabled = item.href === '#'; %>
         <% const isActive = isItemActive(item); %>
@@ -103,7 +122,8 @@
           class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
           <%= isDisabled ? 'tabindex="-1" aria-disabled="true"' : '' %>
         >
-          <%= item.label %>
+          <span class="app-sidebar__nav-icon" aria-hidden="true"><%- renderNavIcon(item.icon) %></span>
+          <span class="app-sidebar__nav-text"><%= item.label %></span>
         </a>
       <% }) %>
     <% } %>
