@@ -1,55 +1,70 @@
 <%
   const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
-  const loginTitle = productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite';
-  const loginSignature = productBranding ? productBranding.productSignature : 'by ProcessIQ';
   const loginSubtitle = isPmvMode
     ? 'Seguimiento y evolucion del jugador en un entorno claro, moderno y profesional.'
     : 'Accede a la plataforma operativa del club.';
-  const loginMark = productBranding ? productBranding.logoCompactAsset : '/img/soccerreport-logo.png';
+  const loginTitle = productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite';
+  const loginSignature = productBranding ? productBranding.productSignature : 'by ProcessIQ';
+  const loginVisual = '/img/playertrack-login-reference-v2.png';
 %>
 
 <div class="login-shell">
-  <div class="login-card p-4 p-md-5">
-    <div class="login-brand">
-      <div class="login-brand__header">
-        <img
-          src="<%= loginMark %>"
-          alt="<%= loginTitle %>"
-          class="login-logo"
-        />
-        <div class="login-brand__copy">
-          <div class="login-brand__eyebrow"><%= loginSignature %></div>
-          <div class="login-brand__product"><%= loginTitle %></div>
-        </div>
+  <div class="login-stage">
+    <div class="login-visual" aria-hidden="true">
+      <div class="login-visual__frame">
+        <img src="<%= loginVisual %>" alt="" class="login-visual__art" />
       </div>
-      <h1 class="login-brand__title">Iniciar sesión</h1>
-      <p class="login-brand__subtitle mb-0"><%= loginSubtitle %></p>
     </div>
 
-    <form method="POST" action="/login" class="login-form">
-      <div class="mb-3 text-start">
-        <label for="email" class="form-label">Email</label>
-        <input
-          type="email"
-          class="form-control"
-          id="email"
-          name="email"
-          required
-        />
+    <div class="login-panel">
+    <div class="login-card p-4 p-md-5">
+      <div class="login-brand">
+        <h1 class="login-brand__title">Iniciar sesión</h1>
+        <p class="login-brand__subtitle mb-0"><%= loginSubtitle %></p>
       </div>
-      <div class="mb-3 text-start">
-        <label for="password" class="form-label">Contraseña</label>
-        <input
-          type="password"
-          class="form-control"
-          id="password"
-          name="password"
-          required
-        />
-      </div>
-      <button type="submit" class="btn <%= isPmvMode ? 'btn-primary' : 'btn-sr-primary' %> w-100">
-        Entrar
-      </button>
-    </form>
+
+      <form method="POST" action="/login" class="login-form">
+        <div class="mb-3 text-start">
+          <label for="email" class="form-label">Email</label>
+          <div class="login-field">
+            <input
+              type="email"
+              class="form-control"
+              id="email"
+              name="email"
+              placeholder="tu@email.com"
+              required
+            />
+            <span class="login-field__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20"><path d="M10 10a3.25 3.25 0 1 0-3.25-3.25A3.25 3.25 0 0 0 10 10zm0 1.75c-3.37 0-6.25 1.77-6.25 4.12V18h12.5v-2.13c0-2.35-2.88-4.12-6.25-4.12z"/></svg>
+            </span>
+          </div>
+        </div>
+        <div class="mb-3 text-start">
+          <label for="password" class="form-label">Contraseña</label>
+          <div class="login-field">
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              placeholder="Tu contraseña"
+              required
+            />
+            <span class="login-field__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20"><path d="M6.75 8V6.75a3.25 3.25 0 1 1 6.5 0V8h.75A1.75 1.75 0 0 1 15.75 9.75v6.5A1.75 1.75 0 0 1 14 18H6A1.75 1.75 0 0 1 4.25 16.25v-6.5A1.75 1.75 0 0 1 6 8zm1.5 0h3.5V6.75a1.75 1.75 0 0 0-3.5 0z"/></svg>
+            </span>
+          </div>
+        </div>
+        <button type="submit" class="btn <%= isPmvMode ? 'btn-primary' : 'btn-sr-primary' %> w-100">
+          Entrar
+        </button>
+      </form>
+    </div>
+    <div class="login-panel__footer">
+      <strong><%= loginTitle %></strong>
+      <span><%= loginSignature %></span>
+    </div>
+    </div>
   </div>
 </div>
