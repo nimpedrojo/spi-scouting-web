@@ -22,6 +22,7 @@
   --pmv-shadow-md: 0 22px 50px rgba(15, 23, 42, 0.1);
   --pmv-radius-lg: 1.25rem;
   --pmv-radius-md: 0.95rem;
+  --app-header-height: 60px;
 
   /* Neutrals */
   --sr-bg: #f5f7fa;           /* Fondo app claro */

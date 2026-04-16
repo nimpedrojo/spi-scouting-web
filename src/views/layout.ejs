@@ -29,10 +29,10 @@
   %>
   <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %> <%= currentUser ? (isPmvShell ? 'mode-pmv' : 'mode-suite') : '' %>">
     <% if (currentUser) { %>
+      <%- include('partials/topbar') %>
       <div class="app-frame">
         <%- include('partials/sidebar') %>
         <main class="app-main">
-          <%- include('partials/topbar') %>
           <div class="app-content">
             <div class="app-content__inner">
               <% if (success && success.length) { %>

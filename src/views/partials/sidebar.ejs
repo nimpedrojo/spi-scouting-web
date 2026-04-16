@@ -9,11 +9,6 @@
   const productSubtitle = productModeInfo && productModeInfo.effectiveMeta
     ? productModeInfo.effectiveMeta.productSubtitle
     : 'Modular Football Club Platform';
-  const sidebarTitle = isPmvMode ? 'Seguimiento de jugadores' : productTitle;
-  const sidebarSubtitle = isPmvMode ? 'Trabajo diario del club' : productSubtitle;
-  const modeLabel = isPmvMode ? 'Trabajo diario' : 'Suite completa';
-  const workSectionLabel = isPmvMode ? 'Trabajo' : 'Gestión';
-  const adminSectionLabel = isPmvMode ? 'Gestión' : 'Administración';
   const managementItems = [
     { label: 'Panel general', href: '/dashboard', icon: 'dashboard' },
     { label: 'Plantillas', href: '/teams', icon: 'teams' },
@@ -26,26 +21,6 @@
       { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams', icon: 'scouting' },
     ] : []),
   ];
-  const adminItems = [
-    { label: 'Plantillas eval.', href: '/evaluation-templates', icon: 'templates' },
-    { label: 'Admin. equipos', href: '/admin/club', adminOnly: true, icon: 'club' },
-    { label: 'Usuarios', href: '/admin/users', adminOnly: true, icon: 'users' },
-    { label: 'Clubes', href: '/clubs', superAdminOnly: true, icon: 'clubs' },
-    { label: 'Plataforma', href: '/admin/platform', superAdminOnly: true, icon: 'platform' },
-  ];
-  const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
-  const isSuperAdminUser = currentUser && currentUser.role === 'superadmin';
-  const visibleAdminItems = adminItems.filter((item) => {
-    if (item.superAdminOnly) {
-      return isSuperAdminUser;
-    }
-
-    if (item.adminOnly) {
-      return isAdminUser;
-    }
-
-    return true;
-  });
   const isItemActive = (item) => {
     if (item.href === '#' || !activeRoute) {
       return false;
@@ -78,19 +53,7 @@
 %>
 
 <aside class="app-sidebar">
-  <div class="app-sidebar__brand">
-    <a href="/dashboard" class="text-decoration-none text-reset d-flex align-items-center gap-2">
-      <img src="/img/soccerreport-logo.png" alt="SoccerProcessIQ Suite" class="app-sidebar__logo" />
-      <div>
-        <div class="app-sidebar__title"><%= sidebarTitle %></div>
-        <div class="app-sidebar__subtitle"><%= sidebarSubtitle %></div>
-      </div>
-    </a>
-  </div>
-
   <div class="app-sidebar__meta">
-    <div class="small text-uppercase text-muted">Modo</div>
-    <div class="fw-semibold"><%= modeLabel %></div>
     <div class="small text-uppercase text-muted">Club</div>
     <div class="fw-semibold"><%= activeClubName || 'Sin club asignado' %></div>
     <div class="small text-uppercase text-muted mt-3">Temporada</div>
@@ -98,7 +61,6 @@
   </div>
 
   <nav class="nav flex-column app-sidebar__nav">
-    <div class="app-sidebar__section-label"><%= workSectionLabel %></div>
     <% managementItems.forEach((item) => { %>
       <% const isDisabled = item.href === '#'; %>
       <% const isActive = isItemActive(item); %>
@@ -111,22 +73,6 @@
         <span class="app-sidebar__nav-text"><%= item.label %></span>
       </a>
     <% }) %>
-
-    <% if (visibleAdminItems.length) { %>
-      <div class="app-sidebar__section-label app-sidebar__section-label--secondary"><%= adminSectionLabel %></div>
-      <% visibleAdminItems.forEach((item) => { %>
-        <% const isDisabled = item.href === '#'; %>
-        <% const isActive = isItemActive(item); %>
-        <a
-          href="<%= item.href %>"
-          class="nav-link <%= isActive ? 'active' : '' %> <%= isDisabled ? 'disabled' : '' %>"
-          <%= isDisabled ? 'tabindex="-1" aria-disabled="true"' : '' %>
-        >
-          <span class="app-sidebar__nav-icon" aria-hidden="true"><%- renderNavIcon(item.icon) %></span>
-          <span class="app-sidebar__nav-text"><%= item.label %></span>
-        </a>
-      <% }) %>
-    <% } %>
   </nav>
 
   <div class="app-sidebar__footer">

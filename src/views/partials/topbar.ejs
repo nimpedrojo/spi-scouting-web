@@ -1,22 +1,33 @@
-<% const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking; %>
+<%
+  const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
+  const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+  const adminHref = currentUser && currentUser.role === 'superadmin' ? '/admin/platform' : '/admin/club';
+  const adminLabel = 'Administración';
+  const headerTitle = isPmvMode ? 'Seguimiento de jugadores' : 'SoccerProcessIQ Suite';
+  const headerSubtitle = isPmvMode ? 'Trabajo diario del club' : 'Modular Football Club Platform';
+%>
 <header class="app-topbar">
-  <div>
-    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-      <h1 class="h4 mb-0"><%= pageTitle || 'SoccerProcessIQ Suite' %></h1>
-      <% if (productModeInfo && productModeInfo.effectiveMeta && !isPmvMode) { %>
-        <span class="badge text-bg-light border"><%= productModeInfo.effectiveMeta.label %></span>
-      <% } %>
-    </div>
-    <% if (typeof pageDescription !== 'undefined' && pageDescription) { %>
-      <p class="text-muted mb-0"><%= pageDescription %></p>
+  <div class="app-topbar__brand-wrap">
+    <a href="/dashboard" class="app-topbar__brand text-decoration-none text-reset">
+      <img src="/img/soccerreport-logo.png" alt="SoccerProcessIQ Suite" class="app-topbar__logo" />
+      <div>
+        <div class="app-topbar__brand-title"><%= headerTitle %></div>
+        <div class="app-topbar__brand-subtitle"><%= headerSubtitle %></div>
+      </div>
+    </a>
+    <% if (productModeInfo && productModeInfo.effectiveMeta && !isPmvMode) { %>
+      <span class="badge text-bg-light border"><%= productModeInfo.effectiveMeta.label %></span>
     <% } %>
   </div>
 
   <% if (currentUser) { %>
-    <div class="d-flex align-items-center gap-3">
-      <a href="/account" class="btn btn-outline-secondary btn-sm">Mi cuenta</a>
+    <div class="d-flex align-items-center gap-2 flex-wrap app-topbar__actions">
+      <a href="/account" class="btn btn-outline-secondary btn-sm">Ver mi perfil</a>
+      <% if (isAdminUser) { %>
+        <a href="<%= adminHref %>" class="btn btn-outline-secondary btn-sm"><%= adminLabel %></a>
+      <% } %>
       <form method="POST" action="/logout">
-        <button class="btn btn-primary btn-sm" type="submit">Salir</button>
+        <button class="btn btn-light btn-sm" type="submit">Salir</button>
       </form>
     </div>
   <% } %>
