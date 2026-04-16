@@ -7,12 +7,13 @@
   const cancelHref = (flowContext && flowContext.returnToPlayerHref)
     || (flowContext && flowContext.returnToTeamHref)
     || '/reports';
+  const productLabel = productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite';
 %>
 
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
   <div>
     <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-      <span class="dashboard-kicker"><%= isPmvMode ? 'SPI Player Tracking' : 'SoccerProcessIQ Suite' %></span>
+      <span class="dashboard-kicker"><%= isPmvMode ? productLabel : 'SoccerProcessIQ Suite' %></span>
       <% if (isPmvMode) { %>
         <span class="badge text-bg-light border">Informe de jugador</span>
       <% } %>

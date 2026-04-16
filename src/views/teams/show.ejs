@@ -43,6 +43,7 @@
     map.set(meta.key, meta.label);
     return map;
   }, new Map()).entries()).map(([value, label]) => ({ value, label }));
+  const productLabel = productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite';
 %>
 
 <div class="mb-4">
@@ -56,10 +57,10 @@
   <div class="card-body p-4 p-lg-5">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
       <div class="d-flex align-items-start gap-3">
-        <div class="team-detail-hero__crest">SPI</div>
+        <div class="team-detail-hero__crest"><%= isPmvMode ? 'PT' : 'SPI' %></div>
         <div>
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <span class="dashboard-kicker"><%= isPmvMode ? 'SPI Player Tracking' : 'SoccerProcessIQ Suite' %></span>
+            <span class="dashboard-kicker"><%= isPmvMode ? productLabel : 'SoccerProcessIQ Suite' %></span>
             <span class="badge text-bg-light border"><%= isPmvMode ? 'Equipo activo' : 'Team Workspace' %></span>
           </div>
           <h1 class="team-detail-hero__title mb-2"><%= team.name %></h1>
@@ -71,7 +72,7 @@
           </div>
           <p class="text-muted mb-0">
             <% if (isPmvMode) { %>
-              Espacio operativo del equipo para seguir jugadores, registrar actividad y entrar rápido a informes y evaluaciones.
+              Espacio operativo del equipo para seguir jugadores, registrar actividad y entrar rapido a informes y evaluaciones.
             <% } else { %>
               Centro operativo del equipo dentro de la suite modular. Desde aquí puedes entrar al core del equipo y a los módulos activos del club.
             <% } %>

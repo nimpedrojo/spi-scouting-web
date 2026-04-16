@@ -3,12 +3,6 @@
   const planningEnabled = activeModules.includes('planning');
   const scoutingTeamsEnabled = activeModules.includes('scouting_teams');
   const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
-  const productTitle = productModeInfo && productModeInfo.effectiveMeta
-    ? productModeInfo.effectiveMeta.productLabel
-    : 'SoccerProcessIQ Suite';
-  const productSubtitle = productModeInfo && productModeInfo.effectiveMeta
-    ? productModeInfo.effectiveMeta.productSubtitle
-    : 'Modular Football Club Platform';
   const managementItems = [
     { label: 'Panel general', href: '/dashboard', icon: 'dashboard' },
     { label: 'Plantillas', href: '/teams', icon: 'teams' },

@@ -48,6 +48,11 @@ app.use(attachProductModeContext);
 app.use(attachModuleContext);
 
 app.use((req, res, next) => {
+  const productModeInfo = req.context ? req.context.productMode || null : null;
+  const productMeta = productModeInfo && productModeInfo.effectiveMeta
+    ? productModeInfo.effectiveMeta
+    : null;
+
   res.locals.currentUser = req.session.user || null;
   res.locals.success = req.flash('success');
   res.locals.error = req.flash('error');
@@ -62,17 +67,26 @@ app.use((req, res, next) => {
   res.locals.activeSeasonLabel = req.context && req.context.activeSeason
     ? req.context.activeSeason.name
     : null;
-  res.locals.pageTitle = 'SoccerProcessIQ Suite';
   res.locals.activeModules = req.context ? req.context.activeModuleKeys || [] : [];
-  res.locals.productModeInfo = req.context ? req.context.productMode || null : null;
-  res.locals.productMode = req.context && req.context.productMode
-    ? req.context.productMode.effectiveMode
+  res.locals.productModeInfo = productModeInfo;
+  res.locals.productMode = productModeInfo
+    ? productModeInfo.effectiveMode
     : 'suite';
   res.locals.isPmvPlayerTracking = Boolean(
-    req.context
-    && req.context.productMode
-    && req.context.productMode.isPmvPlayerTracking,
+    productModeInfo
+    && productModeInfo.isPmvPlayerTracking,
   );
+  res.locals.productBranding = {
+    productLabel: productMeta ? productMeta.productLabel : 'SoccerProcessIQ Suite',
+    productSubtitle: productMeta ? productMeta.productSubtitle : 'Modular Football Club Platform',
+    productSignature: productMeta ? productMeta.productSignature : 'by ProcessIQ',
+    productWordmark: productMeta ? productMeta.productWordmark : 'SoccerProcessIQ Suite',
+    logoAsset: productMeta ? productMeta.logoAsset : '/img/soccerreport-logo.png',
+    logoCompactAsset: productMeta ? productMeta.logoCompactAsset : '/img/soccerreport-logo.png',
+    iconAsset: productMeta ? productMeta.iconAsset : '/img/soccerreport-logo.png',
+    brandAccent: productMeta ? productMeta.brandAccent : 'suite',
+  };
+  res.locals.pageTitle = productMeta ? productMeta.productLabel : 'SoccerProcessIQ Suite';
 
   next();
 });

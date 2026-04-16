@@ -1,6 +1,6 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
   <div>
-    <h1 class="h3 mb-1"><%= isPmvPlayerTracking ? 'SPI Player Tracking' : 'Valoraciones' %></h1>
+    <h1 class="h3 mb-1"><%= isPmvPlayerTracking ? (productBranding ? productBranding.productLabel : 'PlayerTrack') : 'Valoraciones' %></h1>
     <p class="text-muted mb-0">
       <%= isPmvPlayerTracking
         ? 'Puerta de entrada al seguimiento de jugadores con informes, evaluaciones e histórico operativo.'

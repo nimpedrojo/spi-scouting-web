@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><%= pageTitle || 'SoccerProcessIQ Suite' %></title>
+    <title><%= pageTitle || (productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite') %></title>
+    <link rel="icon" href="<%= productBranding ? productBranding.iconAsset : '/img/playertrack-icon.svg' %>" />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -27,7 +28,7 @@
       && productModeInfo
       && productModeInfo.isPmvPlayerTracking;
   %>
-  <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %> <%= currentUser ? (isPmvShell ? 'mode-pmv' : 'mode-suite') : '' %>">
+  <body class="<%= currentUser ? 'app-shell' : 'auth-shell' %> <%= currentUser ? (isPmvShell ? 'mode-pmv' : 'mode-suite') : '' %> <%= productBranding ? `brand-${productBranding.brandAccent}` : 'brand-suite' %>">
     <% if (currentUser) { %>
       <%- include('partials/topbar') %>
       <div class="app-frame">
