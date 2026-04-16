@@ -260,6 +260,7 @@ body {
 .app-frame {
   display: block;
   min-height: calc(100vh - var(--app-header-height));
+  padding-top: var(--app-header-height);
 }
 
 .dashboard-context-card {
@@ -466,8 +467,10 @@ body {
   padding: 0.75rem 1.25rem;
   margin-bottom: 0;
   width: 100%;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1030;
   box-shadow: none;
   min-height: var(--app-header-height);
@@ -1178,7 +1181,7 @@ body {
 }
 
 .mode-pmv .app-content {
-  padding-top: 0.35rem;
+  padding-top: 1rem;
 }
 
 .mode-pmv .app-content__inner {
@@ -1520,6 +1523,7 @@ body {
 @media (max-width: 991.98px) {
   .app-frame {
     min-height: auto;
+    padding-top: var(--app-header-height);
   }
 
   .app-sidebar {
