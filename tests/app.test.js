@@ -704,7 +704,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(resPage.status).toBe(200);
     expect(resPage.text).toContain('Administración de plataforma');
     expect(resPage.text).toContain('Modo de producto global');
-    expect(resPage.text).toContain('SPI Player Tracking');
+    expect(resPage.text).toContain('PlayerTrack');
 
     const resUpdate = await agent.post('/admin/platform/product-mode').send({
       default_product_mode: 'pmv_player_tracking',
@@ -1173,7 +1173,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
     expect(
-      res.text.includes('SPI Core') || res.text.includes('¿Qué quieres hacer ahora?'),
+      res.text.includes('SPI Core') || res.text.includes('Seguimiento claro del jugador'),
     ).toBe(true);
     expect(
       res.text.includes('SPI Scouting Players') || res.text.includes('Evaluar jugador'),
@@ -3333,7 +3333,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     const res = await agent.get('/dashboard');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('¿Qué quieres hacer ahora?');
+    expect(res.text).toContain('Seguimiento claro del jugador');
     expect(res.text).toContain('Entrar por equipo');
     expect(res.text).toContain('Evaluar jugador');
     expect(res.text).toContain('Ver historial de informes');
@@ -3376,7 +3376,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     const res = await agent.get(`/teams/${teamId}`);
     expect(res.status).toBe(200);
-    expect(res.text).toContain('SPI Player Tracking');
+    expect(res.text).toContain('PlayerTrack');
     expect(res.text).toContain('Accesos rápidos');
     expect(res.text).toContain(`/evaluations/new?team_id=${teamId}`);
     expect(res.text).toContain(`/reports/new?team_id=${teamId}`);
@@ -4394,7 +4394,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     const res = await agent.get(`/reports/new?team_id=${context.teamId}&player_id=${context.playerId}`);
     expect(res.status).toBe(200);
-    expect(res.text).toContain('SPI Player Tracking');
+    expect(res.text).toContain('PlayerTrack');
     expect(res.text).toContain('Estás creando un informe para <strong>Mario Sanz</strong>');
     expect(res.text).toContain(`name="player_id" value="${context.playerId}"`);
   });

@@ -11,6 +11,8 @@
   const recentActivity = dashboard && dashboard.recentPlayerTrackingActivity
     ? dashboard.recentPlayerTrackingActivity
     : { evaluations: [], reports: [], teams: [] };
+  const pmvBrandLabel = productBranding ? productBranding.productLabel : 'PlayerTrack';
+  const pmvBrandSignature = productBranding ? productBranding.productSignature : 'by ProcessIQ';
 %>
 
 <% if (isPmvMode) { %>
@@ -21,11 +23,12 @@
           <div class="col-12 col-xl-8">
             <div class="mb-4 text-center text-lg-start">
               <div class="d-inline-flex align-items-center gap-2 flex-wrap mb-3">
-                <span class="dashboard-kicker">SPI Player Tracking</span>
+                <span class="dashboard-kicker"><%= pmvBrandLabel %></span>
+                <span class="pmv-brand-signature"><%= pmvBrandSignature %></span>
                 <span class="badge rounded-pill text-bg-light border">Trabajo diario</span>
               </div>
-              <h1 class="h2 mb-2">¿Qué quieres hacer ahora?</h1>
-              <p class="text-muted mb-0">Elige una acción principal y entra al flujo de trabajo del club.</p>
+              <h1 class="h2 mb-2">Seguimiento claro del jugador, desde el primer paso</h1>
+              <p class="text-muted mb-0">Accede al flujo principal del club para evaluar, registrar actividad y revisar la evolución reciente.</p>
             </div>
 
             <div class="row g-4">

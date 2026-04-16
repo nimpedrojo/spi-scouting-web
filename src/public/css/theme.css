@@ -5,19 +5,31 @@
   --sr-secondary: #19c37d;    /* Verde eléctrico (CTA, activos, highlights) */
   --sr-tech: #0b2545;         /* Azul petróleo (fondos alternativos, secciones) */
 
-  /* PMV brand */
-  --pmv-green-700: #1f7a63;
-  --pmv-green-600: #2fa47f;
-  --pmv-blue-700: #1d4ed8;
-  --pmv-blue-600: #2563eb;
-  --pmv-bg: #f8fafc;
-  --pmv-surface: #ffffff;
-  --pmv-border: #e2e8f0;
-  --pmv-text: #0f172a;
-  --pmv-text-muted: #475569;
-  --pmv-success: #10b981;
-  --pmv-warning: #f59e0b;
-  --pmv-danger: #ef4444;
+  /* PlayerTrack brand */
+  --pt-green-700: #1f7a63;
+  --pt-green-600: #2fa47f;
+  --pt-blue-700: #1d4ed8;
+  --pt-blue-600: #2563eb;
+  --pt-bg: #f8fafc;
+  --pt-surface: #ffffff;
+  --pt-border: #e2e8f0;
+  --pt-text: #0f172a;
+  --pt-text-muted: #475569;
+  --pt-success: #10b981;
+  --pt-warning: #f59e0b;
+  --pt-danger: #ef4444;
+  --pmv-green-700: var(--pt-green-700);
+  --pmv-green-600: var(--pt-green-600);
+  --pmv-blue-700: var(--pt-blue-700);
+  --pmv-blue-600: var(--pt-blue-600);
+  --pmv-bg: var(--pt-bg);
+  --pmv-surface: var(--pt-surface);
+  --pmv-border: var(--pt-border);
+  --pmv-text: var(--pt-text);
+  --pmv-text-muted: var(--pt-text-muted);
+  --pmv-success: var(--pt-success);
+  --pmv-warning: var(--pt-warning);
+  --pmv-danger: var(--pt-danger);
   --pmv-shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.06);
   --pmv-shadow-md: 0 22px 50px rgba(15, 23, 42, 0.1);
   --pmv-radius-lg: 1.25rem;

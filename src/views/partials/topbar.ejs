@@ -3,13 +3,16 @@
   const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   const adminHref = currentUser && currentUser.role === 'superadmin' ? '/admin/platform' : '/admin/club';
   const adminLabel = 'Administración';
-  const headerTitle = isPmvMode ? 'Seguimiento de jugadores' : 'SoccerProcessIQ Suite';
-  const headerSubtitle = isPmvMode ? 'Trabajo diario del club' : 'Modular Football Club Platform';
+  const headerTitle = productBranding ? productBranding.productLabel : (isPmvMode ? 'PlayerTrack' : 'SoccerProcessIQ Suite');
+  const headerSubtitle = isPmvMode
+    ? (productBranding ? productBranding.productSignature : 'by ProcessIQ')
+    : (productBranding ? productBranding.productSubtitle : 'Modular Football Club Platform');
+  const headerLogo = productBranding ? productBranding.logoCompactAsset : '/img/soccerreport-logo.png';
 %>
 <header class="app-topbar">
   <div class="app-topbar__brand-wrap">
     <a href="/dashboard" class="app-topbar__brand text-decoration-none text-reset">
-      <img src="/img/soccerreport-logo.png" alt="SoccerProcessIQ Suite" class="app-topbar__logo" />
+      <img src="<%= headerLogo %>" alt="<%= headerTitle %>" class="app-topbar__logo" />
       <div>
         <div class="app-topbar__brand-title"><%= headerTitle %></div>
         <div class="app-topbar__brand-subtitle"><%= headerSubtitle %></div>

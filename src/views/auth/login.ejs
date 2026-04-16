@@ -1,13 +1,32 @@
-<div class="d-flex justify-content-center">
-  <div class="login-card text-center p-4 p-md-5">
-    <img
-      src="/img/login-banner-soccerreport.png"
-      alt="SoccerProcessIQ Suite - Desarrollado por ProcessIQ"
-      class="mb-4 login-logo"
-    />
-    <h1 class="mb-4">Iniciar sesión</h1>
+<%
+  const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
+  const loginTitle = productBranding ? productBranding.productLabel : 'SoccerProcessIQ Suite';
+  const loginSignature = productBranding ? productBranding.productSignature : 'by ProcessIQ';
+  const loginSubtitle = isPmvMode
+    ? 'Seguimiento y evolucion del jugador en un entorno claro, moderno y profesional.'
+    : 'Accede a la plataforma operativa del club.';
+  const loginMark = productBranding ? productBranding.logoCompactAsset : '/img/soccerreport-logo.png';
+%>
 
-    <form method="POST" action="/login">
+<div class="login-shell">
+  <div class="login-card p-4 p-md-5">
+    <div class="login-brand">
+      <div class="login-brand__header">
+        <img
+          src="<%= loginMark %>"
+          alt="<%= loginTitle %>"
+          class="login-logo"
+        />
+        <div class="login-brand__copy">
+          <div class="login-brand__eyebrow"><%= loginSignature %></div>
+          <div class="login-brand__product"><%= loginTitle %></div>
+        </div>
+      </div>
+      <h1 class="login-brand__title">Iniciar sesión</h1>
+      <p class="login-brand__subtitle mb-0"><%= loginSubtitle %></p>
+    </div>
+
+    <form method="POST" action="/login" class="login-form">
       <div class="mb-3 text-start">
         <label for="email" class="form-label">Email</label>
         <input
@@ -28,7 +47,7 @@
           required
         />
       </div>
-      <button type="submit" class="btn btn-sr-primary w-100">
+      <button type="submit" class="btn <%= isPmvMode ? 'btn-primary' : 'btn-sr-primary' %> w-100">
         Entrar
       </button>
     </form>
