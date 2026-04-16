@@ -1,5 +1,6 @@
 const db = require('../db');
 const bcrypt = require('bcryptjs');
+const secretStore = require('../services/secretStore');
 
 async function createUsersTable() {
   const sql = `
@@ -134,12 +135,13 @@ async function createUser({
   processIqPassword = null,
 }) {
   const passwordHash = await bcrypt.hash(password, 10);
+  const storedProcessIqPassword = processIqPassword ? secretStore.encrypt(processIqPassword) : null;
   const [result] = await db.query(
     `INSERT INTO users (
       name, email, password_hash, role, club_id, default_club, default_team, default_team_id
       , processiq_username, processiq_password
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, email, passwordHash, role, clubId, defaultClub, defaultTeam, defaultTeamId, processIqUsername, processIqPassword],
+    [name, email, passwordHash, role, clubId, defaultClub, defaultTeam, defaultTeamId, processIqUsername, storedProcessIqPassword],
   );
   return result.insertId;
 }
@@ -156,7 +158,15 @@ async function findUserByEmail(email) {
     WHERE u.email = ?`,
     [email],
   );
-  return rows[0];
+  const row = rows[0];
+  if (row && row.processiq_password) {
+    try {
+      row.processiq_password = secretStore.decrypt(row.processiq_password);
+    } catch (e) {
+      row.processiq_password = null;
+    }
+  }
+  return row;
 }
 
 async function findUserById(id) {
@@ -171,7 +181,15 @@ async function findUserById(id) {
     WHERE u.id = ?`,
     [id],
   );
-  return rows[0];
+  const row = rows[0];
+  if (row && row.processiq_password) {
+    try {
+      row.processiq_password = secretStore.decrypt(row.processiq_password);
+    } catch (e) {
+      row.processiq_password = null;
+    }
+  }
+  return row;
 }
 
 async function updateUserAccount(
@@ -211,7 +229,7 @@ async function updateUserAccount(
 
   if (processIqPassword !== undefined) {
     sql += ', processiq_password = ?';
-    params.push(processIqPassword);
+    params.push(processIqPassword ? secretStore.encrypt(processIqPassword) : null);
   }
 
   if (passwordHash) {
@@ -257,10 +275,17 @@ async function getAllUsers(club = null) {
 }
 
 async function updateUserRole(id, role) {
-  const [result] = await db.query('UPDATE users SET role = ? WHERE id = ?', [
-    role,
-    id,
-  ]);
+  let sql = 'UPDATE users SET role = ?';
+  const params = [role];
+
+  if (role === 'superadmin') {
+    sql += ', club_id = NULL, default_club = NULL, default_team = NULL, default_team_id = NULL';
+  }
+
+  sql += ' WHERE id = ?';
+  params.push(id);
+
+  const [result] = await db.query(sql, params);
   return result.affectedRows;
 }
 
@@ -295,9 +320,15 @@ async function syncUserClubAssignments() {
 
 async function ensureAdminUser() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@local';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD || null;
   const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [adminEmail]);
   if (rows.length === 0) {
+    if (!adminPassword || adminPassword === 'admin') {
+      // Do not create insecure default admin if no strong password provided
+      // eslint-disable-next-line no-console
+      console.warn('Skipping creation of default superadmin: ADMIN_PASSWORD not set or insecure.');
+      return;
+    }
     // eslint-disable-next-line no-console
     console.log(`Creando usuario superadmin por defecto (${adminEmail})`);
     await createUser({

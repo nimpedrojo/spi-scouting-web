@@ -6,6 +6,8 @@ const dotenv = require('dotenv');
 const expressLayouts = require('express-ejs-layouts');
 const { initDatabaseOnce } = require('./initDb');
 const { attachSessionContext } = require('./middleware/sessionContext');
+const { attachProductModeContext } = require('./middleware/productModeContext');
+const { attachModuleContext } = require('./middleware/moduleMiddleware');
 const logger = require('./services/logger');
 const { requestLogger } = require('./middleware/requestLogger');
 
@@ -42,6 +44,8 @@ app.use(
 );
 app.use(flash());
 app.use(attachSessionContext);
+app.use(attachProductModeContext);
+app.use(attachModuleContext);
 
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
@@ -58,7 +62,17 @@ app.use((req, res, next) => {
   res.locals.activeSeasonLabel = req.context && req.context.activeSeason
     ? req.context.activeSeason.name
     : null;
-  res.locals.pageTitle = 'SoccerReport';
+  res.locals.pageTitle = 'SoccerProcessIQ Suite';
+  res.locals.activeModules = req.context ? req.context.activeModuleKeys || [] : [];
+  res.locals.productModeInfo = req.context ? req.context.productMode || null : null;
+  res.locals.productMode = req.context && req.context.productMode
+    ? req.context.productMode.effectiveMode
+    : 'suite';
+  res.locals.isPmvPlayerTracking = Boolean(
+    req.context
+    && req.context.productMode
+    && req.context.productMode.isPmvPlayerTracking,
+  );
 
   next();
 });
@@ -66,34 +80,15 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
-const authRoutes = require('./routes/authRoutes');
-const reportRoutes = require('./routes/reportRoutes');
-const userAdminRoutes = require('./routes/userAdminRoutes');
-const playerAdminRoutes = require('./routes/playerAdminRoutes');
-const clubAdminRoutes = require('./routes/clubAdminRoutes');
-const clubConfigRoutes = require('./routes/clubConfigRoutes');
-const teamRoutes = require('./routes/teamRoutes');
-const evaluationRoutes = require('./routes/evaluationRoutes');
-const playerProfileRoutes = require('./routes/playerProfileRoutes');
-const evaluationTemplateRoutes = require('./routes/evaluationTemplateRoutes');
-const seasonComparisonRoutes = require('./routes/seasonComparisonRoutes');
-const seasonForecastRoutes = require('./routes/seasonForecastRoutes');
-const assessmentRoutes = require('./routes/assessmentRoutes');
+const coreRoutes = require('./core/routes');
+const scoutingPlayersRoutes = require('./modules/scoutingPlayers/routes');
+const planningRoutes = require('./modules/planning/routes');
+const scoutingTeamsRoutes = require('./modules/scoutingTeams/routes');
 
-app.use('/', authRoutes);
-app.use('/reports', reportRoutes);
-app.use('/admin/users', userAdminRoutes);
-app.use('/admin/players', playerAdminRoutes);
-app.use('/admin/clubs', clubAdminRoutes);
-app.use('/clubs', clubAdminRoutes);
-app.use('/admin/club', clubConfigRoutes);
-app.use('/teams', teamRoutes);
-app.use('/', assessmentRoutes);
-app.use('/', evaluationRoutes);
-app.use('/', playerProfileRoutes);
-app.use('/', evaluationTemplateRoutes);
-app.use('/', seasonComparisonRoutes);
-app.use('/', seasonForecastRoutes);
+app.use('/', coreRoutes);
+app.use('/', scoutingPlayersRoutes);
+app.use('/planning', planningRoutes);
+app.use('/scouting-teams', scoutingTeamsRoutes);
 
 app.get('/', (req, res) => {
   if (req.session.user) {

@@ -1,8 +1,9 @@
-# AGENTS.md — SoccerReport
+
+# AGENTS.md — SoccerProcessIQ Suite
 
 ## Project Overview
 
-SoccerReport is a web application used by football academies and clubs to manage:
+SoccerProcessIQ Suite is a modular platform used by football academies and clubs to manage:
 
 * players
 * teams

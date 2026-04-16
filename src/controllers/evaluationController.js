@@ -1,4 +1,7 @@
 const multer = require('multer');
+const fs = require('fs').promises;
+const os = require('os');
+const path = require('path');
 const {
   createEvaluationWithScores,
   listEvaluations,
@@ -11,7 +14,10 @@ const { buildComparison } = require('../services/comparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  }),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
@@ -60,10 +66,12 @@ async function renderIndex(req, res) {
 async function renderNew(req, res) {
   try {
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const requestedTeamId = req.query.team_id || null;
+    const requestedPlayerId = req.query.player_id || null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.query.template_id || null,
-      teamId: req.query.team_id || null,
-      playerId: req.query.player_id || null,
+      teamId: requestedTeamId,
+      playerId: requestedPlayerId,
       seasonId: req.query.season_id || (activeSeason ? activeSeason.id : null),
     });
     if (!formData) {
@@ -81,6 +89,10 @@ async function renderNew(req, res) {
       formData,
       formValues: {},
       errors: [],
+      flowContext: {
+        returnToPlayerHref: requestedPlayerId ? `/players/${requestedPlayerId}` : '',
+        returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+      },
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -93,10 +105,12 @@ async function renderNew(req, res) {
 async function create(req, res) {
   try {
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const requestedTeamId = req.body.team_id || null;
+    const requestedPlayerId = req.body.player_id || null;
     const formData = await getEvaluationFormData(req.session.user, {
       templateId: req.body.template_id || null,
-      teamId: req.body.team_id || null,
-      playerId: req.body.player_id || null,
+      teamId: requestedTeamId,
+      playerId: requestedPlayerId,
       seasonId: req.body.season_id || (activeSeason ? activeSeason.id : null),
     });
     const groupedScores = buildGroupedScoresFromBody(req.body, formData.template);
@@ -120,6 +134,10 @@ async function create(req, res) {
         formData,
         formValues: req.body,
         errors: result.errors,
+        flowContext: {
+          returnToPlayerHref: requestedPlayerId ? `/players/${requestedPlayerId}` : '',
+          returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+        },
       });
     }
 
@@ -211,7 +229,15 @@ async function importMany(req, res) {
   }
 
   try {
-    const summary = await importEvaluationsFromWorkbook(req.session.user, req.file.buffer);
+    const filePath = req.file.path || (req.file && req.file.location);
+    const buffer = await fs.readFile(filePath);
+    const summary = await importEvaluationsFromWorkbook(req.session.user, buffer);
+    // remove temp file
+    try {
+      if (filePath && filePath.startsWith(os.tmpdir())) await fs.unlink(filePath);
+    } catch (e) {
+      // ignore unlink errors
+    }
     if (summary.errors.length) {
       req.flash('error', `Importacion completada con incidencias. Creadas: ${summary.created}. Omitidas: ${summary.skipped}.`);
     } else {

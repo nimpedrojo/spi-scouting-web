@@ -111,7 +111,7 @@ async function createReport(data) {
   return result.insertId;
 }
 
-async function getAllReports(club = null) {
+async function getAllReports(club = null, filters = {}) {
   let sql = `
     SELECT r.id,
             r.player_name,
@@ -132,6 +132,12 @@ async function getAllReports(club = null) {
     params.push(club);
   }
 
+  if (filters.team) {
+    sql += club ? ' AND' : ' WHERE';
+    sql += ' r.team = ?';
+    params.push(filters.team);
+  }
+
   sql += ' ORDER BY r.created_at DESC';
 
   const [rows] = await db.query(sql, params);
@@ -150,6 +156,45 @@ async function getAllReportsRaw(club = null) {
   sql += ' ORDER BY created_at DESC';
 
   const [rows] = await db.query(sql, params);
+  return rows;
+}
+
+async function countReportsByClubAndTeam(clubName, teamName) {
+  if (!clubName || !teamName) {
+    return 0;
+  }
+
+  const [rows] = await db.query(
+    'SELECT COUNT(*) AS total FROM reports WHERE club = ? AND team = ?',
+    [clubName, teamName],
+  );
+
+  return Number(rows[0] ? rows[0].total : 0);
+}
+
+async function listRecentReportsByClubAndTeam(clubName, teamName, limit = 3) {
+  if (!clubName || !teamName) {
+    return [];
+  }
+
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 3;
+  const [rows] = await db.query(
+    `SELECT
+        r.id,
+        r.player_name,
+        r.player_surname,
+        r.team,
+        r.overall_rating,
+        r.created_at,
+        u.name AS created_by_name
+      FROM reports r
+      LEFT JOIN users u ON u.id = r.created_by
+      WHERE r.club = ? AND r.team = ?
+      ORDER BY r.created_at DESC
+      LIMIT ${safeLimit}`,
+    [clubName, teamName],
+  );
+
   return rows;
 }
 
@@ -275,7 +320,9 @@ module.exports = {
   createReport,
   getAllReports,
   getAllReportsRaw,
+  countReportsByClubAndTeam,
   getReportById,
+  listRecentReportsByClubAndTeam,
   updateReport,
   deleteReport,
   getReportsForPlayerProfile,

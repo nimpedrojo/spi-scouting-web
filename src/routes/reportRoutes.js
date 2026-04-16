@@ -55,43 +55,43 @@ function normalizeReportPlayerOption(player) {
   };
 }
 
-async function getReportPlayersForContext(clubName, defaultTeamId = null) {
-  if (defaultTeamId) {
-    const players = await getPlayersByTeamId(defaultTeamId);
-    return players.map(normalizeReportPlayerOption);
-  }
+function resolveReportFlowContext(players, query = {}, formData = {}) {
+  const requestedPlayerId = (query.player_id || formData.player_id || '').toString().trim();
+  const requestedTeamId = (query.team_id || formData.team_id || '').toString().trim();
+  const selectedPlayer = requestedPlayerId
+    ? players.find((player) => String(player.id) === requestedPlayerId)
+    : null;
 
-  const players = await getAllPlayers(clubName || null);
-  return players.map(normalizeReportPlayerOption);
+  return {
+    requestedPlayerId: selectedPlayer ? String(selectedPlayer.id) : requestedPlayerId || '',
+    requestedTeamId,
+    selectedPlayer,
+    returnToPlayerHref: selectedPlayer ? `/players/${selectedPlayer.id}` : '',
+    returnToTeamHref: requestedTeamId ? `/teams/${requestedTeamId}` : '',
+  };
 }
 
-function reportBelongsToTeamScope(report, teamScope) {
-  if (!teamScope) {
-    return true;
+function populateReportFormFromSelectedPlayer(formData, selectedPlayer, defaultClub, defaultTeamName) {
+  if (!selectedPlayer) {
+    return formData;
   }
 
-  return Boolean(report && String(report.team || '').trim() === String(teamScope.name || '').trim());
+  return {
+    ...formData,
+    player_id: String(selectedPlayer.id),
+    player_name: formData.player_name || selectedPlayer.first_name || '',
+    player_surname: formData.player_surname || selectedPlayer.last_name || '',
+    team: formData.team || selectedPlayer.relational_team_name || defaultTeamName || '',
+    club: formData.club || defaultClub || '',
+    year: formData.year || selectedPlayer.birth_year || '',
+    laterality: formData.laterality || selectedPlayer.laterality || '',
+  };
 }
 
-router.get('/new', ensureAuth, async (req, res) => {
-  const defaultClub =
-    (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
-  const defaultTeamId =
-    (req.session.user && req.session.user.default_team_id) || null;
-  const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
-  const defaultTeam = defaultTeamRecord
-    ? defaultTeamRecord.name
-    : ((req.session.user && req.session.user.default_team) || '');
-
-  const clubFilter = defaultClub || null;
-  let players = await getReportPlayersForContext(clubFilter, defaultTeamId);
-  if (!players.length && defaultTeamId) {
-    players = await getReportPlayersForContext(clubFilter, null);
-  }
-
+async function loadRecommendationConfig(clubName) {
   let recommendationConfig = {};
   try {
-    let rows = await getRecommendationsByClub(defaultClub);
+    let rows = await getRecommendationsByClub(clubName);
     if (!rows || !rows.length) {
       rows = await getRecommendationsByClub('DEFAULT');
     }
@@ -110,19 +110,90 @@ router.get('/new', ensureAuth, async (req, res) => {
     console.error('Error obteniendo recomendaciones de club:', e);
   }
 
+  return recommendationConfig;
+}
+
+async function getReportPlayersForContext(clubName, defaultTeamId = null) {
+  if (defaultTeamId) {
+    const players = await getPlayersByTeamId(defaultTeamId);
+    return players.map(normalizeReportPlayerOption);
+  }
+
+  const players = await getAllPlayers(clubName || null);
+  return players.map(normalizeReportPlayerOption);
+}
+
+function reportBelongsToTeamScope(report, teamScope) {
+  if (!teamScope) {
+    return true;
+  }
+
+  return Boolean(report && String(report.team || '').trim() === String(teamScope.name || '').trim());
+}
+
+function isSuperAdminUser(user) {
+  return Boolean(user && user.role === 'superadmin');
+}
+
+function getReportSessionDefaults(user) {
+  const isSuperAdmin = isSuperAdminUser(user);
+
+  return {
+    defaultClub: isSuperAdmin ? null : ((user && user.default_club) || 'Stadium Venecia'),
+    defaultTeamId: isSuperAdmin ? null : ((user && user.default_team_id) || null),
+    defaultTeam: isSuperAdmin ? '' : ((user && user.default_team) || ''),
+  };
+}
+
+router.get('/new', ensureAuth, async (req, res) => {
+  const { defaultClub, defaultTeamId, defaultTeam } = getReportSessionDefaults(req.session.user);
+  const requestedTeamId = req.query.team_id ? String(req.query.team_id).trim() : null;
+  const activeTeamScope = await getActiveTeamScope(req.session.user);
+  const defaultTeamRecord = defaultTeamId ? await findTeamById(defaultTeamId) : null;
+
+  let scopedTeamRecord = null;
+  if (requestedTeamId) {
+    const candidateTeam = await findTeamById(requestedTeamId);
+    const isAllowedTeam = candidateTeam
+      && (!defaultClub || candidateTeam.club_name === defaultClub)
+      && (!activeTeamScope || String(activeTeamScope.id) === String(candidateTeam.id));
+
+    if (isAllowedTeam) {
+      scopedTeamRecord = candidateTeam;
+    }
+  }
+
+  const resolvedDefaultTeam = scopedTeamRecord
+    ? scopedTeamRecord.name
+    : (defaultTeamRecord ? defaultTeamRecord.name : defaultTeam);
+  const resolvedTeamId = scopedTeamRecord
+    ? scopedTeamRecord.id
+    : defaultTeamId;
+
+  const clubFilter = defaultClub || null;
+  let players = await getReportPlayersForContext(clubFilter, resolvedTeamId);
+  if (!players.length && resolvedTeamId) {
+    players = await getReportPlayersForContext(clubFilter, null);
+  }
+
+  const flowContext = resolveReportFlowContext(players, req.query);
+  const recommendationConfig = await loadRecommendationConfig(defaultClub || 'DEFAULT');
+
   res.render('reports/new', {
-    formData: {
+    formData: populateReportFormFromSelectedPlayer({
       club: defaultClub,
-      team: defaultTeam,
-    },
+      team: resolvedDefaultTeam,
+      team_id: resolvedTeamId || '',
+    }, flowContext.selectedPlayer, defaultClub, resolvedDefaultTeam),
     validationErrors: {},
     players,
     recommendationConfig,
+    flowContext,
   });
   logPageView(req, 'report_new_form', {
     playerCount: players.length,
     scopeClub: defaultClub,
-    defaultTeamId,
+    defaultTeamId: resolvedTeamId,
   });
 });
 
@@ -174,7 +245,10 @@ router.post('/new', ensureAuth, async (req, res) => {
   } = req.body;
 
   try {
-    const sessionDefaultTeamId = (req.session.user && req.session.user.default_team_id) || null;
+    const {
+      defaultClub: sessionDefaultClub,
+      defaultTeamId: sessionDefaultTeamId,
+    } = getReportSessionDefaults(req.session.user);
     const defaultTeamRecord = sessionDefaultTeamId ? await findTeamById(sessionDefaultTeamId) : null;
     const activeTeamScope = await getActiveTeamScope(req.session.user);
 
@@ -242,33 +316,13 @@ router.post('/new', ensureAuth, async (req, res) => {
     const overallRating = avg(overallValues);
 
     if (!player_name || !player_surname) {
-      const clubFilter = (req.session.user && req.session.user.default_club) || null;
+      const clubFilter = sessionDefaultClub || null;
       const playersForForm = await getReportPlayersForContext(
         clubFilter,
         sessionDefaultTeamId,
       );
-      let recommendationConfig = {};
-      try {
-        const clubForRec =
-          (req.session.user && req.session.user.default_club) || clubFilter || 'DEFAULT';
-        let rows = await getRecommendationsByClub(clubForRec);
-        if (!rows || !rows.length) {
-          rows = await getRecommendationsByClub('DEFAULT');
-        }
-        recommendationConfig = rows.reduce((acc, r) => {
-          const opts = (r.options || '')
-            .split(',')
-            .map((s) => s.trim())
-            .filter((s) => s);
-          if (opts.length) {
-            acc[r.year] = opts;
-          }
-          return acc;
-        }, {});
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Error obteniendo recomendaciones de club:', e);
-      }
+      const flowContext = resolveReportFlowContext(playersForForm, req.body, req.body);
+      const recommendationConfig = await loadRecommendationConfig(sessionDefaultClub || clubFilter || 'DEFAULT');
       return res.status(400).render('reports/new', {
         formData: req.body,
         validationErrors: {
@@ -277,12 +331,13 @@ router.post('/new', ensureAuth, async (req, res) => {
         },
         players: playersForForm,
         recommendationConfig,
+        flowContext,
       });
     }
 
     if (activeTeamScope) {
       const allowedPlayers = await getReportPlayersForContext(
-        req.session.user.default_club || null,
+        sessionDefaultClub || null,
         activeTeamScope.id,
       );
       const canCreateForPlayer = allowedPlayers.some((player) => (
@@ -297,12 +352,11 @@ router.post('/new', ensureAuth, async (req, res) => {
     }
 
     // Valores por defecto de club/equipo desde la sesión (si no se ha rellenado nada)
-    const finalClub =
-      club || (req.session.user && req.session.user.default_club) || 'Stadium Venecia';
+    const finalClub = club || sessionDefaultClub || null;
     const finalTeam =
       (activeTeamScope ? activeTeamScope.name : team) || (defaultTeamRecord ? defaultTeamRecord.name : '');
 
-    await createReport({
+    const reportId = await createReport({
       player_name,
       player_surname,
       year: year || null,
@@ -364,7 +418,7 @@ router.post('/new', ensureAuth, async (req, res) => {
       overallRating: overallRating != null ? Number(overallRating.toFixed(2)) : null,
     });
     req.flash('success', 'Informe creado correctamente.');
-    return res.redirect('/reports/new');
+    return res.redirect(`/reports/${reportId}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al crear informe:', err);
@@ -372,15 +426,19 @@ router.post('/new', ensureAuth, async (req, res) => {
       'error',
       `Ha ocurrido un error al guardar el informe: ${err.message}`,
     );
-    const clubFilter = (req.session.user && req.session.user.default_club) || null;
+    const { defaultClub, defaultTeamId } = getReportSessionDefaults(req.session.user);
+    const clubFilter = defaultClub || null;
     const playersForForm = await getReportPlayersForContext(
       clubFilter,
-      (req.session.user && req.session.user.default_team_id) || null,
+      defaultTeamId,
     );
+    const flowContext = resolveReportFlowContext(playersForForm, req.body, req.body);
     return res.status(500).render('reports/new', {
       formData: req.body,
       validationErrors: {},
       players: playersForForm,
+      recommendationConfig: await loadRecommendationConfig(defaultClub || clubFilter || 'DEFAULT'),
+      flowContext,
     });
   }
 });
@@ -391,15 +449,25 @@ router.get('/', ensureAuth, async (req, res) => {
     const isSuperAdmin = req.session.user.role === 'superadmin';
     const clubFilter = isSuperAdmin ? null : req.session.user.default_club || null;
     const activeTeamScope = await getActiveTeamScope(req.session.user);
-    let reports = await getAllReports(clubFilter);
+    const requestedTeamFilter = req.query.team ? String(req.query.team).trim() : null;
+    const effectiveTeamFilter = activeTeamScope
+      ? activeTeamScope.name
+      : requestedTeamFilter;
+    let reports = await getAllReports(clubFilter, { team: effectiveTeamFilter });
     if (activeTeamScope) {
       reports = reports.filter((report) => reportBelongsToTeamScope(report, activeTeamScope));
     }
     logPageView(req, 'reports_list', {
       reportCount: reports.length,
       scopeClub: clubFilter,
+      team: effectiveTeamFilter,
     });
-    res.render('reports/list', { reports });
+    res.render('reports/list', {
+      reports,
+      filters: {
+        team: effectiveTeamFilter || '',
+      },
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Error al obtener informes:', err);
@@ -560,6 +628,12 @@ router.get('/:id', ensureAuth, async (req, res) => {
       req.flash('error', 'Informe no encontrado.');
       return res.redirect('/reports');
     }
+    const clubPlayers = report.club ? await getAllPlayers(report.club) : [];
+    const linkedPlayer = clubPlayers.find((player) => (
+      String(player.first_name || '').trim().toLowerCase() === String(report.player_name || '').trim().toLowerCase()
+      && String(player.last_name || '').trim().toLowerCase() === String(report.player_surname || '').trim().toLowerCase()
+      && (!report.team || !player.relational_team_name || String(player.relational_team_name).trim() === String(report.team).trim())
+    )) || null;
     const radarChartData = await buildReportRadarComparison(report);
     const reportClub = report.club ? await getClubByName(report.club) : null;
     logPageView(req, 'report_detail', {
@@ -572,6 +646,7 @@ router.get('/:id', ensureAuth, async (req, res) => {
       report,
       reportClub,
       radarChartJson: JSON.stringify(radarChartData),
+      linkedPlayer,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

@@ -16,6 +16,10 @@
 
 <div class="mb-3">
   <a href="/reports" class="btn btn-secondary btn-sm">Volver al listado</a>
+  <% if (linkedPlayer) { %>
+    <a href="/players/<%= linkedPlayer.id %>" class="btn btn-primary btn-sm ms-2">Ver ficha del jugador</a>
+    <a href="/evaluations/new?team_id=<%= linkedPlayer.current_team_id || '' %>&player_id=<%= linkedPlayer.id %>" class="btn btn-outline-secondary btn-sm ms-2">Nueva evaluación</a>
+  <% } %>
   <a href="/reports/<%= report.id %>/excel" class="btn btn-success btn-sm ms-2">
     Descargar Excel
   </a>

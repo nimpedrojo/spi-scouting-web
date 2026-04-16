@@ -1,0 +1,130 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Administración de plataforma</h1>
+    <p class="text-muted mb-0">Espacio del superadmin para gobernar la exposición de producto y la operación global de SoccerProcessIQ Suite.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/clubs" class="btn btn-outline-secondary">Clubes</a>
+    <a href="/admin/users" class="btn btn-outline-secondary">Usuarios</a>
+    <a href="/dashboard" class="btn btn-primary">Volver al panel</a>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted">Clubes</div>
+        <div class="display-6 fw-semibold"><%= stats.clubs %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted">Usuarios</div>
+        <div class="display-6 fw-semibold"><%= stats.users %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted">Admins de club</div>
+        <div class="display-6 fw-semibold"><%= stats.admins %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-uppercase text-muted">Superadmins</div>
+        <div class="display-6 fw-semibold"><%= stats.superadmins %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header">Modo de producto global</div>
+      <div class="card-body">
+        <p class="text-muted">
+          Define la exposición funcional por defecto de la plataforma. Cada club podrá heredar este valor o tener su propio override desde la configuración del club.
+        </p>
+
+        <form method="POST" action="/admin/platform/product-mode">
+          <div class="vstack gap-3 mb-4">
+            <% platformSettings.availableModes.forEach((modeEntry) => { %>
+              <label class="border rounded p-3 d-block">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="default_product_mode"
+                    value="<%= modeEntry.key %>"
+                    id="platform_mode_<%= modeEntry.key %>"
+                    <%= platformSettings.defaultMode === modeEntry.key ? 'checked' : '' %>
+                  />
+                  <span class="form-check-label fw-semibold" for="platform_mode_<%= modeEntry.key %>">
+                    <%= modeEntry.label %>
+                  </span>
+                </div>
+                <div class="small text-muted mt-2"><%= modeEntry.description %></div>
+              </label>
+            <% }) %>
+          </div>
+
+          <div class="border rounded bg-light p-3 mb-3">
+            <div class="small text-uppercase text-muted">Modo activo por defecto</div>
+            <div class="fw-semibold"><%= platformSettings.defaultModeMeta.label %></div>
+            <div class="small text-muted"><%= platformSettings.defaultModeMeta.productLabel %> · <%= platformSettings.defaultModeMeta.productSubtitle %></div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Guardar modo global</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header">Accesos de plataforma</div>
+      <div class="card-body">
+        <div class="list-group list-group-flush">
+          <a href="/clubs" class="list-group-item list-group-item-action px-0">
+            <div class="fw-semibold">Gestión de clubes</div>
+            <div class="small text-muted">Alta, edición y baja de clubes de la suite.</div>
+          </a>
+          <a href="/admin/users" class="list-group-item list-group-item-action px-0">
+            <div class="fw-semibold">Usuarios y roles</div>
+            <div class="small text-muted">Administración global de usuarios, admins y superadmins.</div>
+          </a>
+          <a href="/admin/club" class="list-group-item list-group-item-action px-0">
+            <div class="fw-semibold">Configuración por club</div>
+            <div class="small text-muted">Módulos, branding, modo de producto y estructura del club seleccionado.</div>
+          </a>
+          <a href="/admin/players" class="list-group-item list-group-item-action px-0">
+            <div class="fw-semibold">Jugadores</div>
+            <div class="small text-muted">Consulta y mantenimiento global de jugadores cargados en la plataforma.</div>
+          </a>
+        </div>
+
+        <% if (clubs && clubs.length) { %>
+          <div class="mt-4">
+            <div class="fw-semibold mb-2">Clubes recientes</div>
+            <ul class="list-group list-group-flush">
+              <% clubs.forEach((club) => { %>
+                <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                  <span><%= club.name %></span>
+                  <a href="/admin/club?club_id=<%= club.id %>" class="btn btn-sm btn-outline-secondary">Abrir</a>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>

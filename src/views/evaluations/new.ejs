@@ -1,5 +1,22 @@
 <div class="card shadow-sm">
   <div class="card-body">
+    <% const selectedTeamId = formValues.team_id || formData.teamId || ''; %>
+    <% const selectedPlayerId = formValues.player_id || formData.playerId || ''; %>
+    <% const allPlayers = formData.allPlayers || formData.players || []; %>
+    <% const selectedTeam = (formData.teams || []).find((team) => String(team.id) === String(selectedTeamId)); %>
+    <% const selectedPlayer = allPlayers.find((player) => String(player.id) === String(selectedPlayerId)); %>
+    <% if ((productModeInfo && productModeInfo.isPmvPlayerTracking) && (selectedTeam || selectedPlayer)) { %>
+      <div class="border rounded-3 bg-light p-3 mb-4">
+        <div class="small text-uppercase text-muted mb-1">Flujo PMV</div>
+        <div class="fw-semibold mb-1">
+          <%= selectedPlayer ? `${selectedPlayer.first_name} ${selectedPlayer.last_name}` : 'Nueva evaluación' %>
+        </div>
+        <div class="text-muted small">
+          <%= selectedTeam ? `Equipo: ${selectedTeam.name}. ` : '' %>
+          Registra una evaluación y vuelve después a la ficha del jugador para revisar su histórico.
+        </div>
+      </div>
+    <% } %>
     <% if (errors && errors.length) { %>
       <div class="alert alert-danger">
         <ul class="mb-0">
@@ -46,7 +63,7 @@
         <select id="team_id" name="team_id" class="form-select" required>
           <option value="">Selecciona equipo</option>
           <% formData.teams.forEach((team) => { %>
-            <option value="<%= team.id %>" <%= String(formValues.team_id || '') === String(team.id) ? 'selected' : '' %>><%= team.name %></option>
+            <option value="<%= team.id %>" <%= String(selectedTeamId) === String(team.id) ? 'selected' : '' %>><%= team.name %></option>
           <% }) %>
         </select>
       </div>
@@ -55,7 +72,11 @@
         <select id="player_id" name="player_id" class="form-select" required>
           <option value="">Selecciona jugador</option>
           <% formData.players.forEach((player) => { %>
-            <option value="<%= player.id %>" <%= String(formValues.player_id || '') === String(player.id) ? 'selected' : '' %>>
+            <option
+              value="<%= player.id %>"
+              data-team-id="<%= player.current_team_id || '' %>"
+              <%= String(selectedPlayerId) === String(player.id) ? 'selected' : '' %>
+            >
               <%= player.first_name %> <%= player.last_name %>
             </option>
           <% }) %>
@@ -104,8 +125,70 @@
 
       <div class="col-12 d-flex gap-2">
         <button type="submit" class="btn btn-primary">Guardar evaluacion</button>
-        <a href="/evaluations" class="btn btn-outline-secondary">Cancelar</a>
+        <a href="<%= (flowContext && flowContext.returnToPlayerHref) || (flowContext && flowContext.returnToTeamHref) || '/evaluations' %>" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+  (function () {
+    var teamSelect = document.getElementById('team_id');
+    var playerSelect = document.getElementById('player_id');
+    if (!teamSelect || !playerSelect) return;
+
+    var allPlayers = <%- JSON.stringify(allPlayers.map((player) => ({
+      id: player.id,
+      first_name: player.first_name,
+      last_name: player.last_name,
+      current_team_id: player.current_team_id || '',
+    }))) %>;
+    var selectedPlayerId = <%- JSON.stringify(String(selectedPlayerId || '')) %>;
+
+    function buildOption(player, isSelected) {
+      var option = document.createElement('option');
+      option.value = String(player.id);
+      option.textContent = [player.first_name, player.last_name].filter(Boolean).join(' ');
+      option.dataset.teamId = player.current_team_id || '';
+      if (isSelected) {
+        option.selected = true;
+      }
+      return option;
+    }
+
+    function syncPlayers() {
+      var selectedTeamId = String(teamSelect.value || '');
+      var currentPlayerId = String(playerSelect.value || selectedPlayerId || '');
+      var filteredPlayers = selectedTeamId
+        ? allPlayers.filter(function (player) {
+          return String(player.current_team_id || '') === selectedTeamId;
+        })
+        : allPlayers;
+
+      playerSelect.innerHTML = '';
+      playerSelect.appendChild(buildOption({
+        id: '',
+        first_name: 'Selecciona',
+        last_name: 'jugador',
+        current_team_id: '',
+      }, false));
+      playerSelect.options[0].value = '';
+
+      var hasSelectedPlayer = false;
+      filteredPlayers.forEach(function (player) {
+        var isSelected = currentPlayerId && String(player.id) === currentPlayerId;
+        if (isSelected) {
+          hasSelectedPlayer = true;
+        }
+        playerSelect.appendChild(buildOption(player, isSelected));
+      });
+
+      if (!hasSelectedPlayer) {
+        playerSelect.value = '';
+      }
+    }
+
+    teamSelect.addEventListener('change', syncPlayers);
+    syncPlayers();
+  })();
+</script>

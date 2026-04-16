@@ -1,0 +1,179 @@
+<div class="mb-4">
+  <a href="/planning/plans/<%= detail.seasonPlan.id %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+    <span aria-hidden="true">←</span>
+    <span>Volver a la planificación</span>
+  </a>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+      <div>
+        <div class="dashboard-entry-eyebrow">Microciclo</div>
+        <h1 class="h3 mb-2"><%= detail.microcycle.name %></h1>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge text-bg-light border">Orden <%= detail.microcycle.order_index %></span>
+          <span class="badge text-bg-light border"><%= detail.microcycle.phase || 'Sin fase' %></span>
+          <span class="badge text-bg-light border"><%= detail.sessions.length %> sesiones</span>
+        </div>
+        <p class="text-muted mb-0"><%= detail.microcycle.objective || 'Sin objetivo específico definido.' %></p>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/planning/sessions/new?microcycle_id=<%= detail.microcycle.id %>" class="btn btn-primary">Nueva sesión</a>
+        <a href="/planning/templates/new?microcycle_id=<%= detail.microcycle.id %>" class="btn btn-outline-secondary">Guardar como plantilla</a>
+        <form method="POST" action="/planning/microcycles/<%= detail.microcycle.id %>/duplicate">
+          <button type="submit" class="btn btn-outline-secondary">Duplicar</button>
+        </form>
+        <a href="/planning/microcycles/<%= detail.microcycle.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+        <form method="POST" action="/planning/microcycles/<%= detail.microcycle.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar este microciclo?');">
+          <button type="submit" class="btn btn-outline-danger">Eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Equipo</div>
+        <div class="fw-semibold"><%= detail.seasonPlan.team_name %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Planificación</div>
+        <div class="fw-semibold"><%= detail.seasonPlan.season_label %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Fechas</div>
+        <div class="fw-semibold">
+          <%= detail.microcycle.start_date_iso || '-' %>
+          -
+          <%= detail.microcycle.end_date_iso || '-' %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="h4 mb-0">Resumen de estados</h2>
+      <span class="small text-muted">Seguimiento metodológico del microciclo</span>
+    </div>
+
+    <div class="row g-3">
+      <% detail.statusSummary.forEach((statusItem) => { %>
+        <div class="col-md-4">
+          <div class="planning-status-card border rounded-3 p-3 h-100">
+            <span class="badge <%= statusItem.badgeClass %> mb-2"><%= statusItem.label %></span>
+            <div class="display-6 fw-semibold"><%= statusItem.count %></div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="h4 mb-0">Sesiones</h2>
+      <a href="/planning/sessions/new?microcycle_id=<%= detail.microcycle.id %>" class="btn btn-sm btn-primary">Nueva sesión</a>
+    </div>
+
+    <% if (!detail.sessions.length) { %>
+      <p class="mb-0 text-muted">Todavía no hay sesiones para este microciclo.</p>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th>Tareas</th>
+              <th>Duración</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% detail.sessions.forEach((session) => { %>
+              <tr>
+                <td><%= session.session_date_iso || '-' %></td>
+                <td>
+                  <div class="fw-semibold"><%= session.title %></div>
+                  <div class="small text-muted"><%= session.objective || 'Sin objetivo específico' %></div>
+                </td>
+                <td><%= session.session_type || '-' %></td>
+                <td><span class="badge <%= session.status_meta.badgeClass %>"><%= session.status_meta.label %></span></td>
+                <td><%= session.task_count || 0 %></td>
+                <td><%= session.duration_minutes ? session.duration_minutes + ' min' : '-' %></td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <a href="/planning/sessions/<%= session.id %>" class="btn btn-sm btn-primary">Abrir</a>
+                    <a href="/planning/sessions/<%= session.id %>/edit?microcycle_id=<%= detail.microcycle.id %>" class="btn btn-sm btn-outline-secondary">Editar</a>
+                    <form method="POST" action="/planning/sessions/<%= session.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar esta sesión?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="h4 mb-0">Vista semanal</h2>
+      <span class="small text-muted">Lectura rápida por día de trabajo</span>
+    </div>
+
+    <% if (!detail.weeklyView.length) { %>
+      <p class="mb-0 text-muted">Todavía no hay sesiones para construir la semana operativa.</p>
+    <% } else { %>
+      <div class="row g-3">
+        <% detail.weeklyView.forEach((dayEntry) => { %>
+          <div class="col-lg-4 col-md-6">
+            <div class="planning-weekday-card border rounded-3 h-100 p-3">
+              <div class="small text-muted text-uppercase mb-2"><%= dayEntry.label %></div>
+              <div class="fw-semibold mb-3"><%= dayEntry.isoDate === 'sin-fecha' ? 'Sin fecha' : dayEntry.isoDate %></div>
+              <div class="d-grid gap-2">
+                <% dayEntry.sessions.forEach((session) => { %>
+                  <div class="border rounded-3 p-2 bg-body-tertiary">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div>
+                        <div class="fw-semibold"><%= session.title %></div>
+                        <div class="small text-muted"><%= session.session_type || 'Sin tipo' %></div>
+                      </div>
+                      <span class="badge <%= session.status_meta.badgeClass %>"><%= session.status_meta.label %></span>
+                    </div>
+                    <% if (session.duration_minutes) { %>
+                      <div class="small text-muted mt-2"><%= session.duration_minutes %> min</div>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</div>

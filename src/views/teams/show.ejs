@@ -1,32 +1,91 @@
+<%
+  const workspaceSummary = team.workspaceSummary || {};
+  const recentActivity = team.recentActivity || { evaluations: [], reports: [], scoutingTeams: [] };
+  const hasRecentActivity = recentActivity.evaluations.length || recentActivity.reports.length || recentActivity.scoutingTeams.length;
+  const isPmvMode = productMode && productMode.isPmvPlayerTracking;
+  const teamBenchmark = team.teamBenchmark || null;
+  function getLateralityFilterMeta(value) {
+    const normalized = String(value || '').trim().toUpperCase();
+
+    if (!normalized) {
+      return { key: 'unknown', label: 'Sin dato' };
+    }
+
+    if (['DER', 'DERECHO', 'DIESTRO', 'RIGHT'].includes(normalized)) {
+      return { key: 'right', label: 'Derecho' };
+    }
+
+    if (['IZQ', 'IZQUIERDO', 'ZURDO', 'LEFT'].includes(normalized)) {
+      return { key: 'left', label: 'Zurdo' };
+    }
+
+    if (['AMB', 'AMBIDIESTRO', 'BOTH'].includes(normalized)) {
+      return { key: 'both', label: 'Ambidiestro' };
+    }
+
+    return { key: 'unknown', label: 'Sin dato' };
+  }
+
+  const rosterYears = Array.from(new Set(
+    team.players
+      .map((player) => Number(player.birth_year))
+      .filter((year) => Number.isInteger(year) && year > 1900)
+  )).sort((a, b) => b - a);
+
+  const rosterPositions = Array.from(new Set(
+    team.players
+      .map((player) => String(player.primary_position || '').trim().toUpperCase())
+      .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'es'));
+
+  const rosterLateralityOptions = Array.from(team.players.reduce((map, player) => {
+    const meta = getLateralityFilterMeta(player.laterality);
+    map.set(meta.key, meta.label);
+    return map;
+  }, new Map()).entries()).map(([value, label]) => ({ value, label }));
+%>
+
 <div class="mb-4">
-  <a href="/teams" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
+  <a href="/teams<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="text-decoration-none text-muted d-inline-flex align-items-center gap-2">
     <span aria-hidden="true">←</span>
     <span>Volver a Plantillas</span>
   </a>
 </div>
 
-<div class="team-detail-hero card shadow-sm mb-4">
-  <div class="card-body">
+<section class="team-workspace-hero card pmv-surface-card shadow-sm border-0 mb-4">
+  <div class="card-body p-4 p-lg-5">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
       <div class="d-flex align-items-start gap-3">
-        <div class="team-detail-hero__crest">SR</div>
+        <div class="team-detail-hero__crest">SPI</div>
         <div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="dashboard-kicker"><%= isPmvMode ? 'SPI Player Tracking' : 'SoccerProcessIQ Suite' %></span>
+            <span class="badge text-bg-light border"><%= isPmvMode ? 'Equipo activo' : 'Team Workspace' %></span>
+          </div>
           <h1 class="team-detail-hero__title mb-2"><%= team.name %></h1>
-          <div class="d-flex flex-wrap gap-2">
-            <span class="badge text-bg-light"><%= team.season_name %></span>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <span class="badge text-bg-light"><%= team.club_name %></span>
             <span class="badge text-bg-primary"><%= team.category_name %></span>
             <span class="badge text-bg-light"><%= team.section_name %></span>
-            <span class="badge text-bg-light"><%= team.players.length %> jugadores</span>
+            <span class="badge text-bg-light"><%= team.season_name %></span>
           </div>
-          <div class="small text-muted mt-2"><%= team.club_name %></div>
+          <p class="text-muted mb-0">
+            <% if (isPmvMode) { %>
+              Espacio operativo del equipo para seguir jugadores, registrar actividad y entrar rápido a informes y evaluaciones.
+            <% } else { %>
+              Centro operativo del equipo dentro de la suite modular. Desde aquí puedes entrar al core del equipo y a los módulos activos del club.
+            <% } %>
+          </p>
         </div>
       </div>
 
       <div class="d-flex gap-2 flex-wrap">
-        <a href="/evaluations?team_id=<%= team.id %>" class="btn btn-outline-secondary">Evaluaciones</a>
-        <a href="/season-forecast/team/<%= team.id %>" class="btn btn-outline-secondary">Previsión 26/27</a>
+        <% if (activeModules.includes('scouting_players')) { %>
+          <a href="/evaluations/new?team_id=<%= team.id %>" class="btn btn-primary"><%= isPmvMode ? 'Nueva evaluación' : 'Evaluaciones' %></a>
+          <a href="/reports/new?team_id=<%= team.id %>" class="btn btn-outline-secondary"><%= isPmvMode ? 'Nuevo informe' : 'Informes' %></a>
+        <% } %>
         <% if (canManageMultipleTeams) { %>
-          <a href="/teams/<%= team.id %>/edit" class="btn btn-outline-secondary">Editar</a>
+          <a href="/teams/<%= team.id %>/edit<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-outline-secondary">Editar equipo</a>
         <% } %>
         <% if (canManageMultipleTeams && team.source === 'processiq' && team.external_id) { %>
           <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" class="d-inline">
@@ -37,17 +96,349 @@
       </div>
     </div>
   </div>
-</div>
+</section>
+
+<% if (isPmvMode && activeModules.includes('scouting_players')) { %>
+  <section class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Estado actual del equipo</h2>
+        <p class="text-muted mb-0">Lectura simple del nivel medio del grupo con las últimas evaluaciones disponibles de cada jugador.</p>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <% if (!teamBenchmark || !teamBenchmark.isReady) { %>
+          <p class="mb-0 text-muted"><%= (teamBenchmark && teamBenchmark.message) || 'Aún no hay suficientes evaluaciones para mostrar una visión útil del equipo.' %></p>
+        <% } else { %>
+          <div class="row g-4 mb-4">
+            <div class="col-12 col-md-6 col-xl-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-uppercase text-muted">Jugadores evaluados</div>
+                <div class="h3 mb-1"><%= teamBenchmark.evaluatedPlayersCount %>/<%= teamBenchmark.totalPlayers %></div>
+                <div class="small text-muted">Jugadores del equipo con base válida de comparación</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-uppercase text-muted">Evaluaciones usadas</div>
+                <div class="h3 mb-1"><%= teamBenchmark.evaluationsConsideredCount %></div>
+                <div class="small text-muted">Máximo 3 por jugador en temporada activa</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-uppercase text-muted">Última evaluación</div>
+                <div class="h5 mb-1"><%= teamBenchmark.lastEvaluationDate ? new Date(teamBenchmark.lastEvaluationDate).toISOString().slice(0, 10) : '-' %></div>
+                <div class="small text-muted">Última fecha incorporada al estado actual</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="small text-uppercase text-muted">Media global</div>
+                <div class="h3 mb-1"><%= teamBenchmark.globalAverage != null ? teamBenchmark.globalAverage.toFixed(2) : '-' %></div>
+                <div class="small text-muted">Promedio simple de las áreas disponibles</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-4">
+            <div class="col-lg-7">
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Área</th>
+                      <th class="text-end">Media</th>
+                      <th class="w-50">Lectura</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% teamBenchmark.areaEntries.forEach((area) => { %>
+                      <tr>
+                        <td><%= area.label %></td>
+                        <td class="text-end fw-semibold"><%= area.average != null ? area.average.toFixed(2) : '-' %></td>
+                        <td>
+                          <div class="progress" role="progressbar" aria-label="<%= area.label %>" aria-valuenow="<%= area.average != null ? area.average * 10 : 0 %>" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width: <%= area.average != null ? Math.max(0, Math.min(100, area.average * 10)) : 0 %>%"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="col-lg-5">
+              <div class="border rounded-3 p-3 h-100 bg-light">
+                <h3 class="h6 mb-3">Lectura rápida</h3>
+                <% if (teamBenchmark.strongestAreaText) { %>
+                  <p class="mb-2"><%= teamBenchmark.strongestAreaText %></p>
+                <% } %>
+                <% if (teamBenchmark.improvementAreaText) { %>
+                  <p class="mb-0"><%= teamBenchmark.improvementAreaText %></p>
+                <% } %>
+
+                <% if (teamBenchmark.aboveAveragePlayers && teamBenchmark.aboveAveragePlayers.length) { %>
+                  <div class="mt-4">
+                    <div class="small text-uppercase text-muted mb-2">Por encima de la media</div>
+                    <ul class="list-unstyled mb-0">
+                      <% teamBenchmark.aboveAveragePlayers.forEach((player) => { %>
+                        <li class="d-flex justify-content-between py-1">
+                          <span><%= player.fullName %></span>
+                          <strong>+<%= player.difference.toFixed(2) %></strong>
+                        </li>
+                      <% }) %>
+                    </ul>
+                  </div>
+                <% } %>
+
+                <% if (teamBenchmark.improvementPlayers && teamBenchmark.improvementPlayers.length) { %>
+                  <div class="mt-4">
+                    <div class="small text-uppercase text-muted mb-2">Con margen de mejora</div>
+                    <ul class="list-unstyled mb-0">
+                      <% teamBenchmark.improvementPlayers.forEach((player) => { %>
+                        <li class="d-flex justify-content-between py-1">
+                          <span><%= player.fullName %></span>
+                          <strong><%= player.difference.toFixed(2) %></strong>
+                        </li>
+                      <% }) %>
+                    </ul>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </section>
+<% } %>
+
+<section class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h4 mb-1">Resumen rápido</h2>
+      <p class="text-muted mb-0"><%= isPmvMode ? 'Indicadores esenciales para el seguimiento estructurado del equipo.' : 'Indicadores disponibles del equipo con datos reales ya modelados en la plataforma.' %></p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
+        <div class="card-body">
+          <div class="dashboard-entry-eyebrow">Plantilla</div>
+          <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.playerCount || 0 %></div>
+          <div class="text-muted small">Jugadores asignados al equipo</div>
+        </div>
+      </div>
+    </div>
+    <% if (activeModules.includes('scouting_players')) { %>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
+          <div class="card-body">
+            <div class="dashboard-entry-eyebrow">SPI Scouting Players</div>
+            <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.evaluationCount || 0 %></div>
+            <div class="text-muted small">Evaluaciones estructuradas del equipo</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card <%= isPmvMode ? 'pmv-insight-card' : 'dashboard-entry-card' %> h-100 shadow-sm">
+          <div class="card-body">
+            <div class="dashboard-entry-eyebrow">Informes de jugador</div>
+            <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.scoutingPlayerReportCount || 0 %></div>
+            <div class="text-muted small">Informes asociados por club y nombre de equipo</div>
+          </div>
+        </div>
+      </div>
+    <% } %>
+    <% if (!isPmvMode && activeModules.includes('scouting_teams')) { %>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card dashboard-entry-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="dashboard-entry-eyebrow">SPI Scouting Teams</div>
+            <div class="display-6 fw-semibold mb-1"><%= workspaceSummary.scoutingTeamReportCount || 0 %></div>
+            <div class="text-muted small">Informes rivales vinculados por equipo propio</div>
+          </div>
+        </div>
+      </div>
+    <% } else if (!isPmvMode && activeModules.includes('planning')) { %>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card dashboard-entry-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="dashboard-entry-eyebrow">SPI Planning</div>
+            <div class="fw-semibold mb-1">Módulo activo</div>
+            <div class="text-muted small">Disponible a nivel de club, sin contadores específicos por equipo todavía.</div>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h4 mb-1"><%= isPmvMode ? 'Accesos rápidos' : 'SPI Core' %></h2>
+      <p class="text-muted mb-0"><%= isPmvMode ? 'Flujos principales para trabajar el seguimiento de jugadores desde este equipo.' : 'Accesos base del equipo dentro del núcleo operativo de la suite.' %></p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <% coreActions.forEach((entry) => { %>
+        <div class="col-12 col-md-6 col-xl-4">
+          <a href="<%= entry.href %>" class="text-decoration-none text-reset">
+          <div class="card <%= isPmvMode ? 'pmv-action-card pmv-action-card--compact' : 'dashboard-entry-card' %> h-100 shadow-sm">
+            <div class="card-body">
+              <div class="dashboard-entry-eyebrow">SPI Core</div>
+              <h3 class="h5 mb-2"><%= entry.title %></h3>
+              <p class="text-muted small mb-3"><%= entry.description %></p>
+              <div class="small fw-semibold"><%= entry.meta %></div>
+            </div>
+          </div>
+        </a>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<% if (!isPmvMode) { %>
+<section class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h4 mb-1">Módulos activos</h2>
+      <p class="text-muted mb-0">Solo se muestran los módulos activos del club que tienen sentido en el contexto del equipo.</p>
+    </div>
+    <span class="badge rounded-pill text-bg-light border"><%= moduleEntries.length %> visibles</span>
+  </div>
+
+  <% if (moduleEntries.length) { %>
+    <div class="row g-4">
+      <% moduleEntries.forEach((moduleEntry) => { %>
+        <div class="col-12 col-lg-6">
+          <div class="card dashboard-module-card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                  <div class="dashboard-entry-eyebrow">Módulo activo</div>
+                  <h3 class="h5 mb-1"><%= moduleEntry.title %></h3>
+                </div>
+                <span class="badge rounded-pill text-bg-success-subtle border border-success-subtle text-success-emphasis">Activo</span>
+              </div>
+              <p class="mb-3"><%= moduleEntry.description %></p>
+              <% if (moduleEntry.note) { %>
+                <div class="small text-muted border rounded-3 p-2 mb-3"><%= moduleEntry.note %></div>
+              <% } %>
+              <div class="mt-auto d-flex flex-wrap gap-2">
+                <% moduleEntry.actions.forEach((action) => { %>
+                  <a href="<%= action.href %>" class="btn btn-<%= action.variant %>"><%= action.label %></a>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <p class="mb-0 text-muted">Este equipo no tiene módulos adicionales activos más allá de SPI Core.</p>
+      </div>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
+<% if (hasRecentActivity) { %>
+  <section class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Actividad reciente</h2>
+        <p class="text-muted mb-0">Últimos movimientos detectados para este equipo en los módulos disponibles.</p>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <% if (recentActivity.evaluations.length) { %>
+        <div class="col-12 col-lg-4">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
+            <div class="card-body">
+              <div class="dashboard-entry-eyebrow">Evaluaciones</div>
+              <ul class="list-unstyled mb-0">
+                <% recentActivity.evaluations.forEach((item) => { %>
+                  <li class="team-activity-item">
+                    <div class="fw-semibold"><%= item.playerName %></div>
+                    <div class="small text-muted"><%= item.title %> · <%= item.date ? new Date(item.date).toISOString().slice(0, 10) : '-' %></div>
+                    <div class="small text-muted">Autor: <%= item.authorName || '-' %> · Media: <%= Number(item.overallScore || 0).toFixed(2) %></div>
+                  </li>
+                <% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (recentActivity.reports.length) { %>
+        <div class="col-12 col-lg-4">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
+            <div class="card-body">
+              <div class="dashboard-entry-eyebrow">Informes de jugador</div>
+              <ul class="list-unstyled mb-0">
+                <% recentActivity.reports.forEach((item) => { %>
+                  <li class="team-activity-item">
+                    <div class="fw-semibold"><a href="/reports/<%= item.id %>" class="text-decoration-none"><%= item.title %></a></div>
+                    <div class="small text-muted"><%= item.date ? new Date(item.date).toISOString().slice(0, 10) : '-' %></div>
+                    <div class="small text-muted">Scout: <%= item.authorName || '-' %><% if (item.overallRating !== null) { %> · Rating: <%= Number(item.overallRating).toFixed(2) %><% } %></div>
+                  </li>
+                <% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (recentActivity.scoutingTeams.length) { %>
+        <div class="col-12 col-lg-4">
+          <div class="card <%= isPmvMode ? 'pmv-list-card' : '' %> shadow-sm h-100">
+            <div class="card-body">
+              <div class="dashboard-entry-eyebrow">Scouting rival</div>
+              <ul class="list-unstyled mb-0">
+                <% recentActivity.scoutingTeams.forEach((item) => { %>
+                  <li class="team-activity-item">
+                    <div class="fw-semibold"><a href="/scouting-teams/<%= item.id %>" class="text-decoration-none"><%= item.title %></a></div>
+                    <div class="small text-muted"><%= item.competition || 'Sin competición' %></div>
+                    <div class="small text-muted"><%= item.date ? new Date(item.date).toISOString().slice(0, 10) : '-' %> · <%= item.authorName || '-' %></div>
+                  </li>
+                <% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </section>
+<% } %>
 
 <div class="team-detail-tabs mb-4">
-  <a href="/teams/<%= team.id %>?view=list" class="team-detail-tab <%= viewMode === 'list' ? 'active' : '' %>">Plantilla</a>
-  <a href="/season-forecast/team/<%= team.id %>" class="team-detail-tab">Previsión 26/27</a>
-  <a href="/evaluations?team_id=<%= team.id %>" class="team-detail-tab">Evaluaciones</a>
+  <a href="/teams/<%= team.id %>?view=list#team-roster" class="team-detail-tab <%= viewMode === 'list' ? 'active' : '' %>">Plantilla</a>
+  <!--<a href="/teams/<%= team.id %>?view=cards#team-roster" class="team-detail-tab <%= viewMode === 'cards' ? 'active' : '' %>">Tarjetas</a>-->
+  <% if (activeModules.includes('scouting_players')) { %>
+    <a href="/evaluations?team_id=<%= team.id %>" class="team-detail-tab">Evaluaciones</a>
+  <% } %>
+  <% if (!isPmvMode && activeModules.includes('planning')) { %>
+    <a href="/planning?team_id=<%= team.id %>" class="team-detail-tab">Planning</a>
+  <% } %>
+  <% if (!isPmvMode && activeModules.includes('scouting_teams')) { %>
+    <a href="/scouting-teams?team_id=<%= team.id %>" class="team-detail-tab">Scouting rival</a>
+  <% } %>
 </div>
 
 <div class="row g-4">
   <div class="col-xl-4">
-    <div class="card shadow-sm h-100 team-detail-panel">
+    <div class="card <%= isPmvMode ? 'pmv-surface-card' : '' %> shadow-sm h-100 team-detail-panel">
       <div class="card-body">
         <div class="team-detail-panel__heading">Cobertura de posiciones</div>
 
@@ -105,35 +496,92 @@
     </div>
   </div>
 
-  <div class="col-xl-8">
-    <div class="card shadow-sm h-100 team-detail-panel">
+  <div class="col-xl-8" id="team-roster">
+    <div class="card <%= isPmvMode ? 'pmv-surface-card' : '' %> shadow-sm h-100 team-detail-panel">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
           <div>
-            <h2 class="h4 mb-0">Plantilla — <%= team.name %></h2>
+            <h2 class="h4 mb-0">Plantilla del equipo</h2>
+            <% if (isPmvMode) { %>
+              <p class="text-muted mb-0 mt-1">Desde aquí puedes entrar al jugador, registrar actividad y volver rápido a su ficha.</p>
+            <% } %>
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <span class="badge text-bg-light"><%= team.players.length %> jugadores</span>
             <div class="btn-group" role="group" aria-label="Modo de vista de jugadores">
-              <a href="/teams/<%= team.id %>?view=list" class="btn btn-sm btn-outline-secondary <%= viewMode === 'list' ? 'active' : '' %>">Lista</a>
-              <a href="/teams/<%= team.id %>?view=cards" class="btn btn-sm btn-outline-secondary <%= viewMode === 'cards' ? 'active' : '' %>">Tarjetas</a>
+              <a href="/teams/<%= team.id %>?view=list#team-roster" class="btn btn-sm btn-outline-secondary <%= viewMode === 'list' ? 'active' : '' %>">Lista</a>
+              <a href="/teams/<%= team.id %>?view=cards#team-roster" class="btn btn-sm btn-outline-secondary <%= viewMode === 'cards' ? 'active' : '' %>">Tarjetas</a>
             </div>
           </div>
         </div>
 
         <% if (!team.players.length) { %>
-          <p class="mb-0 text-muted">No hay jugadores asignados a esta plantilla.</p>
-        <% } else if (viewMode === 'cards') { %>
-          <div class="row g-3">
+          <div class="border rounded-3 bg-light p-3">
+            <p class="mb-2 text-muted">No hay jugadores asignados a esta plantilla.</p>
+            <a href="/admin/players/new" class="btn btn-sm btn-primary">Añadir primer jugador</a>
+          </div>
+        <% } else { %>
+          <div class="border rounded-3 bg-light-subtle p-3 mb-3" id="team-roster-filters">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-year" class="form-label small text-uppercase text-muted mb-1">Año</label>
+                <select id="roster-filter-year" class="form-select form-select-sm">
+                  <option value="">Todos los años</option>
+                  <% rosterYears.forEach((year) => { %>
+                    <option value="<%= year %>"><%= year %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-position" class="form-label small text-uppercase text-muted mb-1">Posicion</label>
+                <select id="roster-filter-position" class="form-select form-select-sm">
+                  <option value="">Todas las posiciones</option>
+                  <% rosterPositions.forEach((position) => { %>
+                    <option value="<%= position %>"><%= position %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-laterality" class="form-label small text-uppercase text-muted mb-1">Lateralidad</label>
+                <select id="roster-filter-laterality" class="form-select form-select-sm">
+                  <option value="">Todas</option>
+                  <% rosterLateralityOptions.forEach((option) => { %>
+                    <option value="<%= option.value %>"><%= option.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mt-3">
+              <div class="small text-muted">
+                Mostrando <strong id="roster-visible-count"><%= team.players.length %></strong> de <strong><%= team.players.length %></strong> jugadores
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="roster-filter-reset">Limpiar filtros</button>
+            </div>
+          </div>
+
+          <div class="alert alert-light border d-none mb-0" id="team-roster-empty-state" role="status">
+            No hay jugadores que coincidan con los filtros seleccionados.
+          </div>
+        <% } %>
+
+        <% if (team.players.length && viewMode === 'cards') { %>
+          <div class="row g-3" id="team-roster-cards">
             <% team.players.forEach((player, index) => { %>
-              <div class="col-md-6">
+              <% const lateralityMeta = getLateralityFilterMeta(player.laterality); %>
+              <div
+                class="col-md-6"
+                data-roster-item
+                data-year="<%= player.birth_year || '' %>"
+                data-position="<%= player.primary_position || '' %>"
+                data-laterality="<%= lateralityMeta.key %>"
+              >
                 <div class="team-player-card h-100">
                   <div class="team-player-card__rank"><%= index + 1 %></div>
                   <div class="team-player-card__body">
                     <div class="d-flex justify-content-between gap-3">
                       <div>
                         <div class="team-player-card__name"><%= player.full_name %></div>
-                        <div class="small text-muted"><%= player.birth_year || '-' %></div>
+                        <div class="small text-muted"><%= player.birth_year || '-' %> · <%= player.laterality || 'Sin dato' %></div>
                       </div>
                       <div class="team-player-card__meta">
                         <span class="badge text-bg-primary">#<%= player.dorsal || '-' %></span>
@@ -145,6 +593,10 @@
                     </div>
                     <div class="d-flex gap-2 mt-3">
                       <a href="/players/<%= player.id %>" class="btn btn-sm btn-outline-secondary">Perfil</a>
+                      <% if (activeModules.includes('scouting_players')) { %>
+                        <a href="/evaluations/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Evaluar</a>
+                        <a href="/reports/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Informe</a>
+                      <% } %>
                       <a href="/admin/players/<%= player.id %>/edit" class="btn btn-sm btn-primary">Editar</a>
                     </div>
                   </div>
@@ -152,7 +604,7 @@
               </div>
             <% }) %>
           </div>
-        <% } else { %>
+        <% } else if (team.players.length) { %>
           <div class="table-responsive">
             <table class="table align-middle team-detail-table">
               <thead>
@@ -165,14 +617,20 @@
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="team-roster-table-body">
                 <% team.players.forEach((player, index) => { %>
-                  <tr>
+                  <% const lateralityMeta = getLateralityFilterMeta(player.laterality); %>
+                  <tr
+                    data-roster-item
+                    data-year="<%= player.birth_year || '' %>"
+                    data-position="<%= player.primary_position || '' %>"
+                    data-laterality="<%= lateralityMeta.key %>"
+                  >
                     <td>
                       <span class="team-detail-table__rank"><%= player.dorsal || index + 1 %></span>
                     </td>
                     <td>
-                      <div class="fw-semibold"><%= player.full_name %></div>
+                      <div class="fw-semibold"><a href="/players/<%= player.id %>" class="text-decoration-none"><%= player.full_name %></a></div>
                       <div class="small text-muted"><%= player.laterality || '-' %></div>
                     </td>
                     <td><%= player.birth_year || '-' %></td>
@@ -181,6 +639,10 @@
                     <td class="text-end">
                       <div class="d-flex justify-content-end gap-2">
                         <a href="/players/<%= player.id %>" class="btn btn-sm btn-outline-secondary">Perfil</a>
+                        <% if (activeModules.includes('scouting_players')) { %>
+                          <a href="/evaluations/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Evaluar</a>
+                          <a href="/reports/new?team_id=<%= team.id %>&player_id=<%= player.id %>" class="btn btn-sm btn-outline-secondary">Informe</a>
+                        <% } %>
                         <a href="/admin/players/<%= player.id %>/edit" class="btn btn-sm btn-primary">Editar</a>
                       </div>
                     </td>
@@ -194,3 +656,63 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    var yearFilter = document.getElementById('roster-filter-year');
+    var positionFilter = document.getElementById('roster-filter-position');
+    var lateralityFilter = document.getElementById('roster-filter-laterality');
+    var resetButton = document.getElementById('roster-filter-reset');
+    var visibleCount = document.getElementById('roster-visible-count');
+    var emptyState = document.getElementById('team-roster-empty-state');
+    var items = Array.prototype.slice.call(document.querySelectorAll('[data-roster-item]'));
+
+    if (!yearFilter || !positionFilter || !lateralityFilter || !items.length) {
+      return;
+    }
+
+    function applyRosterFilters() {
+      var yearValue = yearFilter.value;
+      var positionValue = positionFilter.value;
+      var lateralityValue = lateralityFilter.value;
+      var matches = 0;
+
+      items.forEach(function (item) {
+        var itemYear = item.getAttribute('data-year') || '';
+        var itemPosition = item.getAttribute('data-position') || '';
+        var itemLaterality = item.getAttribute('data-laterality') || '';
+        var isVisible = (!yearValue || itemYear === yearValue)
+          && (!positionValue || itemPosition === positionValue)
+          && (!lateralityValue || itemLaterality === lateralityValue);
+
+        item.classList.toggle('d-none', !isVisible);
+        if (isVisible) {
+          matches += 1;
+        }
+      });
+
+      if (visibleCount) {
+        visibleCount.textContent = String(matches);
+      }
+
+      if (emptyState) {
+        emptyState.classList.toggle('d-none', matches !== 0);
+      }
+    }
+
+    [yearFilter, positionFilter, lateralityFilter].forEach(function (control) {
+      control.addEventListener('change', applyRosterFilters);
+    });
+
+    if (resetButton) {
+      resetButton.addEventListener('click', function () {
+        yearFilter.value = '';
+        positionFilter.value = '';
+        lateralityFilter.value = '';
+        applyRosterFilters();
+      });
+    }
+
+    applyRosterFilters();
+  }());
+</script>

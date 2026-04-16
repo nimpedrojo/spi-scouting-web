@@ -1,4 +1,4 @@
-const { getClubByName } = require('../models/clubModel');
+const { getClubByName, getClubById } = require('../models/clubModel');
 const {
   ensureActiveSeasonForClub,
   getSeasonsByClubId,
@@ -18,6 +18,20 @@ const {
   getPlayersByTeamIds,
   deleteTeamPlayersByTeamId,
 } = require('../models/teamPlayerModel');
+const {
+  countReportsByClubAndTeam,
+  listRecentReportsByClubAndTeam,
+} = require('../models/reportModel');
+const {
+  countEvaluationsByTeam,
+  listRecentEvaluationsByTeam,
+} = require('../models/evaluationModel');
+const {
+  countScoutingTeamReportsByOwnTeam,
+  listRecentScoutingTeamReportsByOwnTeam,
+} = require('../modules/scoutingTeams/models/scoutingTeamReportModel');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { getTeamBenchmark } = require('./teamBenchmarkService');
 
 function normalizePlayerPreview(player) {
   return {
@@ -221,10 +235,22 @@ function buildTeamCardSummary(players) {
   };
 }
 
-async function requireClubForUser(user) {
-  if (!user || !user.default_club) {
+async function requireClubForUser(user, options = {}) {
+  if (!user) {
     return null;
   }
+
+  if (user.role === 'superadmin') {
+    if (!options.clubId) {
+      return null;
+    }
+    return getClubById(options.clubId);
+  }
+
+  if (!user.default_club) {
+    return null;
+  }
+
   return getClubByName(user.default_club);
 }
 
@@ -338,8 +364,87 @@ async function getTeamDetail(teamId) {
   };
 }
 
-async function getTeamFormData(user) {
-  const club = await requireClubForUser(user);
+async function getTeamWorkspaceData(teamId, options = {}) {
+  const team = await getTeamDetail(teamId);
+  if (!team) {
+    return null;
+  }
+
+  const activeModuleKeys = Array.isArray(options.activeModuleKeys) ? options.activeModuleKeys : [];
+  const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
+  const planningEnabled = activeModuleKeys.includes(MODULE_KEYS.PLANNING);
+  const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
+  const activeSeasonId = options.activeSeasonId || null;
+
+  const [
+    evaluationCount,
+    scoutingPlayerReportCount,
+    scoutingTeamReportCount,
+    recentEvaluations,
+    recentReports,
+    recentScoutingTeamReports,
+    teamBenchmark,
+  ] = await Promise.all([
+    scoutingPlayersEnabled ? countEvaluationsByTeam(team.club_id, team.id) : Promise.resolve(0),
+    scoutingPlayersEnabled
+      ? countReportsByClubAndTeam(team.club_name, team.name)
+      : Promise.resolve(0),
+    scoutingTeamsEnabled
+      ? countScoutingTeamReportsByOwnTeam(team.club_id, team.id)
+      : Promise.resolve(0),
+    scoutingPlayersEnabled
+      ? listRecentEvaluationsByTeam(team.club_id, team.id, 3)
+      : Promise.resolve([]),
+    scoutingPlayersEnabled
+      ? listRecentReportsByClubAndTeam(team.club_name, team.name, 3)
+      : Promise.resolve([]),
+    scoutingTeamsEnabled
+      ? listRecentScoutingTeamReportsByOwnTeam(team.club_id, team.id, 3)
+      : Promise.resolve([]),
+    scoutingPlayersEnabled && activeSeasonId
+      ? getTeamBenchmark(team.id, team.club_id, activeSeasonId)
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    ...team,
+    workspaceSummary: {
+      playerCount: team.players.length,
+      evaluationCount,
+      scoutingPlayerReportCount,
+      scoutingTeamReportCount,
+      planningAvailable: planningEnabled,
+    },
+    recentActivity: {
+      evaluations: recentEvaluations.map((entry) => ({
+        id: entry.id,
+        date: entry.evaluation_date,
+        title: entry.title || 'Evaluación manual',
+        playerName: `${entry.first_name} ${entry.last_name}`.trim(),
+        authorName: entry.author_name || '',
+        overallScore: Number(entry.overall_score || 0),
+      })),
+      reports: recentReports.map((entry) => ({
+        id: entry.id,
+        date: entry.created_at,
+        title: `${entry.player_name} ${entry.player_surname}`.trim(),
+        authorName: entry.created_by_name || '',
+        overallRating: entry.overall_rating != null ? Number(entry.overall_rating) : null,
+      })),
+      scoutingTeams: recentScoutingTeamReports.map((entry) => ({
+        id: entry.id,
+        date: entry.matchDate || entry.createdAt,
+        title: entry.opponentName || 'Rival',
+        competition: entry.competition || '',
+        authorName: entry.authorName || '',
+      })),
+    },
+    teamBenchmark,
+  };
+}
+
+async function getTeamFormData(user, options = {}) {
+  const club = await requireClubForUser(user, options);
   if (!club) {
     return null;
   }
@@ -361,7 +466,7 @@ async function getTeamFormData(user) {
 }
 
 async function createTeamForUser(user, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -377,7 +482,7 @@ async function createTeamForUser(user, payload) {
 }
 
 async function updateTeamForUser(user, teamId, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -390,8 +495,8 @@ async function updateTeamForUser(user, teamId, payload) {
   return updateTeam(teamId, payload);
 }
 
-async function deleteTeamForUser(user, teamId) {
-  const club = await requireClubForUser(user);
+async function deleteTeamForUser(user, teamId, options = {}) {
+  const club = await requireClubForUser(user, options);
   if (!club) {
     throw new Error('CLUB_REQUIRED');
   }
@@ -406,7 +511,7 @@ async function deleteTeamForUser(user, teamId) {
 }
 
 async function validateTeamPayload(user, payload) {
-  const club = await requireClubForUser(user);
+  const club = await requireClubForUser(user, payload || {});
   if (!club) {
     return 'Debes tener un club activo para gestionar plantillas.';
   }
@@ -442,6 +547,7 @@ module.exports = {
   getPlayerPreviewsPerTeam,
   getDefaultTeamOptionsForClub,
   getTeamDetail,
+  getTeamWorkspaceData,
   getTeamFormData,
   createTeamForUser,
   updateTeamForUser,

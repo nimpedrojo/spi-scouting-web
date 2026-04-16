@@ -19,14 +19,17 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <form method="POST" action="/teams/import-players/processiq" class="d-inline" data-processiq-player-loading-form>
+      <% if (selectedClubId) { %>
+        <input type="hidden" name="club_id" value="<%= selectedClubId %>">
+      <% } %>
       <input type="hidden" name="section" value="<%= activeSection %>">
       <input type="hidden" name="category" value="<%= activeCategory %>">
       <button type="submit" class="btn btn-outline-dark" data-loading-button data-loading-text="Cargando visibles...">
         <span class="button-label">Cargar jugadores visibles</span>
       </button>
     </form>
-    <a href="/teams/import/processiq" class="btn btn-outline-secondary">Importar desde ProcessIQ</a>
-    <a href="/teams/new" class="btn btn-primary">Nueva plantilla</a>
+    <a href="/teams/import/processiq<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-outline-secondary">Importar desde ProcessIQ</a>
+    <a href="/teams/new<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-primary">Nueva plantilla</a>
   </div>
 </div>
 
@@ -38,7 +41,7 @@
         Importa plantillas desde <code>api.processiq.es/teams</code>. Solo se crean equipos nuevos del club activo.
       </p>
     </div>
-    <a href="/teams/import/processiq" class="btn btn-sm btn-outline-dark">Abrir previsualización</a>
+    <a href="/teams/import/processiq<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-sm btn-outline-dark">Abrir previsualización</a>
   </div>
 </div>
 
@@ -47,7 +50,7 @@
     <li class="nav-item">
       <a
         class="nav-link <%= activeSection === sectionName ? 'active' : '' %>"
-        href="/teams?section=<%= encodeURIComponent(sectionName) %><%= activeCategory ? '&category=' + encodeURIComponent(activeCategory) : '' %>"
+        href="/teams?section=<%= encodeURIComponent(sectionName) %><%= activeCategory ? '&category=' + encodeURIComponent(activeCategory) : '' %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
       >
         <%= sectionName %>
       </a>
@@ -57,14 +60,14 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
   <a
-    href="/teams?section=<%= encodeURIComponent(activeSection) %>"
+    href="/teams?section=<%= encodeURIComponent(activeSection) %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
     class="btn btn-sm <%= !activeCategory ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
   >
     Todas
   </a>
   <% availableCategories.forEach((categoryName) => { %>
     <a
-      href="/teams?section=<%= encodeURIComponent(activeSection) %>&category=<%= encodeURIComponent(categoryName) %>"
+      href="/teams?section=<%= encodeURIComponent(activeSection) %>&category=<%= encodeURIComponent(categoryName) %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
       class="btn btn-sm <%= activeCategory === categoryName ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
     >
       <%= categoryName %>
@@ -164,20 +167,26 @@
               </div>
 
               <div class="mt-auto d-flex gap-2 flex-wrap">
-                <a href="/teams/<%= team.id %>" class="btn btn-sm btn-primary">Ver</a>
+                <a href="/teams/<%= team.id %><%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-sm btn-primary">Abrir ficha</a>
                 <% if (team.source === 'processiq' && team.external_id) { %>
                   <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" data-processiq-player-loading-form>
+                    <% if (selectedClubId) { %>
+                      <input type="hidden" name="club_id" value="<%= selectedClubId %>">
+                    <% } %>
                     <button type="submit" class="btn btn-sm btn-outline-dark" data-loading-button data-loading-text="Cargando...">
                       <span class="button-label">Cargar jugadores</span>
                     </button>
                   </form>
                 <% } %>
-                <a href="/teams/<%= team.id %>/edit" class="btn btn-sm btn-outline-secondary">Editar</a>
+                <a href="/teams/<%= team.id %>/edit<%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-sm btn-outline-secondary">Editar</a>
                 <form
                   method="POST"
                   action="/teams/<%= team.id %>/delete"
                   onsubmit="return confirm('¿Seguro que quieres eliminar esta plantilla?');"
                 >
+                  <% if (selectedClubId) { %>
+                    <input type="hidden" name="club_id" value="<%= selectedClubId %>">
+                  <% } %>
                   <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
                 </form>
               </div>

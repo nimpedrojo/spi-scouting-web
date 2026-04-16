@@ -27,70 +27,78 @@
 
   <hr class="my-4" />
 
-  <h5>Valores por defecto para informes</h5>
-  <p class="text-muted">
-    Estos valores se usarán como Club y Equipo por defecto al crear nuevos informes.
-    El equipo por defecto ahora se selecciona desde las Plantillas v2 del club.
-  </p>
+  <% if (isSuperAdmin) { %>
+    <h5>Administrador de plataforma</h5>
+    <div class="alert alert-light border">
+      Este usuario es <strong>superadmin</strong> y actúa como administrador de la plataforma. No trabaja con un club ni un equipo activos por defecto.
+      Cuando necesites operar sobre un club concreto, selecciónalo explícitamente desde las pantallas de administración de plataforma o de club.
+    </div>
+  <% } else { %>
+    <h5>Valores por defecto para informes</h5>
+    <p class="text-muted">
+      Estos valores se usarán como Club y Equipo por defecto al crear nuevos informes.
+      El equipo por defecto ahora se selecciona desde las Plantillas v2 del club.
+    </p>
 
-  <div class="mb-3">
-    <a href="/teams" class="btn btn-outline-secondary btn-sm">
-      Ver Plantillas
-    </a>
-    <a href="/teams/new" class="btn btn-outline-secondary btn-sm ms-2">
-      Crear equipo v2
-    </a>
-  </div>
+    <div class="mb-3">
+      <a href="/teams" class="btn btn-outline-secondary btn-sm">
+        Ver Plantillas
+      </a>
+      <a href="/teams/new" class="btn btn-outline-secondary btn-sm ms-2">
+        Crear equipo v2
+      </a>
+    </div>
 
-  <div class="mb-3">
-    <label for="default_club" class="form-label">Club por defecto</label>
-    <% const fixedClubName = (resolvedClub && resolvedClub.name) || user.club_name || ''; %>
-    <% if (fixedClubName) { %>
+    <div class="mb-3">
+      <label for="default_club" class="form-label">Club por defecto</label>
+      <% const fixedClubName = (resolvedClub && resolvedClub.name) || user.club_name || ''; %>
+      <% if (fixedClubName) { %>
+        <input
+          type="text"
+          class="form-control"
+          id="default_club"
+          value="<%= fixedClubName %>"
+          readonly
+        />
+        <input type="hidden" name="default_club" value="<%= fixedClubName %>" />
+      <% } else { %>
       <input
         type="text"
         class="form-control"
         id="default_club"
-        value="<%= fixedClubName %>"
-        readonly
+        name="default_club"
+        value="<%= user.default_club || '' %>"
       />
-      <input type="hidden" name="default_club" value="<%= fixedClubName %>" />
-    <% } else { %>
-    <input
-      type="text"
-      class="form-control"
-      id="default_club"
-      name="default_club"
-      value="<%= user.default_club || '' %>"
-    />
-    <% } %>
-  </div>
-
-  <div class="mb-3">
-    <label for="default_team_id" class="form-label">Equipo por defecto</label>
-    <select
-      class="form-select"
-      id="default_team_id"
-      name="default_team_id"
-    >
-      <% const hasTeams = Array.isArray(teams) && teams.length > 0; %>
-      <% const currentTeamId = user.default_team_id || ''; %>
-      <option value="">-- Selecciona equipo --</option>
-      <% if (hasTeams) { %>
-        <% teams.forEach(function (t) { %>
-          <option value="<%= t.id %>" <%= String(t.id) === String(currentTeamId) ? 'selected' : '' %>>
-            <%= t.label %>
-          </option>
-        <% }) %>
-      <% } else { %>
-        <option value="" selected>Sin equipos v2 configurados todavía</option>
       <% } %>
-    </select>
-    <% if (!hasTeams) { %>
-      <div class="form-text">
-        Crea primero equipos en Plantillas para poder seleccionar uno aquí.
-      </div>
-    <% } %>
-  </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="default_team_id" class="form-label">Equipo por defecto</label>
+      <select
+        class="form-select"
+        id="default_team_id"
+        name="default_team_id"
+      >
+        <% const hasTeams = Array.isArray(teams) && teams.length > 0; %>
+        <% const currentTeamId = user.default_team_id || ''; %>
+        <option value="">-- Selecciona equipo --</option>
+        <% if (hasTeams) { %>
+          <% teams.forEach(function (t) { %>
+            <option value="<%= t.id %>" <%= String(t.id) === String(currentTeamId) ? 'selected' : '' %>>
+              <%= t.label %>
+            </option>
+          <% }) %>
+        <% } else { %>
+          <option value="" selected>Sin equipos v2 configurados todavía</option>
+        <% } %>
+      </select>
+      <% if (!hasTeams) { %>
+        <div class="form-text">
+          Crea primero equipos en Plantillas para poder seleccionar uno aquí.
+        </div>
+      <% } %>
+    </div>
+  <% } %>
 
   <hr class="my-4" />
 

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
 const multer = require('multer');
+const os = require('os');
 const { randomUUID } = require('crypto');
 const XLSX = require('xlsx');
 const {
@@ -30,7 +31,10 @@ const playerPhotosDir = path.join(__dirname, '..', 'public', 'uploads', 'players
 fs.mkdirSync(playerPhotosDir, { recursive: true });
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  }),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
@@ -215,7 +219,9 @@ router.post(
     }
 
     try {
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+      const filePath = req.file && req.file.path;
+      const buffer = await fsPromises.readFile(filePath);
+      const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
@@ -231,6 +237,12 @@ router.post(
 
       // Saltamos la fila de cabecera
       const dataRows = rows.slice(1);
+      // remove temp file
+      try {
+        if (filePath && filePath.startsWith(os.tmpdir())) await fsPromises.unlink(filePath);
+      } catch (e) {
+        // ignore unlink errors
+      }
 
       const { user } = req.session;
       const club =

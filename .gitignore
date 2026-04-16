@@ -5,4 +5,5 @@ dist
 DEPLOYMENT.md
 AGENTS.md
 AUDIT.md
-
+logs
+logs/app.log

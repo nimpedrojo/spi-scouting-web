@@ -10,6 +10,8 @@ const {
   deleteRecommendation,
 } = require('../models/clubRecommendationModel');
 const { updateClubBranding } = require('../models/clubModel');
+const { updateClubModules } = require('../shared/services/clubModuleService');
+const { setClubProductMode } = require('../shared/services/productModeService');
 const {
   resolveAdminClub,
   getClubAdminData,
@@ -79,7 +81,9 @@ function ensureAdmin(req, res, next) {
 
 router.get('/', ensureAdmin, async (req, res) => {
   const club = await resolveAdminClub(req);
-  if (!club) {
+  const isSuperAdmin = req.session.user && req.session.user.role === 'superadmin';
+
+  if (!club && !isSuperAdmin) {
     req.flash(
       'error',
       'Debes configurar primero el club por defecto en tu cuenta para acceder a la configuración del club.',
@@ -89,21 +93,28 @@ router.get('/', ensureAdmin, async (req, res) => {
 
   try {
     const [data, clubOptions] = await Promise.all([
-      getClubAdminData(club),
+      club ? getClubAdminData(club) : Promise.resolve(null),
       getClubAdminOptions(req),
     ]);
 
     return res.render('club/config', {
-      club: club.name,
+      club: club ? club.name : 'Selecciona un club',
       clubRecord: club,
       clubOptions,
-      selectedClubId: club.id,
-      users: data.users,
-      players: data.players,
-      reports: data.reports,
-      recommendations: data.recommendations,
-      v2Teams: data.v2Teams,
-      seasons: data.seasons,
+      selectedClubId: club ? club.id : null,
+      users: data ? data.users : [],
+      players: data ? data.players : [],
+      reports: data ? data.reports : [],
+      recommendations: data ? data.recommendations : [],
+      v2Teams: data ? data.v2Teams : [],
+      seasons: data ? data.seasons : [],
+      modules: data ? data.modules : [],
+      moduleSummary: data ? data.moduleSummary : null,
+      modulePresets: data ? data.modulePresets : [],
+      productMode: data ? data.productMode : null,
+      platformProductSettings: data ? data.platformProductSettings : null,
+      requiresClubSelection: !club,
+      isSuperAdmin,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -164,6 +175,61 @@ router.post('/branding', ensureAdmin, uploadClubCrest, async (req, res) => {
     req.flash('error', message);
     return res.redirect(buildClubConfigRedirect(club));
   }
+});
+
+router.post('/modules', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club por defecto en tu cuenta.',
+    );
+    return res.redirect('/account');
+  }
+
+  try {
+    await updateClubModules(club.id, req.body.module_keys, req.body.module_preset || null);
+    req.session.clubContext = null;
+
+    const message = req.body.module_preset
+      ? 'Preset de módulos aplicado correctamente.'
+      : 'Módulos del club actualizados correctamente.';
+    req.flash('success', message);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al actualizar módulos del club:', err);
+    req.flash('error', 'Ha ocurrido un error al guardar la configuración de módulos.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
+});
+
+router.post('/product-mode', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club que quieres administrar.',
+    );
+    return res.redirect('/admin/club');
+  }
+
+  const selectedMode = req.body && req.body.product_mode
+    ? String(req.body.product_mode).trim()
+    : '';
+  const overrideMode = selectedMode === 'inherit' ? null : selectedMode;
+
+  try {
+    await setClubProductMode(club.id, overrideMode);
+    req.session.clubContext = null;
+    req.flash('success', 'Modo de producto del club actualizado correctamente.');
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al actualizar modo de producto del club:', err);
+    req.flash('error', 'Ha ocurrido un error al guardar el modo de producto del club.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
 });
 
 router.post('/recommendations', ensureAdmin, async (req, res) => {

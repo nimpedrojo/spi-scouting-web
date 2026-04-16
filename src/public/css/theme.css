@@ -1,9 +1,28 @@
-/* SoccerReport Theme Tokens */
+/* SoccerProcessIQ Theme Tokens */
 :root {
   /* Brand */
   --sr-primary: #0f3d2e;      /* Verde esmeralda profundo (navbar, sidebar, footer) */
   --sr-secondary: #19c37d;    /* Verde eléctrico (CTA, activos, highlights) */
   --sr-tech: #0b2545;         /* Azul petróleo (fondos alternativos, secciones) */
+
+  /* PMV brand */
+  --pmv-green-700: #1f7a63;
+  --pmv-green-600: #2fa47f;
+  --pmv-blue-700: #1d4ed8;
+  --pmv-blue-600: #2563eb;
+  --pmv-bg: #f8fafc;
+  --pmv-surface: #ffffff;
+  --pmv-border: #e2e8f0;
+  --pmv-text: #0f172a;
+  --pmv-text-muted: #475569;
+  --pmv-success: #10b981;
+  --pmv-warning: #f59e0b;
+  --pmv-danger: #ef4444;
+  --pmv-shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --pmv-shadow-md: 0 22px 50px rgba(15, 23, 42, 0.1);
+  --pmv-radius-lg: 1.25rem;
+  --pmv-radius-md: 0.95rem;
+  --app-header-height: 60px;
 
   /* Neutrals */
   --sr-bg: #f5f7fa;           /* Fondo app claro */
@@ -134,4 +153,3 @@ a:hover {
 .sr-cat-personalidad {
   border-left: 6px solid var(--sr-cat-personalidad);
 }
-

@@ -4,6 +4,8 @@ const { getReportsForPlayerProfile } = require('../models/reportModel');
 const { getPlayerById } = require('../models/playerModel');
 const { buildPlayerPdfReport } = require('../services/pdfReportService');
 const { canAccessPlayer, canManageMultipleTeams } = require('../services/userScopeService');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { getPlayerBenchmark } = require('../services/playerBenchmarkService');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -63,6 +65,88 @@ function normalizePositions(positionsValue) {
     .filter((position) => supportedPositions.has(position))));
 }
 
+function buildEmptyAnalytics() {
+  return {
+    summary: null,
+    overallAverage: 0,
+    averageByArea: [],
+    groupedMetricBreakdown: {},
+    radarChartData: { labels: [], datasets: [] },
+    history: {
+      totalEvaluations: 0,
+      lastEvaluationDate: null,
+    },
+  };
+}
+
+function buildTrackingSummary(analytics, reports) {
+  const totalEvaluations = analytics && analytics.history ? Number(analytics.history.totalEvaluations || 0) : 0;
+  const totalReports = Array.isArray(reports) ? reports.length : 0;
+  const overallAverage = analytics && totalEvaluations && analytics.overallAverage != null
+    ? Number(analytics.overallAverage)
+    : null;
+  const lastEvaluationDate = analytics && analytics.history ? analytics.history.lastEvaluationDate : null;
+  const lastReportDate = totalReports && reports[0] ? reports[0].created_at : null;
+  const trend = analytics && analytics.history ? analytics.history.trend || null : null;
+
+  return {
+    totalEvaluations,
+    totalReports,
+    overallAverage,
+    lastEvaluationDate,
+    lastReportDate,
+    trend,
+  };
+}
+
+function buildProfileRadarChartData(analytics, playerBenchmark) {
+  const baseChart = analytics && analytics.radarChartData
+    ? analytics.radarChartData
+    : { labels: [], datasets: [] };
+
+  const datasets = Array.isArray(baseChart.datasets)
+    ? baseChart.datasets.map((dataset, index) => ({
+      ...dataset,
+      label: index === 0 ? 'Media jugador' : (dataset.label || `Serie ${index + 1}`),
+    }))
+    : [];
+
+  if (!playerBenchmark || !playerBenchmark.isReady || !Array.isArray(playerBenchmark.areaComparisons)) {
+    return {
+      labels: baseChart.labels || [],
+      datasets,
+    };
+  }
+
+  const teamAverageByLabel = playerBenchmark.areaComparisons.reduce((acc, area) => {
+    acc[area.label] = area.teamAverage;
+    return acc;
+  }, {});
+
+  return {
+    labels: baseChart.labels || [],
+    datasets: [
+      ...datasets,
+      {
+        label: 'Media equipo',
+        data: (baseChart.labels || []).map((label) => {
+          const value = teamAverageByLabel[label];
+          return value != null ? Number(value) : null;
+        }),
+        borderColor: '#6b7280',
+        backgroundColor: 'rgba(107, 114, 128, 0)',
+        pointBackgroundColor: '#6b7280',
+        pointBorderColor: '#ffffff',
+        pointHoverBackgroundColor: '#6b7280',
+        pointHoverBorderColor: '#ffffff',
+        borderDash: [6, 4],
+        borderWidth: 2,
+        fill: false,
+      },
+    ],
+  };
+}
+
 async function renderProfile(req, res) {
   try {
     const club = req.context ? req.context.club : null;
@@ -80,12 +164,22 @@ async function renderProfile(req, res) {
       return res.redirect('/teams');
     }
 
-    const analytics = await getPlayerAnalytics(player.id, club.id, seasonId);
-    const reports = await getReportsForPlayerProfile({
-      clubName: club.name,
-      firstName: player.first_name,
-      lastName: player.last_name,
-    });
+    const scoutingPlayersEnabled = Boolean(
+      req.context
+      && Array.isArray(req.context.activeModuleKeys)
+      && req.context.activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS),
+    );
+
+    const analytics = scoutingPlayersEnabled
+      ? await getPlayerAnalytics(player.id, club.id, seasonId)
+      : buildEmptyAnalytics();
+    const reports = scoutingPlayersEnabled
+      ? await getReportsForPlayerProfile({
+        clubName: club.name,
+        firstName: player.first_name,
+        lastName: player.last_name,
+      })
+      : [];
 
     const playerSummary = {
       ...analytics.summary,
@@ -99,6 +193,12 @@ async function renderProfile(req, res) {
     };
 
     const positionsList = normalizePositions(playerSummary.positions);
+    const teamProfileHref = player.current_team_id ? `/teams/${player.current_team_id}` : null;
+    const benchmarkSeasonId = activeSeason ? activeSeason.id : null;
+    const playerBenchmark = scoutingPlayersEnabled && player.current_team_id && benchmarkSeasonId
+      ? await getPlayerBenchmark(player.id, player.current_team_id, club.id, benchmarkSeasonId)
+      : null;
+    const profileRadarChartData = buildProfileRadarChartData(analytics, playerBenchmark);
 
     return res.render('players/show', {
       pageTitle: `${player.first_name} ${player.last_name}`,
@@ -115,11 +215,15 @@ async function renderProfile(req, res) {
       analytics: {
         ...analytics,
         areaEntries: Object.values(analytics.groupedMetricBreakdown || {}),
-        radarChartJson: JSON.stringify(analytics.radarChartData),
+        radarChartJson: JSON.stringify(profileRadarChartData),
       },
+      trackingSummary: buildTrackingSummary(analytics, reports),
+      scoutingPlayersEnabled,
       areaLabelHelper: getAreaLabel,
       activeSeason,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
+      teamProfileHref,
+      playerBenchmark,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

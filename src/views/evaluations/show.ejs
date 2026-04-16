@@ -12,7 +12,10 @@
           <span class="badge text-bg-primary">Media: <%= Number(evaluation.overall_score).toFixed(2) %></span>
         </div>
       </div>
-      <a href="/players/<%= evaluation.player_id %>/evaluations" class="btn btn-outline-secondary">Ver historial del jugador</a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="/players/<%= evaluation.player_id %>" class="btn btn-primary">Ver ficha del jugador</a>
+        <a href="/players/<%= evaluation.player_id %>/evaluations" class="btn btn-outline-secondary">Ver historial del jugador</a>
+      </div>
     </div>
   </div>
 </div>

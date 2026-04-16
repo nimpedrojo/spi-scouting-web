@@ -20,7 +20,195 @@
   </div>
 <% } %>
 
+<% if (requiresClubSelection) { %>
+  <div class="alert alert-light border mb-4">
+    <% if (isSuperAdmin) { %>
+      Selecciona primero un club para administrar su configuración, branding, módulos y estructura operativa.
+    <% } else { %>
+      Debes seleccionar un club antes de continuar.
+    <% } %>
+  </div>
+<% } %>
+
 <div class="row g-4">
+  <% if (!requiresClubSelection) { %>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        Modo de producto del club
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Controla si este club hereda la experiencia global de plataforma o si debe mostrarse con una exposición específica de producto.
+        </p>
+
+        <form method="POST" action="/admin/club/product-mode">
+          <input type="hidden" name="club_id" value="<%= selectedClubId || '' %>" />
+
+          <div class="vstack gap-3 mb-4">
+            <label class="border rounded p-3 d-block">
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  name="product_mode"
+                  value="inherit"
+                  id="product_mode_inherit"
+                  <%= !clubRecord.product_mode ? 'checked' : '' %>
+                />
+                <span class="form-check-label fw-semibold">Heredar modo global</span>
+              </div>
+              <div class="small text-muted mt-2">
+                Usa el modo por defecto de la plataforma:
+                <strong><%= platformProductSettings && platformProductSettings.defaultModeMeta ? platformProductSettings.defaultModeMeta.label : 'Suite completa' %></strong>.
+              </div>
+            </label>
+
+            <% if (productMode && productMode.availableModes) { %>
+              <% productMode.availableModes.forEach((modeEntry) => { %>
+                <label class="border rounded p-3 d-block">
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="product_mode"
+                      value="<%= modeEntry.key %>"
+                      id="product_mode_<%= modeEntry.key %>"
+                      <%= clubRecord.product_mode === modeEntry.key ? 'checked' : '' %>
+                    />
+                    <span class="form-check-label fw-semibold"><%= modeEntry.label %></span>
+                  </div>
+                  <div class="small text-muted mt-2"><%= modeEntry.description %></div>
+                </label>
+              <% }) %>
+            <% } %>
+          </div>
+
+          <% if (productMode) { %>
+            <div class="border rounded bg-light p-3 mb-3">
+              <div class="small text-uppercase text-muted">Modo efectivo actual</div>
+              <div class="fw-semibold"><%= productMode.effectiveMeta.label %></div>
+              <div class="small text-muted">
+                <% if (productMode.clubOverride) { %>
+                  Override del club activo sobre la configuración global.
+                <% } else { %>
+                  Heredado de la plataforma.
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary">Guardar modo de producto</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        Módulos activos del club
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Activa solo los verticales que este club debe tener disponibles en navegación, dashboard y acceso por URL.
+        </p>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Activos</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.active : 0 %></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Inactivos</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.inactive : 0 %></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted text-uppercase">Total preparado</div>
+              <div class="display-6 fw-semibold"><%= moduleSummary ? moduleSummary.total : 0 %></div>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST" action="/admin/club/modules">
+          <input type="hidden" name="club_id" value="<%= selectedClubId || '' %>" />
+
+          <% if (modulePresets && modulePresets.length) { %>
+            <div class="mb-4">
+              <div class="fw-semibold mb-2">Presets rápidos</div>
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                <% modulePresets.forEach((preset) => { %>
+                  <button
+                    type="submit"
+                    name="module_preset"
+                    value="<%= preset.key %>"
+                    class="btn btn-outline-secondary btn-sm"
+                  >
+                    <%= preset.label %>
+                  </button>
+                <% }) %>
+              </div>
+              <div class="small text-muted">
+                Usa un preset para aplicar una combinación recomendada sin marcar módulo a módulo.
+              </div>
+            </div>
+          <% } %>
+
+          <% if (!modules || !modules.length) { %>
+            <p class="text-muted mb-3">No hay módulos configurados todavía para este club.</p>
+          <% } else { %>
+            <div class="vstack gap-3 mb-3">
+              <% modules.forEach((moduleEntry) => { %>
+                <div class="border rounded p-3">
+                  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div class="form-check flex-grow-1">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="module_keys"
+                        value="<%= moduleEntry.moduleKey %>"
+                        id="module_<%= moduleEntry.moduleKey %>"
+                        <%= moduleEntry.enabled ? 'checked' : '' %>
+                      />
+                      <label class="form-check-label fw-semibold" for="module_<%= moduleEntry.moduleKey %>">
+                        <%= moduleEntry.label %>
+                      </label>
+                    </div>
+                    <span class="badge <%= moduleEntry.enabled ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis' %>">
+                      <%= moduleEntry.enabled ? 'Activo' : 'Inactivo' %>
+                    </span>
+                  </div>
+                  <div class="small text-muted mt-2"><%= moduleEntry.description %></div>
+                  <div class="small text-muted mt-2">
+                    Ruta principal:
+                    <% if (moduleEntry.entryPath && moduleEntry.entryPath !== '#') { %>
+                      <code><%= moduleEntry.entryPath %></code>
+                    <% } else { %>
+                      <span>No definida todavía</span>
+                    <% } %>
+                  </div>
+                  <div class="small text-muted mt-2">
+                    Acceso previsto: <%= moduleEntry.roleSummary || 'Pendiente de definir.' %>
+                  </div>
+                  <% if (moduleEntry.defaultEnabled) { %>
+                    <div class="small text-muted mt-2">Módulo base recomendado para todos los clubes.</div>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary">Guardar selección manual</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
@@ -128,21 +316,23 @@
                   <strong><%= t.name %></strong>
                   <small class="text-muted d-block"><%= t.season_name || '-' %> · <%= t.category_name || '-' %> · <%= t.section_name || '-' %></small>
                 </span>
-                <a href="/teams/<%= t.id %>" class="btn btn-sm btn-outline-primary">Ver</a>
+                <a href="/teams/<%= t.id %>?club_id=<%= selectedClubId %>" class="btn btn-sm btn-outline-primary">Abrir ficha</a>
               </li>
             <% }); %>
           </ul>
         <% } %>
 
         <div class="d-flex gap-2">
-          <a href="/teams" class="btn btn-sm btn-outline-secondary">Abrir Plantillas</a>
-          <a href="/teams/new" class="btn btn-sm btn-primary">Crear equipo v2</a>
+          <a href="/teams?club_id=<%= selectedClubId %>" class="btn btn-sm btn-outline-secondary">Abrir Plantillas</a>
+          <a href="/teams/new?club_id=<%= selectedClubId %>" class="btn btn-sm btn-primary">Crear equipo v2</a>
         </div>
       </div>
     </div>
   </div>
+  <% } %>
 </div>
 
+<% if (!requiresClubSelection) { %>
 <div class="row g-4 mt-1">
   <div class="col-lg-6">
     <div class="card h-100">
@@ -214,6 +404,7 @@
     </div>
   </div>
 </div>
+<% } %>
 
 <div class="row g-4 mt-1">
   <div class="col-lg-12">

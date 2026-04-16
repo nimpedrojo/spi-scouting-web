@@ -1,0 +1,110 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1">Scouting Teams</h1>
+    <p class="text-muted mb-0">Informes de scouting de equipos y rivales integrados en el core de la suite.</p>
+  </div>
+  <% if (canCreateReports) { %>
+    <a href="/scouting-teams/new" class="btn btn-primary">Nuevo informe</a>
+  <% } %>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/scouting-teams" class="row g-3 align-items-end">
+      <% if (filters.teamId) { %>
+        <input type="hidden" name="team_id" value="<%= filters.teamId %>" />
+      <% } %>
+      <div class="col-md-8">
+        <label class="form-label">Buscar por rival, competición o equipo</label>
+        <input
+          type="text"
+          name="q"
+          class="form-control"
+          value="<%= filters.q || filters.search || '' %>"
+          placeholder="Ej. Zaragoza, División de Honor, Juvenil A"
+        />
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+        <a href="<%= filters.teamId ? '/scouting-teams?team_id=' + encodeURIComponent(filters.teamId) : '/scouting-teams' %>" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (filters.teamId) { %>
+  <div class="alert alert-light border d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <strong>Equipo filtrado:</strong> vista del módulo acotada al equipo seleccionado.
+    </div>
+    <a href="/scouting-teams" class="btn btn-sm btn-outline-secondary">Quitar filtro</a>
+  </div>
+<% } %>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Informes del módulo</div>
+        <div class="display-6 fw-semibold"><%= reportCount %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase mb-2">Permisos del usuario</div>
+        <div class="fw-semibold"><%= canManageAllReports ? 'Gestión completa del club' : 'Lectura y edición propia' %></div>
+        <div class="small text-muted mt-2">
+          <% if (canManageAllReports) { %>
+            Puedes crear, editar y borrar cualquier informe del club.
+          <% } else { %>
+            Puedes crear informes y editar los que hayas creado tú.
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <% if (!reports.length) { %>
+      <p class="mb-0 text-muted">Todavía no hay informes de scouting de equipos para este club.</p>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Rival</th>
+              <th>Competición</th>
+              <th>Fecha</th>
+              <th>Equipo propio</th>
+              <th>Sistema</th>
+              <th>Autor</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% reports.forEach((report) => { %>
+              <tr>
+                <td class="fw-semibold"><%= report.opponentName %></td>
+                <td><%= report.competition || '-' %></td>
+                <td><%= report.matchDate ? report.matchDate.toISOString().slice(0, 10) : '-' %></td>
+                <td><%= report.ownTeamName || '-' %></td>
+                <td><%= report.systemShape || '-' %></td>
+                <td><%= report.authorName || '-' %></td>
+                <td class="text-nowrap">
+                  <a href="/scouting-teams/<%= report.id %>" class="btn btn-sm btn-primary">Ver</a>
+                  <% if (report.permissions && report.permissions.canEdit) { %>
+                    <a href="/scouting-teams/<%= report.id %>/edit" class="btn btn-sm btn-outline-secondary ms-1">Editar</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

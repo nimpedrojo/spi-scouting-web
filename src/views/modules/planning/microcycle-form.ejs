@@ -1,0 +1,95 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><%= microcycle ? 'Editar microciclo' : 'Nuevo microciclo' %></h1>
+    <p class="text-muted mb-0">Organiza la semana metodológica dentro de la planificación del equipo.</p>
+  </div>
+  <a href="/planning/plans/<%= seasonPlan.id %>" class="btn btn-outline-secondary">Volver a la planificación</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= formAction %>" class="row g-3">
+      <input type="hidden" name="season_plan_id" value="<%= formValues.season_plan_id %>" />
+      <% if (!microcycle) { %>
+        <div class="col-12">
+          <div class="planning-template-callout">
+            <div>
+              <div class="planning-template-callout-title">Plantillas reutilizables</div>
+              <p class="text-muted mb-0">Puedes arrancar el microciclo desde una plantilla del equipo. Si la plantilla incluye sesiones base, indica la fecha de inicio para poder generarlas.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label for="template_id" class="form-label">Plantilla</label>
+          <select id="template_id" name="template_id" class="form-select">
+            <option value="">Sin plantilla</option>
+            <% (templates || []).forEach((templateDetail) => { %>
+              <option value="<%= templateDetail.id %>" <%= String(formValues.template_id || '') === String(templateDetail.id) ? 'selected' : '' %>>
+                <%= templateDetail.name %> · <%= templateDetail.session_blueprint_count %> sesiones base
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Sesiones base</label>
+          <div class="form-control bg-body-tertiary">
+            <% if (selectedTemplate && selectedTemplate.sessions.length) { %>
+              <span><%= selectedTemplate.sessions.length %> sesiones configuradas en la plantilla</span>
+            <% } else if (selectedTemplate) { %>
+              <span>La plantilla seleccionada no incluye sesiones base</span>
+            <% } else { %>
+              <span>Sin plantilla aplicada</span>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="col-md-8">
+        <label for="name" class="form-label">Nombre</label>
+        <input type="text" id="name" name="name" class="form-control" required value="<%= formValues.name %>" placeholder="Ej. Microciclo 1" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="order_index" class="form-label">Orden</label>
+        <input type="number" min="1" id="order_index" name="order_index" class="form-control" required value="<%= formValues.order_index %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="start_date" class="form-label">Fecha inicio</label>
+        <input type="date" id="start_date" name="start_date" class="form-control" value="<%= formValues.start_date %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="end_date" class="form-label">Fecha fin</label>
+        <input type="date" id="end_date" name="end_date" class="form-control" value="<%= formValues.end_date %>" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="phase" class="form-label">Fase</label>
+        <select id="phase" name="phase" class="form-select">
+          <option value="">Sin fase</option>
+          <% phaseOptions.forEach((phase) => { %>
+            <option value="<%= phase %>" <%= formValues.phase === phase ? 'selected' : '' %>><%= phase %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label for="objective" class="form-label">Objetivo</label>
+        <textarea id="objective" name="objective" class="form-control" rows="4"><%= formValues.objective %></textarea>
+      </div>
+
+      <div class="col-12">
+        <label for="notes" class="form-label">Notas</label>
+        <textarea id="notes" name="notes" class="form-control" rows="5"><%= formValues.notes %></textarea>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/planning/plans/<%= seasonPlan.id %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

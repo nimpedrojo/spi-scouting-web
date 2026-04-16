@@ -1,4 +1,6 @@
 const db = require('../db');
+const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { countScoutingTeamReportsByClub } = require('../modules/scoutingTeams/models/scoutingTeamReportModel');
 
 function getSeasonDateRange(seasonName) {
   if (!seasonName || !/^\d{4}\/\d{2}$/.test(seasonName)) {
@@ -98,15 +100,170 @@ async function getPendingEvaluationsByTeam(clubId, activeSeasonId) {
   }));
 }
 
-async function getDashboardData(clubId, activeSeason) {
-  const [metrics, pendingByTeam] = await Promise.all([
-    getDashboardMetrics(clubId, activeSeason),
-    activeSeason ? getPendingEvaluationsByTeam(clubId, activeSeason.id) : Promise.resolve([]),
+async function getRecentPlayerTrackingActivity(clubId, activeSeason) {
+  if (!clubId) {
+    return {
+      evaluations: [],
+      reports: [],
+      teams: [],
+    };
+  }
+
+  const seasonId = activeSeason ? activeSeason.id : null;
+  const seasonRange = getSeasonDateRange(activeSeason ? activeSeason.name : null);
+
+  const evaluationParams = [clubId];
+  let evaluationSeasonClause = '';
+  if (seasonId) {
+    evaluationSeasonClause = ' AND e.season_id = ?';
+    evaluationParams.push(seasonId);
+  }
+
+  const reportParams = [clubId];
+  let reportSeasonClause = '';
+  if (seasonRange) {
+    reportSeasonClause = ' AND r.created_at >= ? AND r.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
+    reportParams.push(seasonRange.from, seasonRange.to);
+  }
+
+  let teamEvaluationSeasonClause = '';
+  if (seasonId) {
+    teamEvaluationSeasonClause = ' AND e.season_id = ?';
+  }
+  let teamReportSeasonClause = '';
+  if (seasonRange) {
+    teamReportSeasonClause = ' AND r.created_at >= ? AND r.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
+  }
+
+  const [evaluationRows, reportRows, teamRows] = await Promise.all([
+    db.query(
+      `SELECT
+          e.id,
+          e.evaluation_date,
+          e.title,
+          e.overall_score,
+          p.id AS player_id,
+          p.first_name,
+          p.last_name,
+          t.id AS team_id,
+          t.name AS team_name
+        FROM evaluations e
+        INNER JOIN players p ON p.id = e.player_id
+        INNER JOIN teams t ON t.id = e.team_id
+        WHERE e.club_id = ?${evaluationSeasonClause}
+        ORDER BY e.evaluation_date DESC, e.created_at DESC
+        LIMIT 5`,
+      evaluationParams,
+    ),
+    db.query(
+      `SELECT
+          r.id,
+          r.created_at,
+          r.player_name,
+          r.player_surname,
+          r.team,
+          r.overall_rating
+        FROM reports r
+        WHERE r.club = (SELECT name FROM clubs WHERE id = ? LIMIT 1)${reportSeasonClause}
+        ORDER BY r.created_at DESC
+        LIMIT 5`,
+      reportParams,
+    ),
+    db.query(
+      `SELECT
+          t.id AS team_id,
+          t.name AS team_name,
+          COUNT(DISTINCT tp.player_id) AS total_players,
+          COUNT(DISTINCT e.id) AS evaluations_count,
+          COUNT(DISTINCT r.id) AS reports_count,
+          MAX(e.evaluation_date) AS last_evaluation_date,
+          MAX(r.created_at) AS last_report_date
+        FROM teams t
+        INNER JOIN seasons s ON s.id = t.season_id AND s.is_active = 1
+        LEFT JOIN team_players tp ON tp.team_id = t.id
+        LEFT JOIN evaluations e ON e.team_id = t.id${teamEvaluationSeasonClause}
+        LEFT JOIN reports r
+          ON r.team = t.name
+         AND r.club = (SELECT name FROM clubs WHERE id = ? LIMIT 1)${teamReportSeasonClause}
+        WHERE t.club_id = ?
+        GROUP BY t.id, t.name
+        ORDER BY COALESCE(MAX(e.evaluation_date), '1900-01-01') DESC,
+                 COALESCE(MAX(r.created_at), '1900-01-01') DESC,
+                 t.name ASC
+        LIMIT 6`,
+      seasonId
+        ? (seasonRange
+          ? [seasonId, clubId, seasonRange.from, seasonRange.to, clubId]
+          : [seasonId, clubId, clubId])
+        : (seasonRange
+          ? [clubId, clubId, seasonRange.from, seasonRange.to, clubId]
+          : [clubId, clubId]),
+    ),
+  ]);
+
+  return {
+    evaluations: evaluationRows[0].map((row) => ({
+      id: row.id,
+      date: row.evaluation_date,
+      title: row.title || 'Evaluación manual',
+      playerId: row.player_id,
+      playerName: `${row.first_name} ${row.last_name}`.trim(),
+      teamId: row.team_id,
+      teamName: row.team_name,
+      overallScore: row.overall_score != null ? Number(row.overall_score) : null,
+    })),
+    reports: reportRows[0].map((row) => ({
+      id: row.id,
+      date: row.created_at,
+      playerName: `${row.player_name} ${row.player_surname}`.trim(),
+      teamName: row.team || '',
+      overallRating: row.overall_rating != null ? Number(row.overall_rating) : null,
+    })),
+    teams: teamRows[0].map((row) => ({
+      teamId: row.team_id,
+      teamName: row.team_name,
+      totalPlayers: Number(row.total_players || 0),
+      evaluationsCount: Number(row.evaluations_count || 0),
+      reportsCount: Number(row.reports_count || 0),
+      lastEvaluationDate: row.last_evaluation_date,
+      lastReportDate: row.last_report_date,
+    })),
+  };
+}
+
+async function getDashboardData(clubId, activeSeason, options = {}) {
+  const activeModuleKeys = Array.isArray(options.activeModuleKeys)
+    ? options.activeModuleKeys
+    : [];
+  const scoutingPlayersEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_PLAYERS);
+  const planningEnabled = activeModuleKeys.includes(MODULE_KEYS.PLANNING);
+  const scoutingTeamsEnabled = activeModuleKeys.includes(MODULE_KEYS.SCOUTING_TEAMS);
+
+  const [metrics, pendingByTeam, scoutingTeamsReportCount, recentPlayerTrackingActivity] = await Promise.all([
+    clubId
+      ? getDashboardMetrics(clubId, activeSeason)
+      : Promise.resolve(null),
+    scoutingPlayersEnabled && activeSeason
+      ? getPendingEvaluationsByTeam(clubId, activeSeason.id)
+      : Promise.resolve([]),
+    scoutingTeamsEnabled
+      ? countScoutingTeamReportsByClub(clubId)
+      : Promise.resolve(0),
+    scoutingPlayersEnabled
+      ? getRecentPlayerTrackingActivity(clubId, activeSeason)
+      : Promise.resolve({ evaluations: [], reports: [], teams: [] }),
   ]);
 
   return {
     metrics,
     pendingByTeam,
+    recentPlayerTrackingActivity,
+    modules: {
+      scoutingPlayersEnabled,
+      planningEnabled,
+      scoutingTeamsEnabled,
+      scoutingTeamsReportCount,
+    },
   };
 }
 
@@ -114,5 +271,6 @@ module.exports = {
   getSeasonDateRange,
   getDashboardMetrics,
   getPendingEvaluationsByTeam,
+  getRecentPlayerTrackingActivity,
   getDashboardData,
 };

@@ -1,0 +1,113 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><%= report ? 'Editar informe de scouting' : 'Nuevo informe de scouting' %></h1>
+    <p class="text-muted mb-0">MVP integrado desde el core común para registrar observación de rivales y equipos.</p>
+  </div>
+  <a href="/scouting-teams" class="btn btn-outline-secondary">Volver al módulo</a>
+</div>
+
+<form method="POST" action="<%= formAction %>">
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Contexto del informe</h2>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Rival observado <span class="text-danger">*</span></label>
+              <input type="text" name="opponent_name" class="form-control" value="<%= formData.opponent_name %>" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">País o contexto del rival</label>
+              <input type="text" name="opponent_country_name" class="form-control" value="<%= formData.opponent_country_name %>" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Equipo propio</label>
+              <select name="own_team_id" class="form-select">
+                <option value="">Sin asociar</option>
+                <% teamOptions.forEach((team) => { %>
+                  <option value="<%= team.id %>" <%= String(formData.own_team_id || '') === String(team.id) ? 'selected' : '' %>><%= team.label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha de partido</label>
+              <input type="date" name="match_date" class="form-control" value="<%= formData.match_date %>" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Competición</label>
+              <input type="text" name="competition" class="form-control" value="<%= formData.competition %>" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Sistema base</label>
+              <input type="text" name="system_shape" class="form-control" value="<%= formData.system_shape %>" placeholder="4-3-3, 4-4-2, 3-5-2..." />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Análisis táctico</h2>
+          <div class="mb-3">
+            <label class="form-label">Estilo con balón</label>
+            <textarea name="style_in_possession" class="form-control" rows="4"><%= formData.style_in_possession %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Estilo sin balón</label>
+            <textarea name="style_out_of_possession" class="form-control" rows="4"><%= formData.style_out_of_possession %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Transiciones</label>
+            <textarea name="transitions" class="form-control" rows="4"><%= formData.transitions %></textarea>
+          </div>
+          <div>
+            <label class="form-label">Balón parado</label>
+            <textarea name="set_pieces" class="form-control" rows="4"><%= formData.set_pieces %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Conclusiones</h2>
+          <div class="mb-3">
+            <label class="form-label">Fortalezas</label>
+            <textarea name="strengths" class="form-control" rows="4"><%= formData.strengths %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Debilidades</label>
+            <textarea name="weaknesses" class="form-control" rows="4"><%= formData.weaknesses %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Jugadores clave</label>
+            <textarea name="key_players" class="form-control" rows="3"><%= formData.key_players %></textarea>
+          </div>
+          <div>
+            <label class="form-label">Observaciones generales</label>
+            <textarea name="general_observations" class="form-control" rows="5"><%= formData.general_observations %></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Guía rápida</h2>
+          <p class="text-muted">Este MVP adapta el valor del repositorio de opponent scouting a una ficha única y operativa para clubes.</p>
+          <ul class="mb-0">
+            <li>Registra un rival reutilizable por club.</li>
+            <li>Relaciona el informe con tu estructura deportiva si aplica.</li>
+            <li>Resume fases del juego y conclusiones accionables.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="d-grid gap-2 mt-3">
+        <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+        <a href="/scouting-teams" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </div>
+  </div>
+</form>

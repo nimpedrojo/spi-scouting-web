@@ -1,6 +1,10 @@
-# SoccerReport
+# SoccerProcessIQ Suite
 
-Aplicación web sencilla para gestionar informes de ojeo / scouting de jugadores de fútbol. Construida con **Node.js**, **Express** y **EJS**, utiliza MySQL como base de datos y Bootstrap para la interfaz.
+SoccerProcessIQ Suite — Modular Football Club Platform.
+
+Este repositorio contiene la implementación del módulo histórico de scouting de jugadores dentro de la suite modular "SoccerProcessIQ Suite". La aplicación base está construida con **Node.js**, **Express** y **EJS**, usa MySQL como base de datos y Bootstrap para la interfaz.
+
+Nota de transición: este proyecto era conocido previamente como "SoccerReport"; el código y las rutas existentes mantienen compatibilidad, pero la documentación y el posicionamiento ahora reflejan la arquitectura modular y la visión de suite.
 
 ## Funcionalidad principal
 

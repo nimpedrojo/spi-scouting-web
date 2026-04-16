@@ -30,6 +30,18 @@ const {
 const MIN_SCORE = 0;
 const MAX_SCORE = 10;
 
+function filterPlayersByTeam(players, teamId) {
+  if (!Array.isArray(players)) {
+    return [];
+  }
+
+  if (!teamId) {
+    return players;
+  }
+
+  return players.filter((player) => String(player.current_team_id || '') === String(teamId));
+}
+
 function flattenGroupedScores(groupedScores, templateAreas) {
   const flattened = [];
   templateAreas.forEach((area) => {
@@ -311,6 +323,7 @@ async function getEvaluationFormData(user, options = {}) {
     filterTeamsForUser(user, teams),
     filterPlayersForUser(user, players),
   ]);
+  const filteredPlayers = filterPlayersByTeam(visiblePlayers, options.teamId || null);
 
   let resolvedTemplate = null;
   if (options.templateId) {
@@ -326,7 +339,10 @@ async function getEvaluationFormData(user, options = {}) {
   return {
     club,
     teams: visibleTeams,
-    players: visiblePlayers,
+    players: filteredPlayers,
+    allPlayers: visiblePlayers,
+    teamId: options.teamId || null,
+    playerId: options.playerId || null,
     seasons,
     activeSeason,
     template: resolvedTemplate.metrics,
