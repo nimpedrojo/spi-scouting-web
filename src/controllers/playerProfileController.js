@@ -99,6 +99,54 @@ function buildTrackingSummary(analytics, reports) {
   };
 }
 
+function buildProfileRadarChartData(analytics, playerBenchmark) {
+  const baseChart = analytics && analytics.radarChartData
+    ? analytics.radarChartData
+    : { labels: [], datasets: [] };
+
+  const datasets = Array.isArray(baseChart.datasets)
+    ? baseChart.datasets.map((dataset, index) => ({
+      ...dataset,
+      label: index === 0 ? 'Media jugador' : (dataset.label || `Serie ${index + 1}`),
+    }))
+    : [];
+
+  if (!playerBenchmark || !playerBenchmark.isReady || !Array.isArray(playerBenchmark.areaComparisons)) {
+    return {
+      labels: baseChart.labels || [],
+      datasets,
+    };
+  }
+
+  const teamAverageByLabel = playerBenchmark.areaComparisons.reduce((acc, area) => {
+    acc[area.label] = area.teamAverage;
+    return acc;
+  }, {});
+
+  return {
+    labels: baseChart.labels || [],
+    datasets: [
+      ...datasets,
+      {
+        label: 'Media equipo',
+        data: (baseChart.labels || []).map((label) => {
+          const value = teamAverageByLabel[label];
+          return value != null ? Number(value) : null;
+        }),
+        borderColor: '#6b7280',
+        backgroundColor: 'rgba(107, 114, 128, 0)',
+        pointBackgroundColor: '#6b7280',
+        pointBorderColor: '#ffffff',
+        pointHoverBackgroundColor: '#6b7280',
+        pointHoverBorderColor: '#ffffff',
+        borderDash: [6, 4],
+        borderWidth: 2,
+        fill: false,
+      },
+    ],
+  };
+}
+
 async function renderProfile(req, res) {
   try {
     const club = req.context ? req.context.club : null;
@@ -150,6 +198,7 @@ async function renderProfile(req, res) {
     const playerBenchmark = scoutingPlayersEnabled && player.current_team_id && benchmarkSeasonId
       ? await getPlayerBenchmark(player.id, player.current_team_id, club.id, benchmarkSeasonId)
       : null;
+    const profileRadarChartData = buildProfileRadarChartData(analytics, playerBenchmark);
 
     return res.render('players/show', {
       pageTitle: `${player.first_name} ${player.last_name}`,
@@ -166,7 +215,7 @@ async function renderProfile(req, res) {
       analytics: {
         ...analytics,
         areaEntries: Object.values(analytics.groupedMetricBreakdown || {}),
-        radarChartJson: JSON.stringify(analytics.radarChartData),
+        radarChartJson: JSON.stringify(profileRadarChartData),
       },
       trackingSummary: buildTrackingSummary(analytics, reports),
       scoutingPlayersEnabled,

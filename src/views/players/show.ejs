@@ -697,7 +697,7 @@
             }
           },
           plugins: {
-            legend: { display: false }
+            legend: { display: chartData && Array.isArray(chartData.datasets) && chartData.datasets.length > 1 }
           }
         }
       });

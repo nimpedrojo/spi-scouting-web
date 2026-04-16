@@ -4,6 +4,45 @@
   const hasRecentActivity = recentActivity.evaluations.length || recentActivity.reports.length || recentActivity.scoutingTeams.length;
   const isPmvMode = productMode && productMode.isPmvPlayerTracking;
   const teamBenchmark = team.teamBenchmark || null;
+  function getLateralityFilterMeta(value) {
+    const normalized = String(value || '').trim().toUpperCase();
+
+    if (!normalized) {
+      return { key: 'unknown', label: 'Sin dato' };
+    }
+
+    if (['DER', 'DERECHO', 'DIESTRO', 'RIGHT'].includes(normalized)) {
+      return { key: 'right', label: 'Derecho' };
+    }
+
+    if (['IZQ', 'IZQUIERDO', 'ZURDO', 'LEFT'].includes(normalized)) {
+      return { key: 'left', label: 'Zurdo' };
+    }
+
+    if (['AMB', 'AMBIDIESTRO', 'BOTH'].includes(normalized)) {
+      return { key: 'both', label: 'Ambidiestro' };
+    }
+
+    return { key: 'unknown', label: 'Sin dato' };
+  }
+
+  const rosterYears = Array.from(new Set(
+    team.players
+      .map((player) => Number(player.birth_year))
+      .filter((year) => Number.isInteger(year) && year > 1900)
+  )).sort((a, b) => b - a);
+
+  const rosterPositions = Array.from(new Set(
+    team.players
+      .map((player) => String(player.primary_position || '').trim().toUpperCase())
+      .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'es'));
+
+  const rosterLateralityOptions = Array.from(team.players.reduce((map, player) => {
+    const meta = getLateralityFilterMeta(player.laterality);
+    map.set(meta.key, meta.label);
+    return map;
+  }, new Map()).entries()).map(([value, label]) => ({ value, label }));
 %>
 
 <div class="mb-4">
@@ -385,7 +424,7 @@
 
 <div class="team-detail-tabs mb-4">
   <a href="/teams/<%= team.id %>?view=list#team-roster" class="team-detail-tab <%= viewMode === 'list' ? 'active' : '' %>">Plantilla</a>
-  <a href="/teams/<%= team.id %>?view=cards#team-roster" class="team-detail-tab <%= viewMode === 'cards' ? 'active' : '' %>">Tarjetas</a>
+  <!--<a href="/teams/<%= team.id %>?view=cards#team-roster" class="team-detail-tab <%= viewMode === 'cards' ? 'active' : '' %>">Tarjetas</a>-->
   <% if (activeModules.includes('scouting_players')) { %>
     <a href="/evaluations?team_id=<%= team.id %>" class="team-detail-tab">Evaluaciones</a>
   <% } %>
@@ -481,17 +520,68 @@
             <p class="mb-2 text-muted">No hay jugadores asignados a esta plantilla.</p>
             <a href="/admin/players/new" class="btn btn-sm btn-primary">Añadir primer jugador</a>
           </div>
-        <% } else if (viewMode === 'cards') { %>
-          <div class="row g-3">
+        <% } else { %>
+          <div class="border rounded-3 bg-light-subtle p-3 mb-3" id="team-roster-filters">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-year" class="form-label small text-uppercase text-muted mb-1">Año</label>
+                <select id="roster-filter-year" class="form-select form-select-sm">
+                  <option value="">Todos los años</option>
+                  <% rosterYears.forEach((year) => { %>
+                    <option value="<%= year %>"><%= year %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-position" class="form-label small text-uppercase text-muted mb-1">Posicion</label>
+                <select id="roster-filter-position" class="form-select form-select-sm">
+                  <option value="">Todas las posiciones</option>
+                  <% rosterPositions.forEach((position) => { %>
+                    <option value="<%= position %>"><%= position %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="roster-filter-laterality" class="form-label small text-uppercase text-muted mb-1">Lateralidad</label>
+                <select id="roster-filter-laterality" class="form-select form-select-sm">
+                  <option value="">Todas</option>
+                  <% rosterLateralityOptions.forEach((option) => { %>
+                    <option value="<%= option.value %>"><%= option.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mt-3">
+              <div class="small text-muted">
+                Mostrando <strong id="roster-visible-count"><%= team.players.length %></strong> de <strong><%= team.players.length %></strong> jugadores
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="roster-filter-reset">Limpiar filtros</button>
+            </div>
+          </div>
+
+          <div class="alert alert-light border d-none mb-0" id="team-roster-empty-state" role="status">
+            No hay jugadores que coincidan con los filtros seleccionados.
+          </div>
+        <% } %>
+
+        <% if (team.players.length && viewMode === 'cards') { %>
+          <div class="row g-3" id="team-roster-cards">
             <% team.players.forEach((player, index) => { %>
-              <div class="col-md-6">
+              <% const lateralityMeta = getLateralityFilterMeta(player.laterality); %>
+              <div
+                class="col-md-6"
+                data-roster-item
+                data-year="<%= player.birth_year || '' %>"
+                data-position="<%= player.primary_position || '' %>"
+                data-laterality="<%= lateralityMeta.key %>"
+              >
                 <div class="team-player-card h-100">
                   <div class="team-player-card__rank"><%= index + 1 %></div>
                   <div class="team-player-card__body">
                     <div class="d-flex justify-content-between gap-3">
                       <div>
                         <div class="team-player-card__name"><%= player.full_name %></div>
-                        <div class="small text-muted"><%= player.birth_year || '-' %></div>
+                        <div class="small text-muted"><%= player.birth_year || '-' %> · <%= player.laterality || 'Sin dato' %></div>
                       </div>
                       <div class="team-player-card__meta">
                         <span class="badge text-bg-primary">#<%= player.dorsal || '-' %></span>
@@ -514,7 +604,7 @@
               </div>
             <% }) %>
           </div>
-        <% } else { %>
+        <% } else if (team.players.length) { %>
           <div class="table-responsive">
             <table class="table align-middle team-detail-table">
               <thead>
@@ -527,9 +617,15 @@
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="team-roster-table-body">
                 <% team.players.forEach((player, index) => { %>
-                  <tr>
+                  <% const lateralityMeta = getLateralityFilterMeta(player.laterality); %>
+                  <tr
+                    data-roster-item
+                    data-year="<%= player.birth_year || '' %>"
+                    data-position="<%= player.primary_position || '' %>"
+                    data-laterality="<%= lateralityMeta.key %>"
+                  >
                     <td>
                       <span class="team-detail-table__rank"><%= player.dorsal || index + 1 %></span>
                     </td>
@@ -560,3 +656,63 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    var yearFilter = document.getElementById('roster-filter-year');
+    var positionFilter = document.getElementById('roster-filter-position');
+    var lateralityFilter = document.getElementById('roster-filter-laterality');
+    var resetButton = document.getElementById('roster-filter-reset');
+    var visibleCount = document.getElementById('roster-visible-count');
+    var emptyState = document.getElementById('team-roster-empty-state');
+    var items = Array.prototype.slice.call(document.querySelectorAll('[data-roster-item]'));
+
+    if (!yearFilter || !positionFilter || !lateralityFilter || !items.length) {
+      return;
+    }
+
+    function applyRosterFilters() {
+      var yearValue = yearFilter.value;
+      var positionValue = positionFilter.value;
+      var lateralityValue = lateralityFilter.value;
+      var matches = 0;
+
+      items.forEach(function (item) {
+        var itemYear = item.getAttribute('data-year') || '';
+        var itemPosition = item.getAttribute('data-position') || '';
+        var itemLaterality = item.getAttribute('data-laterality') || '';
+        var isVisible = (!yearValue || itemYear === yearValue)
+          && (!positionValue || itemPosition === positionValue)
+          && (!lateralityValue || itemLaterality === lateralityValue);
+
+        item.classList.toggle('d-none', !isVisible);
+        if (isVisible) {
+          matches += 1;
+        }
+      });
+
+      if (visibleCount) {
+        visibleCount.textContent = String(matches);
+      }
+
+      if (emptyState) {
+        emptyState.classList.toggle('d-none', matches !== 0);
+      }
+    }
+
+    [yearFilter, positionFilter, lateralityFilter].forEach(function (control) {
+      control.addEventListener('change', applyRosterFilters);
+    });
+
+    if (resetButton) {
+      resetButton.addEventListener('click', function () {
+        yearFilter.value = '';
+        positionFilter.value = '';
+        lateralityFilter.value = '';
+        applyRosterFilters();
+      });
+    }
+
+    applyRosterFilters();
+  }());
+</script>

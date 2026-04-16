@@ -3269,11 +3269,13 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('Infantil F');
     expect(res.text).toContain('SoccerProcessIQ Suite');
     expect(res.text).toContain('SPI Core');
-    expect(res.text).toContain('Módulos activos');
     expect(res.text).toContain('Lucia Pardo');
     expect(res.text).toContain('Perfil');
     expect(res.text).toContain('SPI Scouting Players');
     expect(res.text).not.toContain('SPI Planning');
+    expect(res.text).toContain('roster-filter-year');
+    expect(res.text).toContain('roster-filter-position');
+    expect(res.text).toContain('roster-filter-laterality');
   });
 
   test('team detail muestra módulos activos del club en el contexto del equipo', async () => {
@@ -4575,6 +4577,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('Diferencia global');
     expect(res.text).toContain('Tecnica');
     expect(res.text).toContain('El jugador se sitúa por encima de la media del equipo');
+    expect(res.text).toContain('Media equipo');
   });
 
   test('player profile empty state without evaluations', async () => {
