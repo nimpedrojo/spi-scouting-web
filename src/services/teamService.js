@@ -264,6 +264,9 @@ async function getActiveSeasonByClub(clubId) {
 async function getTeamsGroupedBySectionAndCategory(clubId, filters = {}) {
   const teams = await getTeamsByClubId(clubId);
   const filteredTeams = teams.filter((team) => {
+    if (filters.seasonId && String(team.season_id) !== String(filters.seasonId)) {
+      return false;
+    }
     if (filters.section && team.section_name !== filters.section) {
       return false;
     }

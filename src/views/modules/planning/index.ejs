@@ -11,7 +11,7 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <form method="GET" action="/planning" class="row g-3 align-items-end">
-      <div class="col-md-8">
+      <div class="col-md-5">
         <label for="team_id" class="form-label">Equipo</label>
         <select id="team_id" name="team_id" class="form-select">
           <% if (planning.visibleTeams && planning.visibleTeams.length) { %>
@@ -25,10 +25,24 @@
           <% } %>
         </select>
       </div>
-      <div class="col-md-4 d-flex gap-2">
+      <div class="col-md-4">
+        <label for="planningSeasonSelector" class="form-label">Temporada</label>
+        <select id="planningSeasonSelector" name="season_id" class="form-select">
+          <% if (seasonView && seasonView.seasons && seasonView.seasons.length) { %>
+            <% seasonView.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= String((seasonView && seasonView.selectedSeasonId) || '') === String(season.id) ? 'selected' : '' %>>
+                <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option value="">Sin temporadas</option>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2">
         <button type="submit" class="btn btn-outline-secondary">Cambiar contexto</button>
         <% if (planning.selectedTeam) { %>
-          <a href="/teams/<%= planning.selectedTeam.id %>" class="btn btn-outline-secondary">Volver al equipo</a>
+          <a href="/teams/<%= planning.selectedTeam.id %>?season_id=<%= encodeURIComponent((seasonView && seasonView.selectedSeasonId) || '') %>" class="btn btn-outline-secondary">Volver al equipo</a>
         <% } %>
       </div>
     </form>
@@ -49,10 +63,95 @@
         <div class="d-flex flex-wrap gap-2">
           <span class="badge text-bg-light border"><%= planning.seasonPlans.length %> planificaciones</span>
           <% if (planning.activeSeason) { %>
-            <span class="badge text-bg-light border">Temporada activa <%= planning.activeSeason.name %></span>
+            <span class="badge text-bg-light border">Temporada en contexto <%= planning.activeSeason.name %></span>
           <% } %>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="card season-recommendation-card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+          <div class="season-recommendation-card__eyebrow text-muted small fw-semibold mb-2">Equipo futuro</div>
+          <h2 class="h5 mb-1">Jugadores recomendados</h2>
+          <p class="text-muted mb-0">Vista rápida de las incorporaciones sugeridas para esta plantilla de la siguiente temporada.</p>
+        </div>
+        <span class="badge text-bg-light border"><%= (planning.recommendations && planning.recommendations.totalRecommendations) || 0 %> recomendaciones</span>
+      </div>
+
+      <% if (!planning.recommendations || !(planning.recommendations.totalRecommendations > 0)) { %>
+        <div class="season-recommendation-empty text-muted">
+          No hay jugadores recomendados todavía para este equipo.
+        </div>
+      <% } else { %>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="season-recommendation-highlight h-100">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                <h3 class="h6 mb-0">Internos</h3>
+                <span class="badge text-bg-light border"><%= planning.recommendations.internalRecommendations.length %></span>
+              </div>
+              <% if (!planning.recommendations.internalRecommendations.length) { %>
+                <div class="season-recommendation-empty text-muted">Sin recomendaciones internas.</div>
+              <% } else { %>
+                <div class="season-recommendation-history">
+                  <% planning.recommendations.internalRecommendations.forEach((item) => { %>
+                    <div class="season-recommendation-history-item">
+                      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+                        <div>
+                          <div class="fw-semibold"><%= item.displayName %></div>
+                          <div class="small text-muted"><%= item.sourceLabel %></div>
+                        </div>
+                        <span class="season-recommendation-status <%= item.statusMeta.className %>"><%= item.statusMeta.label %></span>
+                      </div>
+                      <% if (item.notes) { %>
+                        <div class="small text-muted mb-2"><%= item.notes %></div>
+                      <% } %>
+                      <% if (item.detailHref) { %>
+                        <a href="<%= item.detailHref %>" class="btn btn-sm btn-outline-secondary">Abrir ficha</a>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="season-recommendation-highlight h-100">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                <h3 class="h6 mb-0">Externos (scouting)</h3>
+                <span class="badge text-bg-light border"><%= planning.recommendations.externalRecommendations.length %></span>
+              </div>
+              <% if (!planning.recommendations.externalRecommendations.length) { %>
+                <div class="season-recommendation-empty text-muted">Sin recomendaciones externas.</div>
+              <% } else { %>
+                <div class="season-recommendation-history">
+                  <% planning.recommendations.externalRecommendations.forEach((item) => { %>
+                    <div class="season-recommendation-history-item">
+                      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+                        <div>
+                          <div class="fw-semibold"><%= item.displayName %></div>
+                          <div class="small text-muted"><%= item.sourceLabel %></div>
+                        </div>
+                        <span class="season-recommendation-status <%= item.statusMeta.className %>"><%= item.statusMeta.label %></span>
+                      </div>
+                      <% if (item.notes) { %>
+                        <div class="small text-muted mb-2"><%= item.notes %></div>
+                      <% } %>
+                      <% if (item.detailHref) { %>
+                        <a href="<%= item.detailHref %>" class="btn btn-sm btn-outline-secondary">Abrir informe</a>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
     </div>
   </div>
 <% } %>

@@ -4,6 +4,7 @@ const { createPlayersTable } = require('./models/playerModel');
 const { createClubsTable } = require('./models/clubModel');
 const { createClubRecommendationsTable } = require('./models/clubRecommendationModel');
 const { createSeasonsTable } = require('./models/seasonModel');
+const { createSeasonTeamRecommendationsTable } = require('./models/seasonTeamRecommendationModel');
 const { createSectionsTable, seedDefaultSections } = require('./models/sectionModel');
 const { createCategoriesTable, seedDefaultCategories } = require('./models/categoryModel');
 const { createTeamsTable } = require('./models/teamModel');
@@ -66,6 +67,7 @@ async function initializeDatabase() {
   await createReportsTable();
   await createPlayersTable();
   await createTeamPlayersTable();
+  await createSeasonTeamRecommendationsTable();
   await createEvaluationsTable();
   await createEvaluationScoresTable();
   await createEvaluationTemplatesTable();

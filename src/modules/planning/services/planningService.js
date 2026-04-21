@@ -1,5 +1,8 @@
 const { getTeamsByClubId, findTeamById } = require('../../../models/teamModel');
+const { getReportById } = require('../../../models/reportModel');
+const { getSeasonsByClubId } = require('../../../models/seasonModel');
 const { getActiveSeasonByClub } = require('../../../services/teamService');
+const { getRecommendationsByTeam } = require('../../../services/seasonRecommendationService');
 const {
   filterTeamsForUser,
   getActiveTeamScope,
@@ -212,6 +215,16 @@ function addDaysToIsoDate(baseDate, offsetDays) {
   return parsedBase.toISOString().slice(0, 10);
 }
 
+function addYearsToIsoDate(baseDate, offsetYears) {
+  const parsedBase = parseIsoDateToUtc(baseDate);
+  if (!parsedBase) {
+    return null;
+  }
+
+  parsedBase.setUTCFullYear(parsedBase.getUTCFullYear() + Number(offsetYears || 0));
+  return parsedBase.toISOString().slice(0, 10);
+}
+
 function diffDays(fromDate, toDate) {
   const from = parseIsoDateToUtc(fromDate);
   const to = parseIsoDateToUtc(toDate);
@@ -237,6 +250,22 @@ function getDateLabel(dateValue) {
   }).format(parseIsoDateToUtc(isoDate));
 }
 
+function extractSeasonStartYear(label) {
+  const match = String(label || '').match(/\b(20\d{2})\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function getSeasonYearOffset(sourceLabel, targetLabel) {
+  const sourceYear = extractSeasonStartYear(sourceLabel);
+  const targetYear = extractSeasonStartYear(targetLabel);
+
+  if (!sourceYear || !targetYear) {
+    return 0;
+  }
+
+  return targetYear - sourceYear;
+}
+
 function decorateSession(session) {
   const statusMeta = getSessionStatusMeta(session.status);
   return {
@@ -250,6 +279,173 @@ function decorateTask(task) {
   return {
     ...task,
   };
+}
+
+function getRecommendationStatusMeta(status) {
+  const normalizedStatus = normalizeOptionalText(status) || 'proposed';
+  const statusMap = {
+    proposed: { key: 'proposed', label: 'Propuesta', className: 'season-recommendation-status--proposed' },
+    in_review: { key: 'in_review', label: 'En revision', className: 'season-recommendation-status--in_review' },
+    validated: { key: 'validated', label: 'Validada', className: 'season-recommendation-status--validated' },
+    discarded: { key: 'discarded', label: 'Descartada', className: 'season-recommendation-status--discarded' },
+  };
+
+  return statusMap[normalizedStatus] || statusMap.proposed;
+}
+
+function getRecommendationPlayerName(recommendation) {
+  if (!recommendation) {
+    return 'Jugador sin identificar';
+  }
+
+  if (recommendation.source_type === 'internal') {
+    const firstName = normalizeOptionalText(recommendation.player_first_name);
+    const lastName = normalizeOptionalText(recommendation.player_last_name);
+    return [firstName, lastName].filter(Boolean).join(' ') || 'Jugador interno';
+  }
+
+  const scoutedName = normalizeOptionalText(recommendation.scouted_player_name);
+  const scoutedSurname = normalizeOptionalText(recommendation.scouted_player_surname);
+  return [scoutedName, scoutedSurname].filter(Boolean).join(' ') || 'Jugador scouting';
+}
+
+function decorateRecommendationItem(item) {
+  const statusMeta = getRecommendationStatusMeta(item.status);
+  return {
+    ...item,
+    displayName: getRecommendationPlayerName(item),
+    sourceLabel: item.source_type === 'scouted' ? 'Scouting' : 'Interno',
+    statusMeta,
+    detailHref: item.source_type === 'scouted'
+      ? (item.scouted_player_id ? `/reports/${item.scouted_player_id}` : null)
+      : (item.player_id ? `/players/${item.player_id}` : null),
+  };
+}
+
+async function getPlanningRecommendations(clubId, selectedTeam) {
+  if (!clubId || !selectedTeam || !selectedTeam.id || !selectedTeam.season_id) {
+    return {
+      internalRecommendations: [],
+      externalRecommendations: [],
+      totalRecommendations: 0,
+    };
+  }
+
+  const result = await getRecommendationsByTeam(selectedTeam.season_id, selectedTeam.id, { clubId });
+
+  if (result.errors && result.errors.length) {
+    return {
+      internalRecommendations: [],
+      externalRecommendations: [],
+      totalRecommendations: 0,
+      errors: result.errors,
+    };
+  }
+
+  const resolvedExternalRecommendations = await Promise.all(
+    (result.externalRecommendations || []).map(async (item) => {
+      if (!item.scouted_player_id) {
+        return item;
+      }
+
+      const report = await getReportById(item.scouted_player_id);
+      if (!report) {
+        return item;
+      }
+
+      return {
+        ...item,
+        scouted_player_name: report.player_name || null,
+        scouted_player_surname: report.player_surname || null,
+      };
+    }),
+  );
+
+  const internalRecommendations = (result.internalRecommendations || []).map(decorateRecommendationItem);
+  const externalRecommendations = resolvedExternalRecommendations.map(decorateRecommendationItem);
+
+  return {
+    internalRecommendations,
+    externalRecommendations,
+    totalRecommendations: internalRecommendations.length + externalRecommendations.length,
+  };
+}
+
+async function resolveNextSeasonForTeam(team) {
+  if (!team || !team.club_id || !team.season_id) {
+    return null;
+  }
+
+  const seasons = await getSeasonsByClubId(team.club_id);
+  const currentSeasonStartYear = extractSeasonStartYear(team.season_name);
+  const futureSeasons = seasons
+    .filter((season) => String(season.id) !== String(team.season_id))
+    .map((season) => ({
+      ...season,
+      startYear: extractSeasonStartYear(season.name),
+    }))
+    .filter((season) => season.startYear && (!currentSeasonStartYear || season.startYear > currentSeasonStartYear))
+    .sort((a, b) => a.startYear - b.startYear || a.name.localeCompare(b.name, 'es'));
+
+  return futureSeasons[0] || null;
+}
+
+async function resolveEquivalentTeamForNextSeason(sourceTeam, targetSeasonId) {
+  if (!sourceTeam || !sourceTeam.club_id || !targetSeasonId) {
+    return null;
+  }
+
+  const teams = await getTeamsByClubId(sourceTeam.club_id);
+  return teams.find((team) => (
+    String(team.season_id) === String(targetSeasonId)
+    && String(team.name) === String(sourceTeam.name)
+    && String(team.section_id) === String(sourceTeam.section_id)
+    && String(team.category_id) === String(sourceTeam.category_id)
+  )) || null;
+}
+
+async function duplicateSessionsForSeasonPlan(sourceMicrocycleId, targetMicrocycleId, yearOffset) {
+  const sourceSessions = await listPlanSessionsByMicrocycle(sourceMicrocycleId);
+
+  for (const session of sourceSessions) {
+    const duplicatedSession = await createPlanSession({
+      microcycleId: targetMicrocycleId,
+      sessionDate: addYearsToIsoDate(session.session_date, yearOffset) || session.session_date_iso,
+      title: session.title,
+      sessionType: session.session_type,
+      durationMinutes: session.duration_minutes,
+      status: 'planned',
+      objective: session.objective,
+      contents: session.contents,
+      notes: session.notes,
+    });
+
+    const sourceTasks = await listPlanSessionTasksBySession(session.id);
+    for (const task of sourceTasks) {
+      await createPlanSessionTask({
+        sessionId: duplicatedSession.id,
+        sortOrder: task.sort_order,
+        title: task.title,
+        taskType: task.task_type,
+        durationMinutes: task.duration_minutes,
+        objective: task.objective,
+        details: task.details,
+        space: task.space,
+        ageGroup: task.age_group,
+        playerCount: task.player_count,
+        complexity: task.complexity,
+        strategy: task.strategy,
+        coordinativeSkills: task.coordinative_skills,
+        tacticalIntention: task.tactical_intention,
+        dynamics: task.dynamics,
+        gameSituation: task.game_situation,
+        coordination: task.coordination,
+        explanatoryImagePath: await clonePlanningTaskImage(task.explanatory_image_path),
+        contents: task.contents,
+        notes: task.notes,
+      });
+    }
+  }
 }
 
 function buildWeeklyView(sessions) {
@@ -294,13 +490,16 @@ function decorateMicrocycle(microcycle) {
   };
 }
 
-async function getVisibleTeamsForPlanning(user, clubId) {
+async function getVisibleTeamsForPlanning(user, clubId, seasonId = null) {
   const teams = await getTeamsByClubId(clubId);
-  return filterTeamsForUser(user, teams);
+  const filteredTeams = seasonId
+    ? teams.filter((team) => String(team.season_id) === String(seasonId))
+    : teams;
+  return filterTeamsForUser(user, filteredTeams);
 }
 
-async function resolveSelectedTeam(user, clubId, requestedTeamId = null) {
-  const visibleTeams = await getVisibleTeamsForPlanning(user, clubId);
+async function resolveSelectedTeam(user, clubId, requestedTeamId = null, seasonId = null) {
+  const visibleTeams = await getVisibleTeamsForPlanning(user, clubId, seasonId);
   if (!visibleTeams.length) {
     return {
       visibleTeams,
@@ -335,17 +534,24 @@ async function resolveSelectedTeam(user, clubId, requestedTeamId = null) {
   };
 }
 
-async function getPlanningHomeData(user, club, activeSeason, requestedTeamId = null) {
-  const { visibleTeams, selectedTeam } = await resolveSelectedTeam(user, club.id, requestedTeamId);
+async function getPlanningHomeData(user, club, selectedSeason, requestedTeamId = null) {
+  const { visibleTeams, selectedTeam } = await resolveSelectedTeam(
+    user,
+    club.id,
+    requestedTeamId,
+    selectedSeason ? selectedSeason.id : null,
+  );
   const seasonPlans = selectedTeam
     ? (await listSeasonPlansByTeam(club.id, selectedTeam.id)).map(decorateSeasonPlan)
     : [];
+  const recommendations = await getPlanningRecommendations(club.id, selectedTeam);
 
   return {
     visibleTeams,
     selectedTeam,
-    activeSeason,
+    activeSeason: selectedSeason,
     seasonPlans,
+    recommendations,
     canManagePlanning: Boolean(user),
   };
 }
@@ -631,6 +837,72 @@ async function deleteSeasonPlanForUser(user, clubId, seasonPlanId) {
 
   await deleteSeasonPlan(seasonPlan.id);
   return seasonPlan;
+}
+
+/**
+ * Duplica una planificación completa al equipo equivalente de la siguiente temporada.
+ * Copia plan, microciclos, sesiones y tareas; reinicia el estado operativo de sesiones.
+ */
+async function duplicateSeasonPlanToNextSeasonForUser(user, clubId, seasonPlanId) {
+  const seasonPlan = await getSeasonPlanContextForUser(user, clubId, seasonPlanId);
+  if (!seasonPlan) {
+    return { errors: ['Planificación no encontrada.'] };
+  }
+
+  const sourceTeam = await findTeamById(seasonPlan.team_id);
+  if (!sourceTeam || Number(sourceTeam.club_id) !== Number(clubId)) {
+    return { errors: ['El equipo origen de la planificación no es válido.'] };
+  }
+
+  const targetSeason = await resolveNextSeasonForTeam(sourceTeam);
+  if (!targetSeason) {
+    return { errors: ['No existe una temporada siguiente disponible para este equipo.'] };
+  }
+
+  const targetTeam = await resolveEquivalentTeamForNextSeason(sourceTeam, targetSeason.id);
+  if (!targetTeam) {
+    return { errors: ['No existe el equipo equivalente en la siguiente temporada.'] };
+  }
+
+  const existingPlans = await listSeasonPlansByTeam(clubId, targetTeam.id);
+  if (existingPlans.some((item) => String(item.season_label) === String(targetSeason.name))) {
+    return { errors: ['Ya existe una planificación creada para el equipo destino en la siguiente temporada.'] };
+  }
+
+  const yearOffset = getSeasonYearOffset(sourceTeam.season_name || seasonPlan.season_label, targetSeason.name);
+  const duplicatedPlan = await createSeasonPlan({
+    clubId,
+    teamId: targetTeam.id,
+    seasonLabel: targetSeason.name,
+    planningModel: seasonPlan.planning_model,
+    startDate: addYearsToIsoDate(seasonPlan.start_date, yearOffset),
+    endDate: addYearsToIsoDate(seasonPlan.end_date, yearOffset),
+    objective: seasonPlan.objective,
+    notes: seasonPlan.notes,
+    createdBy: user ? user.id : null,
+  });
+
+  const sourceMicrocycles = await listPlanMicrocyclesBySeasonPlan(seasonPlan.id);
+  for (const microcycle of sourceMicrocycles) {
+    const duplicatedMicrocycle = await createPlanMicrocycle({
+      seasonPlanId: duplicatedPlan.id,
+      name: microcycle.name,
+      orderIndex: microcycle.order_index,
+      startDate: addYearsToIsoDate(microcycle.start_date, yearOffset),
+      endDate: addYearsToIsoDate(microcycle.end_date, yearOffset),
+      objective: microcycle.objective,
+      phase: microcycle.phase,
+      notes: microcycle.notes,
+    });
+
+    await duplicateSessionsForSeasonPlan(microcycle.id, duplicatedMicrocycle.id, yearOffset);
+  }
+
+  return {
+    seasonPlan: await findSeasonPlanById(duplicatedPlan.id),
+    targetSeason,
+    targetTeam,
+  };
 }
 
 async function getNextMicrocycleOrderIndex(seasonPlanId) {
@@ -1273,6 +1545,7 @@ module.exports = {
   createSeasonPlanForUser,
   updateSeasonPlanForUser,
   deleteSeasonPlanForUser,
+  duplicateSeasonPlanToNextSeasonForUser,
   createMicrocycleForUser,
   updateMicrocycleForUser,
   duplicateMicrocycleForUser,

@@ -13,7 +13,7 @@
     <p class="text-muted mb-0">
       <%= clubName %>
       <% if (activeSeason) { %>
-        · Temporada activa <strong><%= activeSeason.name %></strong>
+        · Contexto <strong><%= activeSeason.name %></strong>
       <% } %>
     </p>
   </div>
@@ -33,6 +33,33 @@
   </div>
 </div>
 
+<% if (seasonView && seasonView.seasons && seasonView.seasons.length) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" action="/teams" class="row g-3 align-items-end">
+        <% if (selectedClubId) { %>
+          <input type="hidden" name="club_id" value="<%= selectedClubId %>">
+        <% } %>
+        <input type="hidden" name="section" value="<%= activeSection %>">
+        <input type="hidden" name="category" value="<%= activeCategory %>">
+        <div class="col-md-8">
+          <label for="teamsSeasonSelector" class="form-label">Temporada</label>
+          <select id="teamsSeasonSelector" name="season_id" class="form-select">
+            <% seasonView.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= String(seasonView.selectedSeasonId || '') === String(season.id) ? 'selected' : '' %>>
+                <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-outline-secondary">Cambiar temporada</button>
+        </div>
+      </form>
+    </div>
+  </div>
+<% } %>
+
 <div class="card shadow-sm border-0 bg-light-subtle mb-4">
   <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
     <div>
@@ -50,7 +77,7 @@
     <li class="nav-item">
       <a
         class="nav-link <%= activeSection === sectionName ? 'active' : '' %>"
-        href="/teams?section=<%= encodeURIComponent(sectionName) %><%= activeCategory ? '&category=' + encodeURIComponent(activeCategory) : '' %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
+        href="/teams?section=<%= encodeURIComponent(sectionName) %><%= activeCategory ? '&category=' + encodeURIComponent(activeCategory) : '' %><%= seasonView && seasonView.selectedSeasonId ? '&season_id=' + encodeURIComponent(seasonView.selectedSeasonId) : '' %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
       >
         <%= sectionName %>
       </a>
@@ -60,14 +87,14 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
   <a
-    href="/teams?section=<%= encodeURIComponent(activeSection) %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
+    href="/teams?section=<%= encodeURIComponent(activeSection) %><%= seasonView && seasonView.selectedSeasonId ? '&season_id=' + encodeURIComponent(seasonView.selectedSeasonId) : '' %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
     class="btn btn-sm <%= !activeCategory ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
   >
     Todas
   </a>
   <% availableCategories.forEach((categoryName) => { %>
     <a
-      href="/teams?section=<%= encodeURIComponent(activeSection) %>&category=<%= encodeURIComponent(categoryName) %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
+      href="/teams?section=<%= encodeURIComponent(activeSection) %>&category=<%= encodeURIComponent(categoryName) %><%= seasonView && seasonView.selectedSeasonId ? '&season_id=' + encodeURIComponent(seasonView.selectedSeasonId) : '' %><%= selectedClubId ? '&club_id=' + encodeURIComponent(selectedClubId) : '' %>"
       class="btn btn-sm <%= activeCategory === categoryName ? 'btn-primary' : 'btn-outline-secondary' %> filter-chip"
     >
       <%= categoryName %>
@@ -167,7 +194,7 @@
               </div>
 
               <div class="mt-auto d-flex gap-2 flex-wrap">
-                <a href="/teams/<%= team.id %><%= selectedClubId ? ('?club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-sm btn-primary">Abrir ficha</a>
+                <a href="/teams/<%= team.id %>?season_id=<%= encodeURIComponent((seasonView && seasonView.selectedSeasonId) || '') %><%= selectedClubId ? ('&club_id=' + encodeURIComponent(selectedClubId)) : '' %>" class="btn btn-sm btn-primary">Abrir ficha</a>
                 <% if (team.source === 'processiq' && team.external_id) { %>
                   <form method="POST" action="/teams/<%= team.id %>/import-players/processiq" data-processiq-player-loading-form>
                     <% if (selectedClubId) { %>

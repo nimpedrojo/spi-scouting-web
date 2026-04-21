@@ -13,7 +13,8 @@ const {
 const { getClubByName } = require('../models/clubModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getAllPlayers } = require('../models/playerModel');
-const { findTeamById } = require('../models/teamModel');
+const { findTeamById, getTeamsByClubId } = require('../models/teamModel');
+const { getSeasonsByClubId } = require('../models/seasonModel');
 const { getPlayersByTeamId } = require('../models/teamPlayerModel');
 const { buildReportRadarComparison } = require('../services/reportComparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
@@ -636,6 +637,14 @@ router.get('/:id', ensureAuth, async (req, res) => {
     )) || null;
     const radarChartData = await buildReportRadarComparison(report);
     const reportClub = report.club ? await getClubByName(report.club) : null;
+    const operationalClub = (req.context && req.context.club) || reportClub || null;
+    const activeSeason = req.context ? req.context.activeSeason : null;
+    const [recommendationSeasons, recommendationTeams] = operationalClub
+      ? await Promise.all([
+        getSeasonsByClubId(operationalClub.id),
+        getTeamsByClubId(operationalClub.id),
+      ])
+      : [[], []];
     logPageView(req, 'report_detail', {
       reportId: Number(id),
       club: report.club || null,
@@ -647,6 +656,10 @@ router.get('/:id', ensureAuth, async (req, res) => {
       reportClub,
       radarChartJson: JSON.stringify(radarChartData),
       linkedPlayer,
+      recommendationSeasons,
+      recommendationTeams,
+      recommendationDefaultSeasonId: activeSeason ? activeSeason.id : '',
+      canManageSeasonRecommendations: isPrivilegedUser(req.session.user),
     });
   } catch (err) {
     // eslint-disable-next-line no-console
