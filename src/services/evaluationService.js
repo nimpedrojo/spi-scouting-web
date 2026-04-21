@@ -3,6 +3,7 @@ const { getAllUsers } = require('../models/userModel');
 const { getAllPlayers, getPlayerById } = require('../models/playerModel');
 const { getTeamsByClubId, findTeamById } = require('../models/teamModel');
 const { findSeasonById, getSeasonsByClubId } = require('../models/seasonModel');
+const { getAllCategories } = require('../models/categoryModel');
 const {
   insertEvaluation,
   findEvaluationById,
@@ -12,6 +13,7 @@ const {
 const {
   insertEvaluationScores,
   getScoresByEvaluationId,
+  listScoresByEvaluationIds,
 } = require('../models/evaluationScoreModel');
 const { requireClubForUser, getActiveSeasonByClub } = require('./teamService');
 const {
@@ -29,6 +31,32 @@ const {
 
 const MIN_SCORE = 0;
 const MAX_SCORE = 10;
+const POSITION_ALIAS_MAP = {
+  POR: 'POR',
+  GK: 'POR',
+  PORTERO: 'POR',
+  CENTRAL: 'CENTRAL',
+  DFC: 'CENTRAL',
+  DFD: 'CENTRAL',
+  DFI: 'CENTRAL',
+  LD: 'LD',
+  RB: 'LD',
+  LI: 'LI',
+  LB: 'LI',
+  MC: 'MC',
+  MCD: 'MC',
+  MCO: 'MC',
+  MEDIOCENTRO: 'MC',
+  ID: 'ID',
+  II: 'II',
+  MP: 'MP',
+  ED: 'ED',
+  EI: 'EI',
+  DEL: 'DEL',
+  DC: 'DEL',
+  ST: 'DEL',
+  DELANTERO: 'DEL',
+};
 
 function filterPlayersByTeam(players, teamId) {
   if (!Array.isArray(players)) {
@@ -40,6 +68,43 @@ function filterPlayersByTeam(players, teamId) {
   }
 
   return players.filter((player) => String(player.current_team_id || '') === String(teamId));
+}
+
+function normalizePositions(positionsValue) {
+  if (!positionsValue) {
+    return [];
+  }
+
+  return Array.from(new Set(
+    String(positionsValue)
+      .split(',')
+      .map((position) => position.trim().toUpperCase())
+      .filter(Boolean)
+      .map((position) => POSITION_ALIAS_MAP[position] || position),
+  ));
+}
+
+function filterEvaluationsByPosition(rows, position) {
+  if (!position) {
+    return rows;
+  }
+
+  const normalizedTarget = String(position).trim().toUpperCase();
+  return rows.filter((row) => normalizePositions(row.positions).includes(normalizedTarget));
+}
+
+function filterEvaluationsByCategory(rows, category) {
+  if (!category) {
+    return rows;
+  }
+
+  return rows.filter((row) => row.category_name === category);
+}
+
+function buildEvaluationPositionOptions(rows) {
+  return Array.from(new Set(
+    (rows || []).flatMap((row) => normalizePositions(row.positions)),
+  )).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
 function flattenGroupedScores(groupedScores, templateAreas) {
@@ -197,12 +262,13 @@ async function listEvaluations(user, filters = {}) {
     return { items: [], groupedByTeam: [], filterOptions: null };
   }
 
-  const [rows, teams, players, authors, seasons, activeSeason] = await Promise.all([
+  const [rows, teams, players, authors, seasons, categories, activeSeason] = await Promise.all([
     listEvaluationsByClub(club.id, filters),
     getTeamsByClubId(club.id),
     getAllPlayers(club.name),
     getAllUsers(club.name),
     getSeasonsByClubId(club.id),
+    getAllCategories(),
     getActiveSeasonByClub(club.id),
   ]);
   const [visibleTeams, visiblePlayers] = await Promise.all([
@@ -214,8 +280,10 @@ async function listEvaluations(user, filters = {}) {
   const visibleRows = rows.filter((row) => (
     visibleTeamIds.has(String(row.team_id)) && visiblePlayerIds.has(String(row.player_id))
   ));
+  const categoryFilteredRows = filterEvaluationsByCategory(visibleRows, filters.category || null);
+  const filteredRows = filterEvaluationsByPosition(categoryFilteredRows, filters.position || null);
 
-  const groupedMap = visibleRows.reduce((map, row) => {
+  const groupedMap = filteredRows.reduce((map, row) => {
     if (!map.has(row.team_id)) {
       map.set(row.team_id, {
         teamId: row.team_id,
@@ -234,15 +302,35 @@ async function listEvaluations(user, filters = {}) {
   }, new Map());
 
   return {
-    items: visibleRows,
+    items: filteredRows,
     groupedByTeam: Array.from(groupedMap.values()),
     filterOptions: {
       teams: visibleTeams,
       players: visiblePlayers,
       authors,
       seasons,
+      categories,
+      positions: buildEvaluationPositionOptions(visibleRows),
       activeSeason,
     },
+  };
+}
+
+async function buildEvaluationExport(user, filters = {}) {
+  const list = await listEvaluations(user, filters);
+  const evaluationIds = list.items.map((item) => item.id);
+  const scores = await listScoresByEvaluationIds(evaluationIds);
+  const scoresByEvaluationId = scores.reduce((map, score) => {
+    if (!map.has(score.evaluation_id)) {
+      map.set(score.evaluation_id, []);
+    }
+    map.get(score.evaluation_id).push(score);
+    return map;
+  }, new Map());
+
+  return {
+    items: list.items,
+    scoresByEvaluationId,
   };
 }
 
@@ -359,6 +447,7 @@ module.exports = {
   calculateOverallScore,
   createEvaluationWithScores,
   listEvaluations,
+  buildEvaluationExport,
   getEvaluationsGroupedByTeam,
   getPlayerEvaluationsHistory,
   getEvaluationDetail,

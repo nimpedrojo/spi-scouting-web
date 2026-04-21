@@ -5,6 +5,15 @@ const { requireClubForUser, getActiveSeasonByClub } = require('./teamService');
 const { createEvaluationWithScores } = require('./evaluationService');
 const { EVALUATION_TEMPLATE } = require('./evaluationTemplate');
 
+const BASE_HEADERS = [
+  'team_name',
+  'player_name',
+  'evaluation_date',
+  'source',
+  'title',
+  'notes',
+];
+
 function buildMetricHeaderMap() {
   const map = {};
   EVALUATION_TEMPLATE.forEach((area) => {
@@ -18,6 +27,28 @@ function buildMetricHeaderMap() {
   return map;
 }
 
+function getWorkbookHeaders() {
+  return [
+    ...BASE_HEADERS,
+    ...Object.keys(buildMetricHeaderMap()),
+  ];
+}
+
+function formatWorkbookDate(value) {
+  if (!value) {
+    return '';
+  }
+
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return String(value).slice(0, 10);
+}
+
 function parseWorkbookRows(buffer) {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -25,6 +56,47 @@ function parseWorkbookRows(buffer) {
     return [];
   }
   return XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+}
+
+function buildWorkbookBufferFromRows(rows) {
+  const headers = getWorkbookHeaders();
+  const dataRows = Array.isArray(rows)
+    ? rows.map((row) => headers.map((header) => (row[header] === undefined ? '' : row[header])))
+    : [];
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Evaluaciones');
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
+
+function buildWorkbookRowsFromEvaluations(evaluations, scoresByEvaluationId = new Map()) {
+  const metricHeaderMap = buildMetricHeaderMap();
+
+  return (evaluations || []).map((evaluation) => {
+    const row = {
+      team_name: evaluation.team_name || '',
+      player_name: `${evaluation.first_name || ''} ${evaluation.last_name || ''}`.trim(),
+      evaluation_date: formatWorkbookDate(evaluation.evaluation_date),
+      source: evaluation.source || 'manual',
+      title: evaluation.title || '',
+      notes: evaluation.notes || '',
+    };
+
+    Object.keys(metricHeaderMap).forEach((header) => {
+      row[header] = '';
+    });
+
+    const scoreEntries = scoresByEvaluationId.get(evaluation.id) || [];
+    scoreEntries.forEach((score) => {
+      const header = `${score.area}_${score.metric_key}`;
+      if (Object.prototype.hasOwnProperty.call(row, header)) {
+        row[header] = Number(score.score);
+      }
+    });
+
+    return row;
+  });
 }
 
 async function importEvaluationsFromWorkbook(user, buffer, options = {}) {
@@ -116,5 +188,8 @@ async function importEvaluationsFromWorkbook(user, buffer, options = {}) {
 }
 
 module.exports = {
+  buildWorkbookBufferFromRows,
+  buildWorkbookRowsFromEvaluations,
+  getWorkbookHeaders,
   importEvaluationsFromWorkbook,
 };

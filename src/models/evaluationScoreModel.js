@@ -63,8 +63,33 @@ async function getScoresByEvaluationId(evaluationId) {
   return rows;
 }
 
+async function listScoresByEvaluationIds(evaluationIds) {
+  if (!Array.isArray(evaluationIds) || !evaluationIds.length) {
+    return [];
+  }
+
+  const placeholders = evaluationIds.map(() => '?').join(', ');
+  const [rows] = await db.query(
+    `SELECT
+        id,
+        evaluation_id,
+        area,
+        metric_key,
+        metric_label,
+        score,
+        sort_order,
+        created_at
+      FROM evaluation_scores
+      WHERE evaluation_id IN (${placeholders})
+      ORDER BY evaluation_id ASC, area ASC, sort_order ASC, metric_label ASC`,
+    evaluationIds,
+  );
+  return rows;
+}
+
 module.exports = {
   createEvaluationScoresTable,
   insertEvaluationScores,
   getScoresByEvaluationId,
+  listScoresByEvaluationIds,
 };

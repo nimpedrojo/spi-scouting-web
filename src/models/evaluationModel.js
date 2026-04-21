@@ -110,19 +110,27 @@ async function listEvaluationsByClub(clubId, filters = {}) {
       e.created_at,
       e.updated_at,
       t.name AS team_name,
+      cat.name AS category_name,
       s.name AS season_name,
       p.first_name,
       p.last_name,
+      tp.positions,
       u.name AS author_name
     FROM evaluations e
     INNER JOIN teams t ON t.id = e.team_id
+    INNER JOIN categories cat ON cat.id = t.category_id
     INNER JOIN seasons s ON s.id = e.season_id
     INNER JOIN players p ON p.id = e.player_id
+    LEFT JOIN team_players tp ON tp.team_id = e.team_id AND tp.player_id = e.player_id
     INNER JOIN users u ON u.id = e.author_id
     WHERE e.club_id = ?
   `;
   const params = [clubId];
 
+  if (filters.seasonId) {
+    sql += ' AND e.season_id = ?';
+    params.push(filters.seasonId);
+  }
   if (filters.teamId) {
     sql += ' AND e.team_id = ?';
     params.push(filters.teamId);

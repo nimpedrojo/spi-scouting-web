@@ -17,6 +17,8 @@ const { ensureAuth, ensureAdmin } = require('../middleware/auth');
 const {
   createPlayerWithAssignment,
   updatePlayerWithAssignment,
+  getVisiblePlayersForUser,
+  getPlayerListData,
 } = require('../services/playerAdminService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 const {
@@ -147,28 +149,26 @@ async function getTeamOptionsForClubName(clubName) {
   }));
 }
 
-async function getVisiblePlayersForUser(user) {
-  const isSuperAdmin = user && user.role === 'superadmin';
-  const clubFilter = isSuperAdmin ? null : user.default_club || null;
-  let players = await getAllPlayers(clubFilter);
-
-  if (!isPrivilegedUser(user) && user && user.default_team_id) {
-    players = players.filter((player) => String(player.current_team_id) === String(user.default_team_id));
-  }
-
-  return players;
-}
-
 // Listado de jugadores
 router.get('/', ensureAuth, async (req, res) => {
   try {
-    const players = await getVisiblePlayersForUser(req.session.user);
+    const listData = await getPlayerListData(req.session.user, req.query);
     logPageView(req, 'players_list', {
-      playerCount: players.length,
+      playerCount: listData.pagination.totalItems,
       scopeClub: req.session.user.default_club || null,
+      teamId: listData.filters.teamId || null,
+      birthYear: listData.filters.birthYear || null,
+      laterality: listData.filters.laterality || null,
+      page: listData.pagination.page,
+      sort: listData.sort.field,
+      direction: listData.sort.direction,
     });
     return res.render('players/list', {
-      players,
+      players: listData.players,
+      filters: listData.filters,
+      filterOptions: listData.filterOptions,
+      pagination: listData.pagination,
+      sort: listData.sort,
       canManageClubPlayers: isPrivilegedUser(req.session.user),
     });
   } catch (err) {

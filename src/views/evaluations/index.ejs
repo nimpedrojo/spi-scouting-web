@@ -12,12 +12,45 @@
   <div class="card-body">
     <form method="GET" action="/evaluations" class="row g-3">
       <div class="col-md-3">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select">
+          <option value="">Todas</option>
+          <% if (filterOptions && filterOptions.seasons) { %>
+            <% filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= String(filters.seasonId || '') === String(season.id) ? 'selected' : '' %>><%= season.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
         <label for="team_id" class="form-label">Equipo</label>
         <select id="team_id" name="team_id" class="form-select">
           <option value="">Todos</option>
           <% if (filterOptions && filterOptions.teams) { %>
             <% filterOptions.teams.forEach((team) => { %>
               <option value="<%= team.id %>" <%= filters.teamId === team.id ? 'selected' : '' %>><%= team.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="position" class="form-label">Posicion</label>
+        <select id="position" name="position" class="form-select">
+          <option value="">Todas</option>
+          <% if (filterOptions && filterOptions.positions) { %>
+            <% filterOptions.positions.forEach((position) => { %>
+              <option value="<%= position %>" <%= String(filters.position || '') === String(position) ? 'selected' : '' %>><%= position %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="category" class="form-label">Categoria</label>
+        <select id="category" name="category" class="form-select">
+          <option value="">Todas</option>
+          <% if (filterOptions && filterOptions.categories) { %>
+            <% filterOptions.categories.forEach((category) => { %>
+              <option value="<%= category.name %>" <%= String(filters.category || '') === String(category.name) ? 'selected' : '' %>><%= category.name %></option>
             <% }) %>
           <% } %>
         </select>
@@ -54,8 +87,9 @@
         <label for="date_to" class="form-label">Hasta</label>
         <input type="date" id="date_to" name="date_to" class="form-control" value="<%= filters.dateTo || '' %>" />
       </div>
-      <div class="col-12 d-flex gap-2">
+      <div class="col-12 d-flex gap-2 flex-wrap">
         <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+        <button type="submit" formaction="/evaluations/export" class="btn btn-success">Exportar Excel</button>
         <a href="/evaluations" class="btn btn-link">Limpiar</a>
       </div>
     </form>
