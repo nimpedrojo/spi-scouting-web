@@ -25,6 +25,117 @@
   </a>
 </div>
 
+<%
+  const recommendationSeasonsSafe = Array.isArray(recommendationSeasons) ? recommendationSeasons : [];
+  const recommendationTeamsSafe = Array.isArray(recommendationTeams) ? recommendationTeams : [];
+  const recommendationDefaultSeason = recommendationDefaultSeasonId
+    || (recommendationSeasonsSafe[0] ? recommendationSeasonsSafe[0].id : '');
+%>
+
+<div class="card season-recommendation-card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+      <div>
+        <div class="season-recommendation-card__eyebrow text-muted small fw-semibold mb-2">Proxima temporada</div>
+        <h5 class="mb-1">Recomendacion desde scouting</h5>
+        <p class="text-muted mb-0">
+          <% if (linkedPlayer) { %>
+            Este informe ya esta vinculado a un jugador interno. Para evitar duplicidades, gestiona la recomendacion desde su ficha.
+          <% } else { %>
+            Marca a este jugador externo para seguimiento deportivo sin crear una ficha en players.
+          <% } %>
+        </p>
+      </div>
+      <% if (linkedPlayer) { %>
+        <a href="/players/<%= linkedPlayer.id %>" class="btn btn-outline-primary btn-sm">Abrir ficha interna</a>
+      <% } else if (canManageSeasonRecommendations) { %>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          data-season-scout-toggle
+          aria-expanded="false"
+        >
+          Recomendar para proxima temporada
+        </button>
+      <% } else { %>
+        <span class="small text-muted">Solo administradores pueden registrar recomendaciones.</span>
+      <% } %>
+    </div>
+
+    <% if (!linkedPlayer) { %>
+      <div class="season-recommendation-highlight mt-3 mb-3">
+        <div class="row g-3 align-items-start">
+          <div class="col-md-4">
+            <div class="season-recommendation-label">Jugador scouted</div>
+            <div class="season-recommendation-value"><%= `${report.player_name} ${report.player_surname}`.trim() %></div>
+          </div>
+          <div class="col-md-4">
+            <div class="season-recommendation-label">Contexto actual</div>
+            <div class="season-recommendation-value"><%= report.team || report.club || 'Sin equipo informado' %></div>
+          </div>
+          <div class="col-md-4">
+            <div class="season-recommendation-label">Estado inicial</div>
+            <span class="season-recommendation-status season-recommendation-status--proposed">Proposed</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="border-top pt-3 <%= canManageSeasonRecommendations ? 'd-none' : '' %>"
+        data-season-scout-panel
+        data-report-id="<%= report.id %>"
+        data-default-season-id="<%= recommendationDefaultSeason %>"
+        data-seasons-json="<%- JSON.stringify(recommendationSeasonsSafe.map((season) => ({ id: season.id, name: season.name, isActive: Boolean(season.is_active) }))) %>"
+        data-teams-json="<%- JSON.stringify(recommendationTeamsSafe.map((team) => ({ id: team.id, name: team.name, seasonId: team.season_id, seasonName: team.season_name }))) %>"
+      >
+        <% if (canManageSeasonRecommendations) { %>
+          <form class="season-recommendation-form" data-season-scout-form>
+            <input type="hidden" name="scoutedPlayerId" value="<%= report.id %>" />
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label" for="seasonRecommendationSeason">Temporada destino</label>
+                <select class="form-select" id="seasonRecommendationSeason" name="seasonId" required></select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="seasonRecommendationTeam">Equipo destino</label>
+                <select class="form-select" id="seasonRecommendationTeam" name="recommendedTeamId">
+                  <option value="">Selecciona un equipo</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="seasonRecommendationTeamLabel">O equipo provisional</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="seasonRecommendationTeamLabel"
+                  name="recommendedTeamLabel"
+                  placeholder="Ej. Juvenil A 2026/27"
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="seasonRecommendationNotes">Notas</label>
+                <textarea
+                  class="form-control"
+                  id="seasonRecommendationNotes"
+                  name="notes"
+                  rows="3"
+                  placeholder="Encaje, seguimiento o motivos de la recomendacion."
+                ></textarea>
+              </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mt-3">
+              <div class="small text-muted" data-season-scout-feedback>La recomendacion se guardara con estado proposed.</div>
+              <button type="submit" class="btn btn-primary btn-sm">Guardar recomendacion</button>
+            </div>
+          </form>
+        <% } else { %>
+          <p class="text-muted mb-0">Solo administradores pueden registrar recomendaciones de proxima temporada.</p>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
 <div class="row mb-3">
   <div class="col-md-4">
     <h5>Datos generales</h5>
@@ -173,6 +284,182 @@
           },
         },
       },
+    });
+  })();
+
+  (function () {
+    var toggleButton = document.querySelector('[data-season-scout-toggle]');
+    var panel = document.querySelector('[data-season-scout-panel]');
+    if (!panel) return;
+
+    var form = panel.querySelector('[data-season-scout-form]');
+    var feedback = panel.querySelector('[data-season-scout-feedback]');
+    var seasonSelect = panel.querySelector('select[name="seasonId"]');
+    var teamSelect = panel.querySelector('select[name="recommendedTeamId"]');
+    var teamLabelInput = panel.querySelector('input[name="recommendedTeamLabel"]');
+    var seasons = [];
+    var teams = [];
+
+    try {
+      seasons = JSON.parse(panel.getAttribute('data-seasons-json') || '[]');
+      teams = JSON.parse(panel.getAttribute('data-teams-json') || '[]');
+    } catch (error) {
+      seasons = [];
+      teams = [];
+    }
+
+    function setFeedback(message, tone) {
+      if (!feedback) return;
+      feedback.textContent = message;
+      feedback.className = 'small';
+      if (tone === 'error') {
+        feedback.classList.add('text-danger');
+        return;
+      }
+      if (tone === 'success') {
+        feedback.classList.add('text-success');
+        return;
+      }
+      feedback.classList.add('text-muted');
+    }
+
+    function populateSeasons() {
+      if (!seasonSelect) return;
+
+      seasonSelect.innerHTML = '';
+      seasons.forEach(function (season) {
+        var option = document.createElement('option');
+        option.value = season.id;
+        option.textContent = season.name;
+        if (String(season.id) === String(panel.getAttribute('data-default-season-id') || '')) {
+          option.selected = true;
+        }
+        seasonSelect.appendChild(option);
+      });
+
+      if (!seasonSelect.value && seasons.length) {
+        seasonSelect.value = seasons[0].id;
+      }
+    }
+
+    function populateTeams(seasonId) {
+      if (!teamSelect) return;
+
+      teamSelect.innerHTML = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Selecciona un equipo';
+      teamSelect.appendChild(placeholder);
+
+      teams
+        .filter(function (team) {
+          return !seasonId || String(team.seasonId) === String(seasonId);
+        })
+        .forEach(function (team) {
+          var option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name + (team.seasonName ? ' · ' + team.seasonName : '');
+          teamSelect.appendChild(option);
+        });
+    }
+
+    if (toggleButton) {
+      toggleButton.addEventListener('click', function () {
+        var isHidden = panel.classList.contains('d-none');
+        panel.classList.toggle('d-none');
+        toggleButton.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      });
+    }
+
+    populateSeasons();
+    populateTeams(seasonSelect ? seasonSelect.value : '');
+
+    if (form && !seasons.length) {
+      setFeedback('No hay temporadas disponibles para registrar la recomendacion.', 'error');
+      var missingSeasonSubmit = form.querySelector('button[type="submit"]');
+      if (missingSeasonSubmit) {
+        missingSeasonSubmit.disabled = true;
+      }
+    }
+
+    if (seasonSelect) {
+      seasonSelect.addEventListener('change', function () {
+        populateTeams(seasonSelect.value);
+      });
+    }
+
+    if (teamSelect && teamLabelInput) {
+      teamSelect.addEventListener('change', function () {
+        if (teamSelect.value) {
+          teamLabelInput.value = '';
+        }
+      });
+      teamLabelInput.addEventListener('input', function () {
+        if (teamLabelInput.value.trim()) {
+          teamSelect.value = '';
+        }
+      });
+    }
+
+    if (!form) return;
+
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      var submitButton = form.querySelector('button[type="submit"]');
+      var formData = new FormData(form);
+      var seasonId = String(formData.get('seasonId') || '').trim();
+      var recommendedTeamId = String(formData.get('recommendedTeamId') || '').trim();
+      var recommendedTeamLabel = String(formData.get('recommendedTeamLabel') || '').trim();
+      var notes = String(formData.get('notes') || '').trim();
+      var scoutedPlayerId = String(formData.get('scoutedPlayerId') || '').trim();
+
+      if (!seasonId) {
+        setFeedback('Selecciona la temporada destino.', 'error');
+        return;
+      }
+
+      if (!recommendedTeamId && !recommendedTeamLabel) {
+        setFeedback('Selecciona un equipo o indica un equipo provisional.', 'error');
+        return;
+      }
+
+      submitButton.disabled = true;
+      setFeedback('Guardando recomendacion...', 'info');
+
+      try {
+        var response = await fetch('/season-recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            seasonId: seasonId,
+            sourceType: 'scouted',
+            scoutedPlayerId: scoutedPlayerId,
+            recommendedTeamId: recommendedTeamId || null,
+            recommendedTeamLabel: recommendedTeamLabel || null,
+            notes: notes || null,
+          }),
+        });
+
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          var errorMessage = payload && Array.isArray(payload.errors) && payload.errors.length
+            ? payload.errors[0]
+            : (payload && payload.error) || 'No se pudo guardar la recomendacion.';
+          throw new Error(errorMessage);
+        }
+
+        form.reset();
+        populateSeasons();
+        populateTeams(seasonSelect ? seasonSelect.value : panel.getAttribute('data-default-season-id'));
+        setFeedback('Recomendacion registrada para proxima temporada.', 'success');
+      } catch (error) {
+        setFeedback(error.message || 'No se pudo guardar la recomendacion.', 'error');
+      } finally {
+        submitButton.disabled = false;
+      }
     });
   })();
 </script>

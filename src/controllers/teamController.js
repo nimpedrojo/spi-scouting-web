@@ -23,6 +23,7 @@ const {
   canManageMultipleTeams,
 } = require('../services/userScopeService');
 const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
+const { resolveSeasonView } = require('../services/seasonViewHelper');
 
 function getRequestedOperationalClubId(req) {
   if (!req || !req.session || !req.session.user || req.session.user.role !== 'superadmin') {
@@ -166,7 +167,9 @@ async function renderIndex(req, res) {
     const activeSection = req.query.section || 'Masculina';
     const activeCategory = req.query.category || '';
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const seasonView = await resolveSeasonView(club.id, activeSeason, req.query.season_id || null);
     let groupedTeams = await getTeamsGroupedBySectionAndCategory(club.id, {
+      seasonId: seasonView.selectedSeasonId,
       section: activeSection,
       category: activeCategory || null,
     });
@@ -200,7 +203,8 @@ async function renderIndex(req, res) {
       pageTitle: 'Plantillas',
       clubName: club.name,
       selectedClubId: club.id,
-      activeSeason,
+      activeSeason: seasonView.selectedSeason || activeSeason,
+      seasonView,
       activeSection,
       activeCategory,
       groupedTeams,
@@ -230,9 +234,10 @@ async function renderShow(req, res) {
     const activeModuleKeys = req.context ? req.context.activeModuleKeys || [] : [];
     const productMode = req.context ? req.context.productMode || null : null;
     const activeSeason = req.context ? req.context.activeSeason || null : null;
+    const seasonView = club ? await resolveSeasonView(club.id, activeSeason, req.query.season_id || null) : null;
     const team = await getTeamWorkspaceData(req.params.id, {
       activeModuleKeys,
-      activeSeasonId: activeSeason ? activeSeason.id : null,
+      activeSeasonId: seasonView && seasonView.selectedSeason ? seasonView.selectedSeason.id : (activeSeason ? activeSeason.id : null),
     });
     const viewMode = req.query.view === 'cards' ? 'cards' : 'list';
     const canAccessRequestedTeam = await canAccessTeam(req.session.user, req.params.id);
@@ -254,6 +259,8 @@ async function renderShow(req, res) {
       team,
       viewMode,
       productMode,
+      activeSeason: seasonView ? seasonView.selectedSeason || activeSeason : activeSeason,
+      seasonView,
       selectedClubId: team.club_id,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
       coreActions: buildTeamCoreActions(team, canManageMultipleTeams(req.session.user)),

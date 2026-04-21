@@ -21,6 +21,13 @@
 
       <div class="d-flex gap-2 flex-wrap">
         <a href="/planning/microcycles/new?plan_id=<%= detail.seasonPlan.id %>" class="btn btn-primary">Nuevo microciclo</a>
+        <form
+          method="POST"
+          action="/planning/plans/<%= detail.seasonPlan.id %>/duplicate-next-season"
+          onsubmit="return confirm('Se creará una nueva planificación en la siguiente temporada con la misma estructura. ¿Continuar?');"
+        >
+          <button type="submit" class="btn btn-outline-secondary">Duplicar planificación a nueva temporada</button>
+        </form>
         <a href="/planning/plans/<%= detail.seasonPlan.id %>/edit" class="btn btn-outline-secondary">Editar</a>
         <form method="POST" action="/planning/plans/<%= detail.seasonPlan.id %>/delete" onsubmit="return confirm('¿Seguro que quieres eliminar esta planificación?');">
           <button type="submit" class="btn btn-outline-danger">Eliminar</button>

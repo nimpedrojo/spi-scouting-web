@@ -14,6 +14,12 @@
     ? (latestEvaluationDate > latestReportDate ? latestEvaluationDate : latestReportDate)
     : (latestEvaluationDate || latestReportDate || null);
   const hasEvaluationHistory = analytics && analytics.history && analytics.history.totalEvaluations;
+  const activeSeasonLabel = player.season_name || (activeSeason ? activeSeason.name : '');
+  const activeSeasonId = activeSeason && activeSeason.id ? activeSeason.id : '';
+  const playerTeamLabel = player.team_name || '';
+  const canEditSeasonRecommendations = Boolean(currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin'));
+  const availableSeasons = seasonView && Array.isArray(seasonView.seasons) ? seasonView.seasons : [];
+  const selectedSeasonId = seasonView && seasonView.selectedSeasonId ? seasonView.selectedSeasonId : activeSeasonId;
 %>
 
 <% if (isPmvMode) { %>
@@ -64,6 +70,21 @@
         </div>
 
         <div class="col-lg-5">
+          <% if (availableSeasons.length) { %>
+            <form method="GET" action="/players/<%= player.id %>" class="mb-3 d-flex gap-2 justify-content-lg-end flex-wrap align-items-end">
+              <div>
+                <label for="playerSeasonSelector" class="form-label small text-muted mb-1">Temporada</label>
+                <select id="playerSeasonSelector" name="season_id" class="form-select form-select-sm">
+                  <% availableSeasons.forEach((season) => { %>
+                    <option value="<%= season.id %>" <%= String(selectedSeasonId || '') === String(season.id) ? 'selected' : '' %>>
+                      <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Cambiar</button>
+            </form>
+          <% } %>
           <div class="d-flex gap-2 justify-content-lg-end flex-wrap pmv-hero-actions">
             <% if (scoutingPlayersEnabled) { %>
               <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-primary">Nueva evaluación</a>
@@ -212,6 +233,99 @@
                 </div>
               <% } %>
             <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-4">
+    <div
+      class="card pmv-surface-card shadow-sm season-recommendation-card"
+      data-season-recommendation-panel
+      data-player-id="<%= player.id %>"
+      data-active-season-id="<%= activeSeasonId %>"
+      data-active-season-label="<%= activeSeasonLabel %>"
+      data-team-label="<%= playerTeamLabel %>"
+      data-can-edit="<%= canEditSeasonRecommendations ? 'true' : 'false' %>"
+    >
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+          <div>
+            <h2 class="h5 mb-1">Próxima temporada</h2>
+            <p class="text-muted mb-0">Recomendación rápida para coordinación deportiva y seguimiento del jugador.</p>
+          </div>
+          <span class="badge rounded-pill text-bg-light border season-recommendation-card__eyebrow">PlayerTrack</span>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="season-recommendation-current" data-season-recommendation-current>
+              <div class="season-recommendation-empty text-muted">Cargando recomendación actual…</div>
+            </div>
+          </div>
+
+          <div class="col-lg-7">
+            <form class="season-recommendation-form" data-season-recommendation-form>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="seasonRecommendationSeason" class="form-label">Temporada</label>
+                  <select id="seasonRecommendationSeason" name="seasonId" class="form-select" required data-season-recommendation-season></select>
+                </div>
+                <div class="col-md-6">
+                  <label for="seasonRecommendationStatus" class="form-label">Estado</label>
+                  <select id="seasonRecommendationStatus" name="status" class="form-select" data-season-recommendation-status>
+                    <option value="proposed">Proposed</option>
+                    <option value="in_review">In review</option>
+                    <option value="validated">Validated</option>
+                    <option value="discarded">Discarded</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label for="seasonRecommendationTeamLabel" class="form-label">Equipo recomendado</label>
+                  <input
+                    id="seasonRecommendationTeamLabel"
+                    name="recommendedTeamLabel"
+                    type="text"
+                    class="form-control"
+                    maxlength="150"
+                    placeholder="Ej. Juvenil A / Cadete Preferente"
+                    value="<%= playerTeamLabel %>"
+                    required
+                    data-season-recommendation-team
+                  />
+                </div>
+                <div class="col-12">
+                  <label for="seasonRecommendationNotes" class="form-label">Notas</label>
+                  <textarea
+                    id="seasonRecommendationNotes"
+                    name="notes"
+                    rows="3"
+                    class="form-control"
+                    placeholder="Motivo de la recomendación, contexto competitivo o puntos a revisar"
+                    data-season-recommendation-notes
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                <button type="submit" class="btn btn-primary" data-season-recommendation-submit <%= canEditSeasonRecommendations ? '' : 'disabled' %>>Guardar recomendación</button>
+                <span class="small text-muted" data-season-recommendation-feedback></span>
+              </div>
+            </form>
+            <% if (!canEditSeasonRecommendations) { %>
+              <p class="small text-muted mt-3 mb-0">Solo administradores pueden guardar recomendaciones de próxima temporada.</p>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h3 class="h6 mb-0">Histórico</h3>
+            <span class="small text-muted" data-season-recommendation-history-count></span>
+          </div>
+          <div class="season-recommendation-history" data-season-recommendation-history>
+            <div class="season-recommendation-empty text-muted">Cargando histórico…</div>
           </div>
         </div>
       </div>
@@ -460,6 +574,21 @@
           </div>
         </div>
         <div class="col-lg-4">
+          <% if (availableSeasons.length) { %>
+            <form method="GET" action="/players/<%= player.id %>" class="mb-3 d-flex gap-2 justify-content-lg-end flex-wrap align-items-end">
+              <div>
+                <label for="playerSeasonSelectorClassic" class="form-label small text-muted mb-1">Temporada</label>
+                <select id="playerSeasonSelectorClassic" name="season_id" class="form-select form-select-sm">
+                  <% availableSeasons.forEach((season) => { %>
+                    <option value="<%= season.id %>" <%= String(selectedSeasonId || '') === String(season.id) ? 'selected' : '' %>>
+                      <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Cambiar</button>
+            </form>
+          <% } %>
           <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
             <% if (scoutingPlayersEnabled) { %>
               <a href="/evaluations/new?team_id=<%= player.current_team_id || '' %>&player_id=<%= player.id %>" class="btn btn-outline-secondary">Evaluar</a>
@@ -541,6 +670,95 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4 season-recommendation-card"
+    data-season-recommendation-panel
+    data-player-id="<%= player.id %>"
+    data-active-season-id="<%= activeSeasonId %>"
+    data-active-season-label="<%= activeSeasonLabel %>"
+    data-team-label="<%= playerTeamLabel %>"
+    data-can-edit="<%= canEditSeasonRecommendations ? 'true' : 'false' %>">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+          <h3 class="h5 mb-1">Próxima temporada</h3>
+          <p class="text-muted mb-0">Bloque compacto para registrar recomendación, estado y contexto del jugador.</p>
+        </div>
+        <span class="badge text-bg-light border season-recommendation-card__eyebrow">PlayerTrack</span>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="season-recommendation-current" data-season-recommendation-current>
+            <div class="season-recommendation-empty text-muted">Cargando recomendación actual…</div>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <form class="season-recommendation-form" data-season-recommendation-form>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="seasonRecommendationSeasonLegacy" class="form-label">Temporada</label>
+                <select id="seasonRecommendationSeasonLegacy" name="seasonId" class="form-select" required data-season-recommendation-season></select>
+              </div>
+              <div class="col-md-6">
+                <label for="seasonRecommendationStatusLegacy" class="form-label">Estado</label>
+                <select id="seasonRecommendationStatusLegacy" name="status" class="form-select" data-season-recommendation-status>
+                  <option value="proposed">Proposed</option>
+                  <option value="in_review">In review</option>
+                  <option value="validated">Validated</option>
+                  <option value="discarded">Discarded</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label for="seasonRecommendationTeamLabelLegacy" class="form-label">Equipo recomendado</label>
+                <input
+                  id="seasonRecommendationTeamLabelLegacy"
+                  name="recommendedTeamLabel"
+                  type="text"
+                  class="form-control"
+                  maxlength="150"
+                  placeholder="Ej. Juvenil A / Cadete Preferente"
+                  value="<%= playerTeamLabel %>"
+                  required
+                  data-season-recommendation-team
+                />
+              </div>
+              <div class="col-12">
+                <label for="seasonRecommendationNotesLegacy" class="form-label">Notas</label>
+                <textarea
+                  id="seasonRecommendationNotesLegacy"
+                  name="notes"
+                  rows="3"
+                  class="form-control"
+                  placeholder="Motivo de la recomendación, contexto competitivo o puntos a revisar"
+                  data-season-recommendation-notes
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+              <button type="submit" class="btn btn-primary" data-season-recommendation-submit <%= canEditSeasonRecommendations ? '' : 'disabled' %>>Guardar recomendación</button>
+              <span class="small text-muted" data-season-recommendation-feedback></span>
+            </div>
+          </form>
+          <% if (!canEditSeasonRecommendations) { %>
+            <p class="small text-muted mt-3 mb-0">Solo administradores pueden guardar recomendaciones de próxima temporada.</p>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <h4 class="h6 mb-0">Histórico</h4>
+          <span class="small text-muted" data-season-recommendation-history-count></span>
+        </div>
+        <div class="season-recommendation-history" data-season-recommendation-history>
+          <div class="season-recommendation-empty text-muted">Cargando histórico…</div>
         </div>
       </div>
     </div>
@@ -710,3 +928,267 @@
     })();
   </script>
 <% } %>
+
+<script>
+  (function () {
+    var panel = document.querySelector('[data-season-recommendation-panel]');
+    if (!panel) return;
+
+    var playerId = panel.getAttribute('data-player-id');
+    var activeSeasonId = panel.getAttribute('data-active-season-id') || '';
+    var activeSeasonLabel = panel.getAttribute('data-active-season-label') || 'Temporada activa';
+    var defaultTeamLabel = panel.getAttribute('data-team-label') || '';
+    var canEdit = panel.getAttribute('data-can-edit') === 'true';
+
+    var currentContainer = panel.querySelector('[data-season-recommendation-current]');
+    var historyContainer = panel.querySelector('[data-season-recommendation-history]');
+    var historyCount = panel.querySelector('[data-season-recommendation-history-count]');
+    var form = panel.querySelector('[data-season-recommendation-form]');
+    var seasonSelect = panel.querySelector('[data-season-recommendation-season]');
+    var statusSelect = panel.querySelector('[data-season-recommendation-status]');
+    var teamInput = panel.querySelector('[data-season-recommendation-team]');
+    var notesInput = panel.querySelector('[data-season-recommendation-notes]');
+    var feedback = panel.querySelector('[data-season-recommendation-feedback]');
+    var submitButton = panel.querySelector('[data-season-recommendation-submit]');
+
+    var seasonRegistry = {};
+    if (activeSeasonId) {
+      seasonRegistry[activeSeasonId] = activeSeasonLabel;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getStatusLabel(status) {
+      if (status === 'in_review') return 'In review';
+      if (status === 'validated') return 'Validated';
+      if (status === 'discarded') return 'Discarded';
+      return 'Proposed';
+    }
+
+    function getSeasonLabel(recommendation) {
+      if (!recommendation) return '-';
+      return seasonRegistry[recommendation.season_id] || recommendation.season_id || 'Temporada no disponible';
+    }
+
+    function getTeamLabel(recommendation) {
+      return recommendation.recommended_team_name || recommendation.recommended_team_label || 'Sin definir';
+    }
+
+    function formatDate(value) {
+      if (!value) return '';
+      return String(value).slice(0, 10);
+    }
+
+    function renderCurrentRecommendation(recommendations) {
+      if (!recommendations.length) {
+        currentContainer.innerHTML = ''
+          + '<div class="season-recommendation-empty">'
+          + '<div class="fw-semibold mb-1">Sin recomendación registrada</div>'
+          + '<div class="text-muted">Usa el formulario para dejar la primera propuesta de próxima temporada.</div>'
+          + '</div>';
+        return;
+      }
+
+      var recommendation = recommendations[0];
+      currentContainer.innerHTML = ''
+        + '<div class="season-recommendation-highlight">'
+        + '  <div class="d-flex justify-content-between align-items-start gap-3 mb-3">'
+        + '    <div>'
+        + '      <div class="season-recommendation-label">Temporada destino</div>'
+        + '      <div class="season-recommendation-value">' + escapeHtml(getSeasonLabel(recommendation)) + '</div>'
+        + '    </div>'
+        + '    <span class="season-recommendation-status season-recommendation-status--' + escapeHtml(recommendation.status || 'proposed') + '">'
+        +        escapeHtml(getStatusLabel(recommendation.status)) + '</span>'
+        + '  </div>'
+        + '  <div class="season-recommendation-meta">'
+        + '    <div><span>Equipo recomendado</span><strong>' + escapeHtml(getTeamLabel(recommendation)) + '</strong></div>'
+        + '    <div><span>Notas</span><strong>' + escapeHtml(recommendation.notes || 'Sin notas') + '</strong></div>'
+        + '    <div><span>Actualizado</span><strong>' + escapeHtml(formatDate(recommendation.updated_at || recommendation.created_at)) + '</strong></div>'
+        + '  </div>'
+        + '</div>';
+    }
+
+    function renderHistory(recommendations) {
+      historyCount.textContent = recommendations.length
+        ? recommendations.length + ' recomendación' + (recommendations.length === 1 ? '' : 'es')
+        : 'Sin histórico';
+
+      if (!recommendations.length) {
+        historyContainer.innerHTML = '<div class="season-recommendation-empty text-muted">Todavía no hay histórico disponible.</div>';
+        return;
+      }
+
+      historyContainer.innerHTML = recommendations.map(function (recommendation) {
+        return ''
+          + '<article class="season-recommendation-history-item">'
+          + '  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">'
+          + '    <div class="fw-semibold">' + escapeHtml(getSeasonLabel(recommendation)) + '</div>'
+          + '    <span class="season-recommendation-status season-recommendation-status--' + escapeHtml(recommendation.status || 'proposed') + '">'
+          +        escapeHtml(getStatusLabel(recommendation.status)) + '</span>'
+          + '  </div>'
+          + '  <div class="small text-muted mb-2">Equipo: ' + escapeHtml(getTeamLabel(recommendation)) + '</div>'
+          + '  <div class="small">' + escapeHtml(recommendation.notes || 'Sin notas registradas.') + '</div>'
+          + '</article>';
+      }).join('');
+    }
+
+    function buildSeasonOptions(recommendations) {
+      recommendations.forEach(function (recommendation) {
+        if (recommendation && recommendation.season_id && !seasonRegistry[recommendation.season_id]) {
+          seasonRegistry[recommendation.season_id] = recommendation.season_id;
+        }
+      });
+
+      var entries = Object.keys(seasonRegistry).map(function (seasonId) {
+        return {
+          id: seasonId,
+          label: seasonRegistry[seasonId]
+        };
+      });
+
+      if (!entries.length) {
+        seasonSelect.innerHTML = '<option value="">Sin temporadas disponibles</option>';
+        seasonSelect.disabled = true;
+        submitButton.disabled = true;
+        feedback.textContent = 'No hay una temporada disponible en el contexto actual.';
+        return;
+      }
+
+      seasonSelect.disabled = false;
+      submitButton.disabled = !canEdit;
+      seasonSelect.innerHTML = entries.map(function (entry) {
+        return '<option value="' + escapeHtml(entry.id) + '">' + escapeHtml(entry.label) + '</option>';
+      }).join('');
+
+      if (activeSeasonId && seasonRegistry[activeSeasonId]) {
+        seasonSelect.value = activeSeasonId;
+      }
+    }
+
+    async function loadRecommendations() {
+      var response = await fetch('/players/' + encodeURIComponent(playerId) + '/recommendations', {
+        headers: {
+          Accept: 'application/json'
+        },
+        credentials: 'same-origin'
+      });
+
+      if (response.status === 403) {
+        throw new Error('No tienes permisos para consultar recomendaciones de este jugador.');
+      }
+
+      if (!response.ok) {
+        throw new Error('No se pudieron cargar las recomendaciones.');
+      }
+
+      return response.json();
+    }
+
+    async function refreshView() {
+      try {
+        feedback.textContent = '';
+        var payload = await loadRecommendations();
+        var recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
+        buildSeasonOptions(recommendations);
+        renderCurrentRecommendation(recommendations);
+        renderHistory(recommendations);
+      } catch (error) {
+        currentContainer.innerHTML = '<div class="season-recommendation-empty text-danger">' + escapeHtml(error.message) + '</div>';
+        historyContainer.innerHTML = '';
+        historyCount.textContent = '';
+      }
+    }
+
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+
+      if (!canEdit) {
+        feedback.textContent = 'No tienes permisos para guardar recomendaciones.';
+        feedback.className = 'small text-danger';
+        return;
+      }
+
+      var seasonId = seasonSelect.value;
+      var teamLabel = teamInput.value.trim();
+      var status = statusSelect.value;
+      var notes = notesInput.value.trim();
+
+      if (!seasonId || !teamLabel) {
+        feedback.textContent = 'Completa temporada y equipo recomendado.';
+        feedback.className = 'small text-danger';
+        return;
+      }
+
+      feedback.textContent = 'Guardando…';
+      feedback.className = 'small text-muted';
+      submitButton.disabled = true;
+
+      try {
+        var createResponse = await fetch('/season-recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            seasonId: seasonId,
+            sourceType: 'internal',
+            playerId: playerId,
+            recommendedTeamLabel: teamLabel,
+            notes: notes
+          })
+        });
+
+        var createdPayload = await createResponse.json();
+        if (!createResponse.ok) {
+          throw new Error(createdPayload && createdPayload.errors ? createdPayload.errors.join(' ') : 'No se pudo guardar la recomendación.');
+        }
+
+        if (status && status !== 'proposed') {
+          var updateResponse = await fetch('/season-recommendations/' + encodeURIComponent(createdPayload.id), {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              recommendedTeamLabel: teamLabel,
+              status: status,
+              notes: notes
+            })
+          });
+
+          var updatePayload = await updateResponse.json();
+          if (!updateResponse.ok) {
+            throw new Error(updatePayload && updatePayload.errors ? updatePayload.errors.join(' ') : 'La recomendación se creó pero no se pudo actualizar el estado.');
+          }
+        }
+
+        feedback.textContent = 'Recomendación guardada correctamente.';
+        feedback.className = 'small text-success';
+        notesInput.value = '';
+        await refreshView();
+      } catch (error) {
+        feedback.textContent = error.message;
+        feedback.className = 'small text-danger';
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    if (!teamInput.value && defaultTeamLabel) {
+      teamInput.value = defaultTeamLabel;
+    }
+
+    refreshView();
+  })();
+</script>

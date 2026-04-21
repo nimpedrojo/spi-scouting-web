@@ -6,6 +6,7 @@ const { buildPlayerPdfReport } = require('../services/pdfReportService');
 const { canAccessPlayer, canManageMultipleTeams } = require('../services/userScopeService');
 const { MODULE_KEYS } = require('../shared/constants/moduleKeys');
 const { getPlayerBenchmark } = require('../services/playerBenchmarkService');
+const { resolveSeasonView } = require('../services/seasonViewHelper');
 
 function buildInitials(player) {
   return `${(player.first_name || '').charAt(0)}${(player.last_name || '').charAt(0)}`.toUpperCase();
@@ -155,8 +156,9 @@ async function renderProfile(req, res) {
       return res.redirect('/dashboard');
     }
 
-    const seasonId = req.query.season_id || null;
     const activeSeason = req.context ? req.context.activeSeason : null;
+    const seasonView = await resolveSeasonView(club.id, activeSeason, req.query.season_id || null);
+    const seasonId = seasonView.selectedSeasonId;
     const player = await getPlayerById(req.params.id, club.name);
 
     if (!player || !(await canAccessPlayer(req.session.user, req.params.id))) {
@@ -187,14 +189,14 @@ async function renderProfile(req, res) {
       team_name: (analytics.summary && analytics.summary.team_name) || player.relational_team_name || player.team || '',
       section_name: (analytics.summary && analytics.summary.section_name) || '',
       category_name: (analytics.summary && analytics.summary.category_name) || '',
-      season_name: (analytics.summary && analytics.summary.season_name) || (activeSeason ? activeSeason.name : ''),
+      season_name: (analytics.summary && analytics.summary.season_name) || (seasonView.selectedSeason ? seasonView.selectedSeason.name : ''),
       dorsal: player.dorsal || (analytics.summary && analytics.summary.dorsal) || '',
       positions: player.positions || (analytics.summary && analytics.summary.positions) || '',
     };
 
     const positionsList = normalizePositions(playerSummary.positions);
     const teamProfileHref = player.current_team_id ? `/teams/${player.current_team_id}` : null;
-    const benchmarkSeasonId = activeSeason ? activeSeason.id : null;
+    const benchmarkSeasonId = seasonView.selectedSeason ? seasonView.selectedSeason.id : null;
     const playerBenchmark = scoutingPlayersEnabled && player.current_team_id && benchmarkSeasonId
       ? await getPlayerBenchmark(player.id, player.current_team_id, club.id, benchmarkSeasonId)
       : null;
@@ -220,7 +222,8 @@ async function renderProfile(req, res) {
       trackingSummary: buildTrackingSummary(analytics, reports),
       scoutingPlayersEnabled,
       areaLabelHelper: getAreaLabel,
-      activeSeason,
+      activeSeason: seasonView.selectedSeason || activeSeason,
+      seasonView,
       canManageMultipleTeams: canManageMultipleTeams(req.session.user),
       teamProfileHref,
       playerBenchmark,

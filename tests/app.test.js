@@ -8,6 +8,17 @@ const db = require('../src/db');
 const { initDatabaseOnce } = require('../src/initDb');
 const { setModuleEnabledForClub } = require('../src/core/models/clubModuleModel');
 const { resolveBestTemplateForContext } = require('../src/services/evaluationTemplateService');
+const {
+  createSeasonTeamRecommendation,
+  validateSeasonTeamRecommendationPayload,
+} = require('../src/models/seasonTeamRecommendationModel');
+const {
+  createRecommendation,
+  updateRecommendation,
+  getRecommendationsByPlayer,
+  getRecommendationsByTeam,
+  getRecommendationsBySeason,
+} = require('../src/services/seasonRecommendationService');
 
 const uploadsRoots = [
   path.join(__dirname, '..', 'src', 'public', 'uploads', 'clubs'),
@@ -214,6 +225,10 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     if (clubIds.length) {
       const clubPlaceholders = buildPlaceholders(clubIds);
       await db.query(
+        `DELETE FROM season_team_recommendations WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
         `DELETE FROM scouting_team_reports WHERE club_id IN (${clubPlaceholders})`,
         clubIds,
       );
@@ -241,6 +256,10 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     if (userIds.length) {
       const userPlaceholders = buildPlaceholders(userIds);
+      await db.query(
+        `DELETE FROM season_team_recommendations WHERE created_by IN (${userPlaceholders})`,
+        userIds,
+      );
       await db.query(
         `DELETE FROM scouting_team_reports WHERE created_by IN (${userPlaceholders})`,
         userIds,
@@ -277,6 +296,10 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
 
     if (seasonIds.length) {
       const seasonPlaceholders = buildPlaceholders(seasonIds);
+      await db.query(
+        `DELETE FROM season_team_recommendations WHERE season_id IN (${seasonPlaceholders})`,
+        seasonIds,
+      );
       await db.query(
         `DELETE FROM seasons WHERE id IN (${seasonPlaceholders})`,
         seasonIds,
@@ -614,6 +637,508 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     };
   }
 
+  describe('seasonTeamRecommendationModel', () => {
+    it('valida que un origen internal requiera player_id y bloquee scouted_player_id', async () => {
+      const errors = validateSeasonTeamRecommendationPayload({
+        clubId: 1,
+        seasonId: randomUUID(),
+        sourceType: 'internal',
+        scoutedPlayerId: 'scouted-001',
+        createdBy: 1,
+      });
+
+      expect(errors).toContain('El jugador interno es obligatorio cuando el origen es internal.');
+      expect(errors).toContain('No se puede informar un jugador scouted cuando el origen es internal.');
+    });
+
+    it('crea una recomendacion historica para un jugador interno', async () => {
+      const context = await createEvaluationContext('Club Recomendaciones');
+
+      const nextSeasonId = randomUUID();
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+
+      const recommendation = await createSeasonTeamRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: context.teamId,
+        recommendedTeamLabel: 'Juvenil Eval',
+        status: 'proposed',
+        notes: 'Mantener seguimiento para la proxima temporada.',
+        createdBy: context.admin.id,
+      });
+
+      expect(recommendation).toEqual(expect.objectContaining({
+        club_id: context.club.id,
+        season_id: nextSeasonId,
+        source_type: 'internal',
+        player_id: context.playerId,
+        recommended_team_id: context.teamId,
+        recommended_team_label: 'Juvenil Eval',
+        status: 'proposed',
+        created_by: context.admin.id,
+      }));
+    });
+  });
+
+  describe('seasonRecommendationService', () => {
+    it('crea una recomendacion con estado inicial proposed', async () => {
+      const context = await createEvaluationContext('Club Service Recommendation');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Propuesto'],
+      );
+
+      const result = await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: nextTeamId,
+        createdBy: context.admin.id,
+        notes: 'Seguimiento inicial.',
+      });
+
+      expect(result.errors).toBeUndefined();
+      expect(result.recommendation).toEqual(expect.objectContaining({
+        club_id: context.club.id,
+        season_id: nextSeasonId,
+        source_type: 'internal',
+        player_id: context.playerId,
+        recommended_team_id: nextTeamId,
+        status: 'proposed',
+      }));
+    });
+
+    it('actualiza equipo, estado y notas respetando el club', async () => {
+      const context = await createEvaluationContext('Club Service Update Recommendation');
+      const nextSeasonId = randomUUID();
+      const secondTeamId = randomUUID();
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [secondTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Futuro'],
+      );
+
+      const created = await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: secondTeamId,
+        createdBy: context.admin.id,
+      });
+
+      const updated = await updateRecommendation(created.recommendation.id, {
+        clubId: context.club.id,
+        recommendedTeamId: secondTeamId,
+        status: 'validated',
+        notes: 'Validada en reunion tecnica.',
+      });
+
+      expect(updated.errors).toBeUndefined();
+      expect(updated.recommendation).toEqual(expect.objectContaining({
+        id: created.recommendation.id,
+        recommended_team_id: secondTeamId,
+        status: 'validated',
+        notes: 'Validada en reunion tecnica.',
+      }));
+    });
+
+    it('devuelve el historico por jugador ordenado por fecha', async () => {
+      const context = await createEvaluationContext('Club Service Player Recommendation');
+      const seasonOneId = randomUUID();
+      const seasonTwoId = randomUUID();
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [seasonOneId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [seasonTwoId, context.club.id, '2028/29'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: seasonOneId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamLabel: 'Juvenil A',
+        createdBy: context.admin.id,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      const second = await createRecommendation({
+        clubId: context.club.id,
+        seasonId: seasonTwoId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamLabel: 'Juvenil Nacional',
+        createdBy: context.admin.id,
+      });
+
+      const history = await getRecommendationsByPlayer(context.playerId, {
+        clubId: context.club.id,
+      });
+
+      expect(history.errors).toBeUndefined();
+      expect(history.recommendations).toHaveLength(2);
+      expect(history.recommendations[0].id).toBe(second.recommendation.id);
+    });
+
+    it('separa recomendaciones internas y externas por equipo', async () => {
+      const context = await createEvaluationContext('Club Service Team Recommendation');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Cadete Proyeccion'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: nextTeamId,
+        createdBy: context.admin.id,
+      });
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'scouted',
+        scoutedPlayerId: 'scouted-ext-001',
+        recommendedTeamId: nextTeamId,
+        recommendedTeamLabel: 'Cadete Proyeccion',
+        createdBy: context.admin.id,
+      });
+
+      const result = await getRecommendationsByTeam(nextSeasonId, nextTeamId, {
+        clubId: context.club.id,
+      });
+
+      expect(result.errors).toBeUndefined();
+      expect(result.internalRecommendations).toHaveLength(1);
+      expect(result.externalRecommendations).toHaveLength(1);
+    });
+
+    it('devuelve la vista de coordinacion por temporada sin mezclar clubes', async () => {
+      const context = await createEvaluationContext('Club Service Season Recommendation');
+      const otherContext = await createEvaluationContext('Club Service Season Recommendation Other');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      const otherSeasonId = randomUUID();
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Coordinacion'],
+      );
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [otherSeasonId, otherContext.club.id, '2027/28'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: nextTeamId,
+        createdBy: context.admin.id,
+      });
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'scouted',
+        scoutedPlayerId: 'scouted-ext-002',
+        recommendedTeamLabel: 'Pendiente definir',
+        createdBy: context.admin.id,
+      });
+      await createRecommendation({
+        clubId: otherContext.club.id,
+        seasonId: otherSeasonId,
+        sourceType: 'internal',
+        playerId: otherContext.playerId,
+        recommendedTeamLabel: 'Otro club',
+        createdBy: otherContext.admin.id,
+      });
+
+      const result = await getRecommendationsBySeason(nextSeasonId, {
+        clubId: context.club.id,
+      });
+
+      expect(result.errors).toBeUndefined();
+      expect(result.recommendations).toHaveLength(2);
+      expect(result.groupedByTeam).toHaveLength(2);
+      expect(result.statusSummary.proposed).toBe(2);
+    });
+  });
+
+  describe('seasonRecommendationRoutes', () => {
+    it('POST /season-recommendations crea una recomendacion y valida inputs', async () => {
+      const context = await createEvaluationContext('Club Route Recommendation Create');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Ruta'],
+      );
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: context.admin.email, password: context.admin.password });
+
+      const invalidResponse = await agent
+        .post('/season-recommendations')
+        .send({
+          seasonId: nextSeasonId,
+          sourceType: 'internal',
+          recommendedTeamId: nextTeamId,
+        });
+
+      expect(invalidResponse.status).toBe(422);
+      expect(invalidResponse.body.errors).toContain('El jugador interno es obligatorio.');
+
+      const response = await agent
+        .post('/season-recommendations')
+        .send({
+          seasonId: nextSeasonId,
+          sourceType: 'internal',
+          playerId: context.playerId,
+          recommendedTeamId: nextTeamId,
+          notes: 'Ruta de alta.',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(expect.objectContaining({
+        club_id: context.club.id,
+        season_id: nextSeasonId,
+        player_id: context.playerId,
+        recommended_team_id: nextTeamId,
+        status: 'proposed',
+      }));
+    });
+
+    it('PUT /season-recommendations/:id actualiza una recomendacion existente', async () => {
+      const context = await createEvaluationContext('Club Route Recommendation Update');
+      const nextSeasonId = randomUUID();
+      const initialTeamId = randomUUID();
+      const targetTeamId = randomUUID();
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+        [
+          initialTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Inicial',
+          targetTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Destino',
+        ],
+      );
+
+      const created = await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: initialTeamId,
+        createdBy: context.admin.id,
+      });
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: context.admin.email, password: context.admin.password });
+
+      const response = await agent
+        .put(`/season-recommendations/${created.recommendation.id}`)
+        .send({
+          recommendedTeamId: targetTeamId,
+          status: 'validated',
+          notes: 'Actualizada desde endpoint.',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({
+        id: created.recommendation.id,
+        recommended_team_id: targetTeamId,
+        status: 'validated',
+        notes: 'Actualizada desde endpoint.',
+      }));
+    });
+
+    it('GET /players/:id/recommendations devuelve el historico del jugador', async () => {
+      const context = await createEvaluationContext('Club Route Recommendation Player');
+      const nextSeasonId = randomUUID();
+      const scopedUser = await createTestUser({
+        name: 'Scoped Recommendation User',
+        role: 'user',
+        defaultClub: context.club.name,
+        defaultTeamId: context.teamId,
+      });
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamLabel: 'Juvenil A',
+        createdBy: context.admin.id,
+      });
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: scopedUser.email, password: scopedUser.password });
+
+      const response = await agent.get(`/players/${context.playerId}/recommendations`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.player).toEqual(expect.objectContaining({
+        id: context.playerId,
+      }));
+      expect(response.body.recommendations).toHaveLength(1);
+    });
+
+    it('GET /teams/:teamId/recommendations devuelve internas y externas', async () => {
+      const context = await createEvaluationContext('Club Route Recommendation Team');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Cadete Ruta'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: nextTeamId,
+        createdBy: context.admin.id,
+      });
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'scouted',
+        scoutedPlayerId: 'route-scouted-001',
+        recommendedTeamId: nextTeamId,
+        recommendedTeamLabel: 'Cadete Ruta',
+        createdBy: context.admin.id,
+      });
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: context.admin.email, password: context.admin.password });
+
+      const response = await agent.get(`/teams/${nextTeamId}/recommendations?seasonId=${encodeURIComponent(nextSeasonId)}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.internalRecommendations).toHaveLength(1);
+      expect(response.body.externalRecommendations).toHaveLength(1);
+    });
+
+    it('GET /seasons/:id/recommendations devuelve la vista global de coordinacion', async () => {
+      const context = await createEvaluationContext('Club Route Recommendation Season');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Coordinacion API'],
+      );
+
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'internal',
+        playerId: context.playerId,
+        recommendedTeamId: nextTeamId,
+        createdBy: context.admin.id,
+      });
+      await createRecommendation({
+        clubId: context.club.id,
+        seasonId: nextSeasonId,
+        sourceType: 'scouted',
+        scoutedPlayerId: 'route-scouted-002',
+        recommendedTeamLabel: 'Pendiente staff',
+        createdBy: context.admin.id,
+      });
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: context.admin.email, password: context.admin.password });
+
+      const response = await agent.get(`/seasons/${nextSeasonId}/recommendations`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.recommendations).toHaveLength(2);
+      expect(response.body.groupedByTeam).toHaveLength(2);
+      expect(response.body.statusSummary.proposed).toBe(2);
+    });
+  });
+
   test('redirección inicial a /login si no hay sesión', async () => {
     const res = await request(app).get('/');
     expect(res.status).toBe(302);
@@ -624,6 +1149,26 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     const res = await request(app).get('/login');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Iniciar sesión');
+    expect(res.text).toContain('Al acceder, confirmas que utilizas la plataforma conforme a la normativa de protección de datos.');
+    expect(res.text).toContain('href="/privacy"');
+    expect(res.text).toContain('target="_blank"');
+    expect(res.text).toContain('© PlayerTrack by ProcessIQ');
+    expect(res.text).toContain('Aviso legal');
+  });
+
+  test('muestra la política de privacidad pública', async () => {
+    const res = await request(app).get('/privacy');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Política de privacidad');
+    expect(res.text).toContain('seguimiento deportivo');
+    expect(res.text).toContain('© PlayerTrack by ProcessIQ');
+  });
+
+  test('muestra el aviso legal público', async () => {
+    const res = await request(app).get('/legal');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Aviso legal');
+    expect(res.text).toContain('usuarios autorizados');
   });
 
   test('un usuario no autenticado es redirigido si intenta ver /account', async () => {
@@ -3856,6 +4401,162 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.text).toContain('Juvenil Visible Planning');
     expect(res.text).not.toContain('Cadete Hidden Planning');
     expect(res.text).not.toContain('Plan oculto');
+  });
+
+  test('planning puede duplicar una planificación completa a la siguiente temporada', async () => {
+    const context = await createTeamContext('Club Planning Duplicate Season');
+    const currentTeamId = randomUUID();
+    const nextSeasonId = randomUUID();
+    const nextTeamId = randomUUID();
+
+    await db.query(
+      `INSERT INTO seasons (id, club_id, name, is_active)
+       VALUES (?, ?, ?, 0)`,
+      [nextSeasonId, context.club.id, '2027/28'],
+    );
+
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      [
+        currentTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Duplica',
+        nextTeamId,
+        context.club.id,
+        nextSeasonId,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil Duplica',
+      ],
+    );
+    await setModuleEnabledForClub(context.club.id, 'planning', true);
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    const resCreatePlan = await agent.post('/planning/plans').send({
+      team_id: currentTeamId,
+      season_label: '2026/27',
+      planning_model: 'structured_microcycle',
+      start_date: '2026-07-10',
+      end_date: '2027-06-10',
+      objective: 'Modelo base',
+      notes: 'Plan origen',
+    });
+    expect(resCreatePlan.status).toBe(302);
+
+    const [sourcePlanRows] = await db.query(
+      'SELECT id FROM season_plans WHERE team_id = ?',
+      [currentTeamId],
+    );
+    const sourcePlanId = sourcePlanRows[0].id;
+
+    await agent.post('/planning/microcycles').send({
+      season_plan_id: sourcePlanId,
+      name: 'Microciclo origen',
+      order_index: '1',
+      start_date: '2026-07-10',
+      end_date: '2026-07-16',
+      objective: 'Base',
+      phase: 'Acumulacion',
+      notes: 'Semana origen',
+    });
+
+    const [microcycleRows] = await db.query(
+      'SELECT id FROM plan_microcycles WHERE season_plan_id = ?',
+      [sourcePlanId],
+    );
+    const sourceMicrocycleId = microcycleRows[0].id;
+
+    await agent.post('/planning/sessions').send({
+      microcycle_id: sourceMicrocycleId,
+      session_date: '2026-07-11',
+      title: 'Sesion origen',
+      session_type: 'Entrenamiento de campo',
+      duration_minutes: '85',
+      status: 'done',
+      objective: 'Ajustes',
+      contents: 'Juego de posicion',
+      notes: 'Sesión completada',
+    });
+
+    const [sessionRows] = await db.query(
+      'SELECT id FROM plan_sessions WHERE microcycle_id = ?',
+      [sourceMicrocycleId],
+    );
+    const sourceSessionId = sessionRows[0].id;
+
+    await agent.post('/planning/tasks')
+      .field('session_id', sourceSessionId)
+      .field('sort_order', '1')
+      .field('title', 'Tarea origen')
+      .field('task_type', 'Tactica')
+      .field('duration_minutes', '20')
+      .field('objective', 'Conservar')
+      .field('details', 'Estructura base')
+      .field('space', '30x20')
+      .field('age_group', 'Sub-19')
+      .field('player_count', '12')
+      .field('complexity', 'Media')
+      .field('strategy', 'Colectiva')
+      .field('coordinative_skills', 'Orientacion')
+      .field('tactical_intention', 'Conservar')
+      .field('dynamics', 'Integrada')
+      .field('game_situation', 'Con oposicion')
+      .field('coordination', 'Especifica')
+      .field('contents', 'Juego de posicion')
+      .field('notes', 'Tarea origen');
+
+    const resDuplicate = await agent.post(`/planning/plans/${sourcePlanId}/duplicate-next-season`);
+    expect(resDuplicate.status).toBe(302);
+    expect(resDuplicate.headers.location).toMatch(/^\/planning\/plans\//);
+    expect(resDuplicate.headers.location).not.toBe(`/planning/plans/${sourcePlanId}`);
+
+    const [targetPlanRows] = await db.query(
+      'SELECT id, team_id, season_label, objective, notes FROM season_plans WHERE team_id = ?',
+      [nextTeamId],
+    );
+    expect(targetPlanRows).toHaveLength(1);
+    expect(targetPlanRows[0].season_label).toBe('2027/28');
+    expect(targetPlanRows[0].objective).toBe('Modelo base');
+    expect(targetPlanRows[0].notes).toBe('Plan origen');
+
+    const targetPlanId = targetPlanRows[0].id;
+    const [targetMicrocycleRows] = await db.query(
+      'SELECT id, name, start_date, end_date FROM plan_microcycles WHERE season_plan_id = ?',
+      [targetPlanId],
+    );
+    expect(targetMicrocycleRows).toHaveLength(1);
+    expect(targetMicrocycleRows[0].name).toBe('Microciclo origen');
+    expect(formatMysqlDate(targetMicrocycleRows[0].start_date)).toBe('2027-07-10');
+    expect(formatMysqlDate(targetMicrocycleRows[0].end_date)).toBe('2027-07-16');
+
+    const [targetSessionRows] = await db.query(
+      'SELECT id, title, session_date, status, notes FROM plan_sessions WHERE microcycle_id = ?',
+      [targetMicrocycleRows[0].id],
+    );
+    expect(targetSessionRows).toHaveLength(1);
+    expect(targetSessionRows[0].title).toBe('Sesion origen');
+    expect(formatMysqlDate(targetSessionRows[0].session_date)).toBe('2027-07-11');
+    expect(targetSessionRows[0].status).toBe('planned');
+    expect(targetSessionRows[0].notes).toBe('Sesión completada');
+
+    const [targetTaskRows] = await db.query(
+      'SELECT title, task_type, player_count, notes FROM plan_session_tasks WHERE session_id = ?',
+      [targetSessionRows[0].id],
+    );
+    expect(targetTaskRows).toHaveLength(1);
+    expect(targetTaskRows[0].title).toBe('Tarea origen');
+    expect(targetTaskRows[0].task_type).toBe('Tactica');
+    expect(targetTaskRows[0].player_count).toBe(12);
+    expect(targetTaskRows[0].notes).toBe('Tarea origen');
   });
 
   test('usuario normal solo ve su equipo activo en plantillas', async () => {

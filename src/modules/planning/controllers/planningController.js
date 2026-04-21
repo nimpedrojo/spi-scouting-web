@@ -20,6 +20,7 @@ const {
   createSeasonPlanForUser,
   updateSeasonPlanForUser,
   deleteSeasonPlanForUser,
+  duplicateSeasonPlanToNextSeasonForUser,
   createMicrocycleForUser,
   updateMicrocycleForUser,
   duplicateMicrocycleForUser,
@@ -45,6 +46,7 @@ const {
 } = require('../services/planningService');
 const { findPlanSessionTaskById } = require('../models/planSessionTaskModel');
 const { deletePlanningTaskImage } = require('../services/planningTaskAssetService');
+const { resolveSeasonView } = require('../../../services/seasonViewHelper');
 
 function getUploadedTaskImagePath(req) {
   return req && req.file ? `/uploads/planning/${req.file.filename}` : null;
@@ -80,11 +82,18 @@ async function renderPlanningHome(req, res) {
   const club = req.context ? req.context.club : null;
   const activeSeason = req.context ? req.context.activeSeason : null;
   const requestedTeamId = req.query.team_id ? String(req.query.team_id).trim() : null;
-  const planning = await getPlanningHomeData(req.session.user, club, activeSeason, requestedTeamId);
+  const seasonView = await resolveSeasonView(club.id, activeSeason, req.query.season_id || null);
+  const planning = await getPlanningHomeData(
+    req.session.user,
+    club,
+    seasonView.selectedSeason || activeSeason,
+    requestedTeamId,
+  );
 
   return res.render('modules/planning/index', {
     pageTitle: 'SPI Planning',
     planning,
+    seasonView,
   });
 }
 
@@ -207,6 +216,22 @@ async function removeSeasonPlan(req, res) {
 
   req.flash('success', 'Planificación eliminada correctamente.');
   return res.redirect(`/planning?team_id=${seasonPlan.team_id}`);
+}
+
+async function duplicateSeasonPlanToNextSeason(req, res) {
+  const club = req.context ? req.context.club : null;
+  const result = await duplicateSeasonPlanToNextSeasonForUser(req.session.user, club.id, req.params.id);
+
+  if (result.errors) {
+    req.flash('error', result.errors[0]);
+    return res.redirect(`/planning/plans/${req.params.id}`);
+  }
+
+  req.flash(
+    'success',
+    `Planificación duplicada a ${result.targetTeam.name} · ${result.targetSeason.name}.`,
+  );
+  return res.redirect(`/planning/plans/${result.seasonPlan.id}`);
 }
 
 async function renderNewMicrocycle(req, res) {
@@ -703,6 +728,7 @@ module.exports = {
   updateMicrocycle,
   duplicateMicrocycle,
   removeMicrocycle,
+  duplicateSeasonPlanToNextSeason,
   renderNewSession,
   createSession,
   renderEditSession,

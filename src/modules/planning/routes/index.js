@@ -68,6 +68,7 @@ router.post('/plans', controller.createSeasonPlan);
 router.get('/plans/:id', controller.renderSeasonPlanShow);
 router.get('/plans/:id/edit', controller.renderEditSeasonPlan);
 router.post('/plans/:id/update', controller.updateSeasonPlan);
+router.post('/plans/:id/duplicate-next-season', controller.duplicateSeasonPlanToNextSeason);
 router.post('/plans/:id/delete', controller.removeSeasonPlan);
 
 router.get('/microcycles/new', controller.renderNewMicrocycle);
