@@ -1,5 +1,31 @@
 <h1 class="mb-4">Base de jugadores</h1>
 
+<%
+  function buildPlayersQuery(overrides) {
+    const params = new URLSearchParams();
+    const next = Object.assign({}, filters || {}, overrides || {});
+    Object.keys(next).forEach(function (key) {
+      var value = next[key];
+      if (value !== undefined && value !== null && String(value) !== '') {
+        params.set(key, String(value));
+      }
+    });
+    return params.toString() ? '?' + params.toString() : '';
+  }
+
+  function sortLink(field) {
+    var nextDir = sort && sort.field === field && sort.direction === 'asc' ? 'desc' : 'asc';
+    return '/admin/players' + buildPlayersQuery({ sort: field, dir: nextDir, page: 1 });
+  }
+
+  function sortIndicator(field) {
+    if (!sort || sort.field !== field) {
+      return '↕';
+    }
+    return sort.direction === 'asc' ? '↑' : '↓';
+  }
+%>
+
 <div class="mb-3 d-flex gap-2">
   <a href="/admin/players/new" class="btn btn-sr-primary">Nuevo jugador</a>
   <% if (canManageClubPlayers) { %>
@@ -8,6 +34,59 @@
     </a>
   <% } %>
 </div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/admin/players" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <option value="">Todos</option>
+          <% (filterOptions && filterOptions.teams ? filterOptions.teams : []).forEach(function (team) { %>
+            <option value="<%= team.id %>" <%= String(filters && filters.teamId || '') === String(team.id) ? 'selected' : '' %>><%= team.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="laterality" class="form-label">Lateralidad</label>
+        <select id="laterality" name="laterality" class="form-select">
+          <option value="">Todas</option>
+          <% (filterOptions && filterOptions.lateralities ? filterOptions.lateralities : []).forEach(function (laterality) { %>
+            <option value="<%= laterality %>" <%= String(filters && filters.laterality || '') === String(laterality) ? 'selected' : '' %>><%= laterality %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="birth_year" class="form-label">Año de nacimiento</label>
+        <select id="birth_year" name="birth_year" class="form-select">
+          <option value="">Todos</option>
+          <% (filterOptions && filterOptions.birthYears ? filterOptions.birthYears : []).forEach(function (year) { %>
+            <option value="<%= year %>" <%= String(filters && filters.birthYear || '') === String(year) ? 'selected' : '' %>><%= year %></option>
+          <% }) %>
+        </select>
+      </div>
+      <input type="hidden" name="sort" value="<%= sort ? sort.field : 'created_at' %>" />
+      <input type="hidden" name="dir" value="<%= sort ? sort.direction : 'desc' %>" />
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Filtrar</button>
+      </div>
+      <div class="col-12">
+        <a href="/admin/players" class="btn btn-link px-0">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (pagination) { %>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <p class="text-muted mb-0">
+      Mostrando <%= pagination.startItem %>-<%= pagination.endItem %> de <%= pagination.totalItems %> jugadores
+    </p>
+    <p class="text-muted mb-0">
+      Página <%= pagination.page %> de <%= pagination.totalPages %>
+    </p>
+  </div>
+<% } %>
 
 <% if (!players || !players.length) { %>
 <p>No hay jugadores registrados.</p>
@@ -25,14 +104,14 @@
           <th>
             <input type="checkbox" id="selectAllPlayers" />
           </th>
-          <th>ID</th>
-          <th>Nombre</th>
-          <th>Apellidos</th>
-          <th>Equipo</th>
-          <th>Dorsal</th>
-          <th>Año nacimiento</th>
-          <th>Lateralidad</th>
-          <th>Creado</th>
+          <th><a class="table-sort-link" href="<%= sortLink('id') %>">ID <span><%= sortIndicator('id') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('first_name') %>">Nombre <span><%= sortIndicator('first_name') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('last_name') %>">Apellidos <span><%= sortIndicator('last_name') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('team') %>">Equipo <span><%= sortIndicator('team') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('dorsal') %>">Dorsal <span><%= sortIndicator('dorsal') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('birth_year') %>">Año nacimiento <span><%= sortIndicator('birth_year') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('laterality') %>">Lateralidad <span><%= sortIndicator('laterality') %></span></a></th>
+          <th><a class="table-sort-link" href="<%= sortLink('created_at') %>">Creado <span><%= sortIndicator('created_at') %></span></a></th>
           <th></th>
         </tr>
       </thead>
@@ -106,13 +185,13 @@
   <table class="table table-striped table-hover align-middle">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Nombre</th>
-        <th>Apellidos</th>
-        <th>Equipo</th>
-        <th>Dorsal</th>
-        <th>Año nacimiento</th>
-        <th>Lateralidad</th>
+        <th><a class="table-sort-link" href="<%= sortLink('id') %>">ID <span><%= sortIndicator('id') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('first_name') %>">Nombre <span><%= sortIndicator('first_name') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('last_name') %>">Apellidos <span><%= sortIndicator('last_name') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('team') %>">Equipo <span><%= sortIndicator('team') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('dorsal') %>">Dorsal <span><%= sortIndicator('dorsal') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('birth_year') %>">Año nacimiento <span><%= sortIndicator('birth_year') %></span></a></th>
+        <th><a class="table-sort-link" href="<%= sortLink('laterality') %>">Lateralidad <span><%= sortIndicator('laterality') %></span></a></th>
         <th></th>
       </tr>
     </thead>
@@ -160,6 +239,24 @@
   </table>
 </div>
 <% } %>
+<% } %>
+
+<% if (pagination && pagination.totalPages > 1) { %>
+  <nav aria-label="Paginación de jugadores" class="mt-4">
+    <ul class="pagination flex-wrap">
+      <li class="page-item <%= pagination.hasPrev ? '' : 'disabled' %>">
+        <a class="page-link" href="<%= pagination.hasPrev ? '/admin/players' + buildPlayersQuery({ page: pagination.page - 1 }) : '#' %>">Anterior</a>
+      </li>
+      <% for (let pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber += 1) { %>
+        <li class="page-item <%= pageNumber === pagination.page ? 'active' : '' %>">
+          <a class="page-link" href="/admin/players<%= buildPlayersQuery({ page: pageNumber }) %>"><%= pageNumber %></a>
+        </li>
+      <% } %>
+      <li class="page-item <%= pagination.hasNext ? '' : 'disabled' %>">
+        <a class="page-link" href="<%= pagination.hasNext ? '/admin/players' + buildPlayersQuery({ page: pagination.page + 1 }) : '#' %>">Siguiente</a>
+      </li>
+    </ul>
+  </nav>
 <% } %>
 
 <script>

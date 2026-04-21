@@ -816,6 +816,21 @@ body {
   margin-bottom: 1rem;
 }
 
+.table-sort-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.table-sort-link:hover,
+.table-sort-link:focus {
+  color: var(--pt-blue-700);
+  text-decoration: none;
+}
+
 .app-topbar .badge.text-bg-light,
 .app-topbar .badge.border {
   background: rgba(255, 255, 255, 0.12) !important;

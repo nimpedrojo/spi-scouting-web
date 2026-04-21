@@ -5,11 +5,16 @@ const path = require('path');
 const {
   createEvaluationWithScores,
   listEvaluations,
+  buildEvaluationExport,
   getPlayerEvaluationsHistory,
   getEvaluationDetail,
   getEvaluationFormData,
 } = require('../services/evaluationService');
-const { importEvaluationsFromWorkbook } = require('../services/importEvaluationService');
+const {
+  importEvaluationsFromWorkbook,
+  buildWorkbookBufferFromRows,
+  buildWorkbookRowsFromEvaluations,
+} = require('../services/importEvaluationService');
 const { buildComparison } = require('../services/comparisonService');
 const { logAuditEvent, logPageView } = require('../services/auditLogger');
 
@@ -35,8 +40,11 @@ function buildGroupedScoresFromBody(body, template) {
 async function renderIndex(req, res) {
   try {
     const filters = {
+      seasonId: req.query.season_id || null,
       teamId: req.query.team_id || null,
       playerId: req.query.player_id || null,
+      position: req.query.position || null,
+      category: req.query.category || null,
       authorId: req.query.author_id || null,
       dateFrom: req.query.date_from || null,
       dateTo: req.query.date_to || null,
@@ -60,6 +68,48 @@ async function renderIndex(req, res) {
     console.error('Error loading evaluations index', err);
     req.flash('error', 'Ha ocurrido un error al cargar las evaluaciones.');
     return res.redirect('/dashboard');
+  }
+}
+
+async function exportMany(req, res) {
+  try {
+    const filters = {
+      seasonId: req.query.season_id || null,
+      teamId: req.query.team_id || null,
+      playerId: req.query.player_id || null,
+      position: req.query.position || null,
+      category: req.query.category || null,
+      authorId: req.query.author_id || null,
+      dateFrom: req.query.date_from || null,
+      dateTo: req.query.date_to || null,
+    };
+    const exportPayload = await buildEvaluationExport(req.session.user, filters);
+    const workbookRows = buildWorkbookRowsFromEvaluations(
+      exportPayload.items,
+      exportPayload.scoresByEvaluationId,
+    );
+    const buffer = buildWorkbookBufferFromRows(workbookRows);
+
+    logAuditEvent(req, 'export', 'evaluation', {
+      count: exportPayload.items.length,
+      filters,
+      format: 'xlsx',
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="evaluaciones_export.xlsx"',
+    );
+    return res.send(buffer);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error exporting evaluations', err);
+    req.flash('error', 'Ha ocurrido un error al exportar evaluaciones.');
+    return res.redirect('/evaluations');
   }
 }
 
@@ -328,6 +378,7 @@ module.exports = {
   renderShow,
   renderPlayerHistory,
   importMany,
+  exportMany,
   renderCompare,
   submitCompare,
 };

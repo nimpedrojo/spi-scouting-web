@@ -5,6 +5,7 @@ const controller = require('../controllers/evaluationController');
 const router = express.Router();
 
 router.get('/evaluations', ensureAuth, controller.renderIndex);
+router.get('/evaluations/export', ensureAuth, controller.exportMany);
 router.get('/evaluations/new', ensureAuth, controller.renderNew);
 router.get('/evaluations/compare', ensureAuth, controller.renderCompare);
 router.post('/evaluations/compare', ensureAuth, controller.submitCompare);

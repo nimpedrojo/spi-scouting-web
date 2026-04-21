@@ -8,6 +8,7 @@ const router = express.Router();
 const requireScoutingPlayers = requireModule(MODULE_KEYS.SCOUTING_PLAYERS);
 
 router.get('/evaluations', ensureAuth, requireScoutingPlayers, controller.renderIndex);
+router.get('/evaluations/export', ensureAuth, requireScoutingPlayers, controller.exportMany);
 router.get('/evaluations/new', ensureAuth, requireScoutingPlayers, controller.renderNew);
 router.get('/evaluations/compare', ensureAuth, requireScoutingPlayers, controller.renderCompare);
 router.post('/evaluations/compare', ensureAuth, requireScoutingPlayers, controller.submitCompare);

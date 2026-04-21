@@ -143,6 +143,17 @@ function buildEvaluationWorkbookBuffer(rows) {
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
+function parseBinaryExcelResponse(response, callback) {
+  response.setEncoding('binary');
+  let data = '';
+  response.on('data', (chunk) => {
+    data += chunk;
+  });
+  response.on('end', () => {
+    callback(null, Buffer.from(data, 'binary'));
+  });
+}
+
 describe('Aplicación SoccerProcessIQ Suite', () => {
   beforeAll(async () => {
     await initDatabaseOnce();
@@ -2073,6 +2084,126 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Base de jugadores');
     expect(res.text).toContain('Mario');
+  });
+
+  test('el listado de jugadores permite filtrar por equipo, lateralidad y año de nacimiento', async () => {
+    const context = await createEvaluationContext('Players Filter List');
+    const otherTeamId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        otherTeamId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Filtrado',
+      ],
+    );
+    const [otherPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, laterality, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      ['Pedro', 'Diestro', context.club.name, context.club.id, otherTeamId, 'Cadete Filtrado', 2011, 'D',],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), otherTeamId, otherPlayerResult.insertId, '7', 'EI'],
+    );
+    await db.query(
+      'UPDATE players SET birth_year = ?, laterality = ? WHERE id = ?',
+      [2010, 'Z', context.playerId],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get(`/admin/players?team_id=${encodeURIComponent(context.teamId)}&laterality=Z&birth_year=2010`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Mario');
+    expect(res.text).not.toContain('Pedro');
+    expect(res.text).toContain('Página 1 de 1');
+  });
+
+  test('el listado de jugadores permite ordenar por columnas', async () => {
+    const context = await createEvaluationContext('Players Sort List');
+    await db.query(
+      'UPDATE players SET birth_year = ? WHERE id = ?',
+      [2010, context.playerId],
+    );
+    await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, laterality, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1), (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [
+        'Alvaro', 'Orden', context.club.name, context.club.id, context.teamId, 'Juvenil Eval', 2012, 'D',
+        'Zeta', 'Orden', context.club.name, context.club.id, context.teamId, 'Juvenil Eval', 2008, 'Z',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const res = await agent.get('/admin/players?sort=birth_year&dir=asc');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('birth_year&amp;dir=desc');
+
+    const bodyMatch = res.text.match(/<tbody>([\s\S]*?)<\/tbody>/);
+    expect(bodyMatch).toBeTruthy();
+
+    const tableBody = bodyMatch[1];
+    const firstIndex = tableBody.indexOf('Zeta');
+    const secondIndex = tableBody.indexOf('Mario');
+    const thirdIndex = tableBody.indexOf('Alvaro');
+
+    expect(firstIndex).toBeGreaterThan(-1);
+    expect(secondIndex).toBeGreaterThan(-1);
+    expect(thirdIndex).toBeGreaterThan(-1);
+    expect(firstIndex).toBeLessThan(secondIndex);
+    expect(secondIndex).toBeLessThan(thirdIndex);
+  });
+
+  test('el listado de jugadores muestra paginación', async () => {
+    const context = await createEvaluationContext('Players Pagination List');
+    const insertValues = [];
+    const placeholders = [];
+
+    for (let index = 0; index < 26; index += 1) {
+      placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, 1)');
+      insertValues.push(
+        `Jugador${String(index).padStart(2, '0')}`,
+        'Paginacion',
+        context.club.name,
+        context.club.id,
+        context.teamId,
+        'Juvenil Eval',
+        2010,
+        'D',
+      );
+    }
+
+    await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, birth_year, laterality, is_active
+      ) VALUES ${placeholders.join(', ')}`,
+      insertValues,
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const firstPage = await agent.get('/admin/players?sort=first_name&dir=asc');
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.text).toContain('Página 1 de 2');
+    expect(firstPage.text).toContain('Jugador00');
+    expect(firstPage.text).not.toContain('Jugador25');
+
+    const secondPage = await agent.get('/admin/players?sort=first_name&dir=asc&page=2');
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.text).toContain('Página 2 de 2');
+    expect(secondPage.text).toContain('Jugador25');
   });
 
   test('un no admin no puede acceder a la gestión de usuarios', async () => {
@@ -5049,6 +5180,94 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       [context.club.id],
     );
     expect(afterCount.total).toBe(beforeRows[0][0].total);
+  });
+
+  test('export evaluation file genera un excel con el formato de importacion y respeta filtros', async () => {
+    const context = await createEvaluationContext('Club Eval Export');
+    const secondSeasonId = randomUUID();
+    const secondTeamId = randomUUID();
+
+    await db.query(
+      'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+      [secondSeasonId, context.club.id, '2027/28'],
+    );
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        secondTeamId,
+        context.club.id,
+        secondSeasonId,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete Export',
+      ],
+    );
+
+    const [secondPlayerResult] = await db.query(
+      `INSERT INTO players (
+        first_name, last_name, club, club_id, current_team_id, team, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      ['Pepe', 'Filtro', context.club.name, context.club.id, secondTeamId, 'Cadete Export'],
+    );
+    await db.query(
+      `INSERT INTO team_players (id, team_id, player_id, dorsal, positions)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), secondTeamId, secondPlayerResult.insertId, '5', 'EI'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({
+      email: context.admin.email,
+      password: 'password123',
+    });
+
+    await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: context.season.id,
+      team_id: context.teamId,
+      player_id: context.playerId,
+      title: 'Exportable',
+      source: 'manual',
+      evaluation_date: '2026-03-10',
+      notes: 'Fila valida export',
+    }));
+
+    await agent.post('/evaluations').send(buildEvaluationPayload({
+      season_id: secondSeasonId,
+      team_id: secondTeamId,
+      player_id: secondPlayerResult.insertId,
+      title: 'No exportable',
+      source: 'manual',
+      evaluation_date: '2027-03-10',
+      notes: 'Fila fuera de filtro',
+    }));
+
+    const res = await agent
+      .get(`/evaluations/export?team_id=${encodeURIComponent(context.teamId)}&season_id=${encodeURIComponent(context.season.id)}&position=MC&category=${encodeURIComponent('Juvenil')}`)
+      .buffer(true)
+      .parse(parseBinaryExcelResponse);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(res.headers['content-disposition']).toContain('evaluaciones_export.xlsx');
+
+    const workbook = XLSX.read(res.body, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual(expect.objectContaining({
+      team_name: 'Juvenil Eval',
+      player_name: 'Mario Sanz',
+      evaluation_date: '2026-03-10',
+      source: 'manual',
+      title: 'Exportable',
+      notes: 'Fila valida export',
+      tecnica_control: 7,
+      tactica_posicionamiento: 8,
+      personalidad_disciplina: 9,
+    }));
+    expect(rows[0].player_name).not.toBe('Pepe Filtro');
   });
 
   test('player profile renders', async () => {
