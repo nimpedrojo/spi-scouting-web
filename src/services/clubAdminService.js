@@ -5,6 +5,7 @@ const { getAllReports } = require('../models/reportModel');
 const { getRecommendationsByClub } = require('../models/clubRecommendationModel');
 const { getTeamsByClubId } = require('../models/teamModel');
 const { getSeasonsByClubId } = require('../models/seasonModel');
+const { buildNextSeasonSuggestion } = require('./seasonAdminService');
 const {
   getClubModules,
   getClubModulePresets,
@@ -76,6 +77,7 @@ async function getClubAdminData(club) {
     recommendations,
     v2Teams,
     seasons,
+    nextSeasonSuggestion: buildNextSeasonSuggestion(seasons),
     modules,
     moduleSummary,
     modulePresets: getClubModulePresets(),

@@ -35,6 +35,20 @@ function getDefaultSeasonName(referenceDate = new Date()) {
   return `${startYear}/${endYear}`;
 }
 
+function getNextSeasonName(currentSeasonName = '') {
+  const normalized = String(currentSeasonName || '').trim();
+  const match = normalized.match(/^(\d{4})[/-](\d{2}|\d{4})$/);
+  if (!match) {
+    const defaultCurrent = getDefaultSeasonName();
+    const defaultMatch = defaultCurrent.match(/^(\d{4})\/(\d{2})$/);
+    const startYear = Number(defaultMatch[1]) + 1;
+    return `${startYear}/${String(startYear + 1).slice(-2)}`;
+  }
+
+  const startYear = Number(match[1]) + 1;
+  return `${startYear}/${String(startYear + 1).slice(-2)}`;
+}
+
 async function findActiveSeasonByClubId(clubId) {
   const [rows] = await db.query(
     `SELECT id, club_id, name, is_active, created_at
@@ -70,6 +84,15 @@ async function createSeason({ clubId, name, isActive = false }) {
   return findSeasonById(id);
 }
 
+async function setActiveSeason(clubId, seasonId) {
+  await db.query('UPDATE seasons SET is_active = 0 WHERE club_id = ?', [clubId]);
+  const [result] = await db.query(
+    'UPDATE seasons SET is_active = 1 WHERE club_id = ? AND id = ?',
+    [clubId, seasonId],
+  );
+  return result.affectedRows;
+}
+
 async function findSeasonById(id) {
   const [rows] = await db.query(
     'SELECT id, club_id, name, is_active, created_at FROM seasons WHERE id = ?',
@@ -100,9 +123,11 @@ async function ensureActiveSeasonForClub(clubId) {
 module.exports = {
   createSeasonsTable,
   getDefaultSeasonName,
+  getNextSeasonName,
   findActiveSeasonByClubId,
   getSeasonsByClubId,
   createSeason,
+  setActiveSeason,
   findSeasonById,
   ensureActiveSeasonForClub,
 };

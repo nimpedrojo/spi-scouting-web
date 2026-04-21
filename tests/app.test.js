@@ -2876,6 +2876,101 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(resConfig.text).toContain('Equipo A');
   });
 
+  test('un admin puede crear la próxima temporada y duplicar la estructura de equipos', async () => {
+    const context = await createTeamContext('Club Season Create');
+    const teamOneId = randomUUID();
+    const teamTwoId = randomUUID();
+    await db.query(
+      `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      [
+        teamOneId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.juvenil.id,
+        'Juvenil A',
+        teamTwoId,
+        context.club.id,
+        context.season.id,
+        context.masculina.id,
+        context.cadete.id,
+        'Cadete A',
+      ],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const resCreate = await agent.post('/admin/club/seasons').send({
+      club_id: String(context.club.id),
+      name: '2027/28',
+      activate_new_season: '1',
+      copy_structure_from_season_id: context.season.id,
+    });
+
+    expect(resCreate.status).toBe(302);
+    expect(resCreate.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [seasonRows] = await db.query(
+      'SELECT id, name, is_active FROM seasons WHERE club_id = ? ORDER BY name ASC',
+      [context.club.id],
+    );
+    const createdSeason = seasonRows.find((row) => row.name === '2027/28');
+    expect(createdSeason).toBeTruthy();
+    expect(createdSeason.is_active).toBe(1);
+
+    const previousSeason = seasonRows.find((row) => row.id === context.season.id);
+    expect(previousSeason.is_active).toBe(0);
+
+    const [teamRows] = await db.query(
+      'SELECT name, season_id FROM teams WHERE club_id = ? AND season_id = ? ORDER BY name ASC',
+      [context.club.id, createdSeason.id],
+    );
+    expect(teamRows).toHaveLength(2);
+    expect(teamRows.map((row) => row.name)).toEqual(['Cadete A', 'Juvenil A']);
+
+    const resConfig = await agent.get('/admin/club');
+    expect(resConfig.status).toBe(200);
+    expect(resConfig.text).toContain('Temporadas del club');
+    expect(resConfig.text).toContain('2027/28');
+    expect(resConfig.text).toContain('Copiar estructura de equipos desde');
+  });
+
+  test('un admin puede activar una temporada existente desde configuración del club', async () => {
+    const context = await createTeamContext('Club Season Activate');
+    const secondSeasonId = randomUUID();
+    await db.query(
+      'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+      [secondSeasonId, context.club.id, '2027/28'],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: context.admin.email, password: 'password123' });
+
+    const resActivate = await agent.post(`/admin/club/seasons/${secondSeasonId}/activate`).send({
+      club_id: String(context.club.id),
+    });
+
+    expect(resActivate.status).toBe(302);
+    expect(resActivate.headers.location).toBe(`/admin/club?club_id=${context.club.id}`);
+
+    const [seasonRows] = await db.query(
+      'SELECT id, is_active FROM seasons WHERE club_id = ? ORDER BY created_at ASC',
+      [context.club.id],
+    );
+    const activatedSeason = seasonRows.find((row) => row.id === secondSeasonId);
+    const previousSeason = seasonRows.find((row) => row.id === context.season.id);
+
+    expect(activatedSeason.is_active).toBe(1);
+    expect(previousSeason.is_active).toBe(0);
+
+    const resConfig = await agent.get('/admin/club');
+    expect(resConfig.status).toBe(200);
+    expect(resConfig.text).toContain('/activate');
+    expect(resConfig.text).toContain('En uso');
+  });
+
   test('un admin puede previsualizar e importar equipos desde ProcessIQ', async () => {
     const context = await createTeamContext('Club Import ProcessIQ');
     const agent = request.agent(app);
