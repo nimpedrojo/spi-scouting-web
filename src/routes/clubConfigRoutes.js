@@ -17,6 +17,10 @@ const {
   getClubAdminData,
   getClubAdminOptions,
 } = require('../services/clubAdminService');
+const {
+  createSeasonForClub,
+  activateSeasonForClub,
+} = require('../services/seasonAdminService');
 
 const router = express.Router();
 const clubCrestsDir = path.join(__dirname, '..', 'public', 'uploads', 'clubs');
@@ -108,6 +112,7 @@ router.get('/', ensureAdmin, async (req, res) => {
       recommendations: data ? data.recommendations : [],
       v2Teams: data ? data.v2Teams : [],
       seasons: data ? data.seasons : [],
+      nextSeasonSuggestion: data ? data.nextSeasonSuggestion : null,
       modules: data ? data.modules : [],
       moduleSummary: data ? data.moduleSummary : null,
       modulePresets: data ? data.modulePresets : [],
@@ -227,6 +232,72 @@ router.post('/product-mode', ensureAdmin, async (req, res) => {
     // eslint-disable-next-line no-console
     console.error('Error al actualizar modo de producto del club:', err);
     req.flash('error', 'Ha ocurrido un error al guardar el modo de producto del club.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
+});
+
+router.post('/seasons', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club que quieres administrar.',
+    );
+    return res.redirect('/admin/club');
+  }
+
+  try {
+    const result = await createSeasonForClub(club.id, {
+      name: req.body && req.body.name ? req.body.name : '',
+      activate: req.body && req.body.activate_new_season === '1',
+      copyStructureFromSeasonId: req.body && req.body.copy_structure_from_season_id
+        ? req.body.copy_structure_from_season_id
+        : '',
+    });
+
+    if (result.errors && result.errors.length) {
+      req.flash('error', result.errors.join(' '));
+      return res.redirect(buildClubConfigRedirect(club));
+    }
+
+    req.session.clubContext = null;
+    const summary = result.copiedTeams
+      ? `Temporada creada correctamente. Equipos copiados: ${result.copiedTeams}.`
+      : 'Temporada creada correctamente.';
+    req.flash('success', summary);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al crear temporada del club:', err);
+    req.flash('error', 'Ha ocurrido un error al crear la temporada.');
+  }
+
+  return res.redirect(buildClubConfigRedirect(club));
+});
+
+router.post('/seasons/:id/activate', ensureAdmin, async (req, res) => {
+  const club = await resolveAdminClub(req);
+  if (!club) {
+    req.flash(
+      'error',
+      'Debes configurar primero el club que quieres administrar.',
+    );
+    return res.redirect('/admin/club');
+  }
+
+  try {
+    const result = await activateSeasonForClub(club.id, req.params.id);
+    if (result.errors && result.errors.length) {
+      req.flash('error', result.errors.join(' '));
+      return res.redirect(buildClubConfigRedirect(club));
+    }
+
+    req.session.clubContext = null;
+    req.flash('success', `Temporada ${result.season.name} activada correctamente.`);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error al activar temporada del club:', err);
+    req.flash('error', 'Ha ocurrido un error al activar la temporada.');
   }
 
   return res.redirect(buildClubConfigRedirect(club));
