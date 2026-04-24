@@ -15,6 +15,7 @@ async function createUsersTable() {
       default_team VARCHAR(150),
       processiq_username VARCHAR(150),
       processiq_password VARCHAR(255),
+      last_login_at DATETIME NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_users_club
         FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -80,6 +81,14 @@ async function createUsersTable() {
     if (e && e.code !== 'ER_DUP_FIELDNAME') {
       // eslint-disable-next-line no-console
       console.error('Error adding processiq_password column', e);
+    }
+  }
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL');
+  } catch (e) {
+    if (e && e.code !== 'ER_DUP_FIELDNAME') {
+      // eslint-disable-next-line no-console
+      console.error('Error adding last_login_at column', e);
     }
   }
 
@@ -255,6 +264,7 @@ async function getAllUsers(club = null) {
       u.default_club,
       u.default_team,
       u.default_team_id,
+      u.last_login_at,
       u.created_at,
       c.name AS club_name,
       dt.name AS default_team_name
@@ -286,6 +296,14 @@ async function updateUserRole(id, role) {
   params.push(id);
 
   const [result] = await db.query(sql, params);
+  return result.affectedRows;
+}
+
+async function updateUserLastLogin(id) {
+  const [result] = await db.query(
+    'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [id],
+  );
   return result.affectedRows;
 }
 
@@ -348,6 +366,7 @@ module.exports = {
   updateUserAccount,
   getAllUsers,
   updateUserRole,
+  updateUserLastLogin,
   deleteUser,
   ensureAdminUser,
   countAdminsByClub,

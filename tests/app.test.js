@@ -1274,6 +1274,29 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(settingsRow.default_product_mode).toBe('pmv_player_tracking');
   });
 
+  test('el login correcto actualiza la fecha del último acceso del usuario', async () => {
+    const user = await createTestUser({
+      name: 'User Last Login',
+      role: 'user',
+    });
+
+    const beforeLogin = new Date();
+    const res = await request(app)
+      .post('/login')
+      .send({ email: user.email, password: 'password123' });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/dashboard');
+
+    const [[row]] = await db.query(
+      'SELECT last_login_at FROM users WHERE id = ?',
+      [user.id],
+    );
+
+    expect(row.last_login_at).toBeTruthy();
+    expect(new Date(row.last_login_at).getTime()).toBeGreaterThanOrEqual(beforeLogin.getTime() - 1000);
+  });
+
   test('dashboard para usuario normal muestra solo opciones de usuario', async () => {
     await db.query(
       'UPDATE platform_settings SET default_product_mode = ? WHERE id = 1',
@@ -2218,6 +2241,31 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     const res = await agent.get('/admin/users');
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/');
+  });
+
+  test('un superadmin ve la fecha y hora del último login en la gestión de usuarios', async () => {
+    const superadmin = await createTestUser({
+      name: 'Superadmin Last Login View',
+      role: 'superadmin',
+    });
+    const targetUser = await createTestUser({
+      name: 'User With Last Login',
+      role: 'user',
+    });
+
+    await db.query(
+      'UPDATE users SET last_login_at = ? WHERE id = ?',
+      ['2026-04-20 18:45:00', targetUser.id],
+    );
+
+    const agent = request.agent(app);
+    await agent.post('/login').send({ email: superadmin.email, password: 'password123' });
+
+    const res = await agent.get('/admin/users');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Último login');
+    expect(res.text).toMatch(/20\/0?4\/26/);
+    expect(res.text).toMatch(/18:45/);
   });
 
   test('un admin puede editar datos básicos de un usuario', async () => {
