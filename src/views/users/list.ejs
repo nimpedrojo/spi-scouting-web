@@ -1,3 +1,19 @@
+<%
+  const isSuperAdminView = currentUser && currentUser.role === 'superadmin';
+
+  function formatDateTime(value) {
+    if (!value) {
+      return 'Nunca';
+    }
+
+    return new Intl.DateTimeFormat('es-ES', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: 'Europe/Madrid',
+    }).format(new Date(value));
+  }
+%>
+
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="mb-0">Gestión de usuarios</h1>
   <a href="/admin/users/new" class="btn btn-primary">Nuevo usuario</a>
@@ -17,6 +33,9 @@
         <th>Club asignado</th>
         <th>Club por defecto</th>
         <th>Equipo por defecto</th>
+        <% if (isSuperAdminView) { %>
+        <th>Último login</th>
+        <% } %>
         <th>Creado</th>
         <th></th>
       </tr>
@@ -83,6 +102,9 @@
         <td><%= u.club_name || u.default_club || '' %></td>
         <td><%= u.default_club || '' %></td>
         <td><%= u.default_team_name || u.default_team || '' %></td>
+        <% if (isSuperAdminView) { %>
+        <td><%= formatDateTime(u.last_login_at) %></td>
+        <% } %>
         <td>
           <%= u.created_at ? new Date(u.created_at).toISOString().slice(0, 10) : '' %>
         </td>

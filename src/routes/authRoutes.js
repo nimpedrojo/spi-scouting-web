@@ -5,6 +5,7 @@ const {
   findUserByEmail,
   findUserById,
   updateUserAccount,
+  updateUserLastLogin,
 } = require('../models/userModel');
 const { getClubByCode, getClubByName } = require('../models/clubModel');
 const { ensureAuth } = require('../middleware/auth');
@@ -68,6 +69,19 @@ router.post('/login', ensureGuest, async (req, res) => {
       req.flash('error', 'Usuario o contraseña incorrectos.');
       return res.redirect('/login');
     }
+
+    try {
+      await updateUserLastLogin(user.id);
+      user.last_login_at = new Date();
+    } catch (updateError) {
+      logger.warn('Could not update last login timestamp', {
+        type: 'auth',
+        action: 'login_last_login_update_failed',
+        userId: user.id,
+        error: logger.formatError(updateError),
+      });
+    }
+
     req.session.user = buildSessionUser(user);
     logger.info('Login successful', {
       type: 'auth',
