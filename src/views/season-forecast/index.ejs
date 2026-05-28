@@ -14,6 +14,16 @@
         </select>
       </div>
       <div class="col-md-3">
+        <label for="target_season_id" class="form-label">Temporada destino</label>
+        <select id="target_season_id" name="target_season_id" class="form-select">
+          <% if (forecast && forecast.filterOptions) { %>
+            <% forecast.filterOptions.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= forecast.targetSeasonId === season.id ? 'selected' : '' %>><%= season.name %><%= season.is_active ? ' · activa' : '' %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
         <label for="section" class="form-label">Sección</label>
         <select id="section" name="section" class="form-select">
           <option value="">Todas</option>
@@ -60,8 +70,10 @@
   </div>
 <% } else { %>
   <div class="row g-4">
-    <% forecast.rows.forEach((entry) => { %>
-      <div class="col-lg-6">
+    <div class="col-xl-8">
+      <div class="row g-4">
+      <% forecast.rows.forEach((entry) => { %>
+        <div class="col-lg-6">
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
@@ -93,6 +105,32 @@
               </div>
             </div>
 
+            <div class="border rounded p-3 mb-3 bg-light">
+              <div class="small text-muted mb-2">Equipo propuesto <%= forecast.targetSeason ? forecast.targetSeason.name : '' %></div>
+              <form method="POST" action="/season-forecast/assign" class="d-flex flex-column gap-2">
+                <input type="hidden" name="playerId" value="<%= entry.player.id %>">
+                <input type="hidden" name="sourceSeasonId" value="<%= forecast.resolvedSeasonId || '' %>">
+                <input type="hidden" name="targetSeasonId" value="<%= forecast.targetSeasonId || '' %>">
+                <input type="hidden" name="section" value="<%= selectedFilters.section || '' %>">
+                <input type="hidden" name="category" value="<%= selectedFilters.category || '' %>">
+                <input type="hidden" name="teamId" value="<%= selectedFilters.teamId || '' %>">
+                <select name="targetTeamId" class="form-select form-select-sm" <%= forecast.targetTeams && forecast.targetTeams.length ? '' : 'disabled' %>>
+                  <option value="">Seleccionar equipo destino</option>
+                  <% forecast.targetTeams.forEach((team) => { %>
+                    <option value="<%= team.id %>" <%= entry.assignment && entry.assignment.teamId === team.id ? 'selected' : '' %>>
+                      <%= team.name %> · <%= team.category_name %> · <%= team.section_name %>
+                    </option>
+                  <% }) %>
+                </select>
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                  <span class="small text-muted">
+                    <%= entry.assignment ? `Asignado a ${entry.assignment.teamName}` : 'Sin equipo destino guardado' %>
+                  </span>
+                  <button type="submit" class="btn btn-sm btn-outline-primary" <%= forecast.targetTeams && forecast.targetTeams.length ? '' : 'disabled' %>>Guardar</button>
+                </div>
+              </form>
+            </div>
+
             <ul class="small text-muted ps-3 mb-3">
               <% entry.explanation.forEach((reason) => { %>
                 <li><%= reason %></li>
@@ -108,6 +146,49 @@
           </div>
         </div>
       </div>
-    <% }) %>
+      <% }) %>
+      </div>
+    </div>
+
+    <div class="col-xl-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h3 class="h5 mb-1">Configuración <%= forecast.targetSeason ? forecast.targetSeason.name : '' %></h3>
+              <div class="small text-muted">Jugadores colocados por equipo destino</div>
+            </div>
+            <span class="badge text-bg-light border"><%= forecast.teamConfiguration.reduce((total, group) => total + group.internalRecommendations.length, 0) %></span>
+          </div>
+
+          <% if (!forecast.targetTeams.length) { %>
+            <p class="mb-0 text-muted">No hay equipos creados para la temporada destino seleccionada.</p>
+          <% } else { %>
+            <div class="list-group list-group-flush">
+              <% forecast.teamConfiguration.forEach((group) => { %>
+                <div class="list-group-item px-0">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <a class="fw-semibold text-decoration-none" href="/season-forecast/team/<%= group.team.id %>?season_id=<%= forecast.targetSeasonId || '' %>"><%= group.team.name %></a>
+                      <div class="small text-muted"><%= group.team.category_name %> · <%= group.team.section_name %></div>
+                    </div>
+                    <span class="badge text-bg-primary"><%= group.internalRecommendations.length %></span>
+                  </div>
+                  <% if (group.internalRecommendations.length) { %>
+                    <ul class="small mt-2 mb-0 ps-3">
+                      <% group.internalRecommendations.slice(0, 6).forEach((recommendation) => { %>
+                        <li><%= recommendation.player_first_name %> <%= recommendation.player_last_name %></li>
+                      <% }) %>
+                    </ul>
+                  <% } else { %>
+                    <div class="small text-muted mt-2">Sin jugadores colocados todavía.</div>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
   </div>
 <% } %>
