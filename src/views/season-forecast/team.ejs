@@ -25,6 +25,49 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h3 class="h5 mb-1">Plantilla propuesta <%= result.seasonLabel || '' %></h3>
+          <div class="small text-muted">Jugadores colocados desde la previsión de próxima temporada</div>
+        </div>
+        <span class="badge text-bg-primary"><%= result.plannedRoster.length %></span>
+      </div>
+      <% if (!result.plannedRoster.length && !result.plannedExternalRoster.length) { %>
+        <p class="mb-0 text-muted">Todavía no hay jugadores asignados a este equipo en la previsión.</p>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Jugador</th>
+                <th>Estado</th>
+                <th>Notas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% result.plannedRoster.forEach((recommendation) => { %>
+                <tr>
+                  <td><%= recommendation.player_first_name %> <%= recommendation.player_last_name %></td>
+                  <td><span class="badge text-bg-light border"><%= recommendation.status %></span></td>
+                  <td class="text-muted small"><%= recommendation.notes || '-' %></td>
+                </tr>
+              <% }) %>
+              <% result.plannedExternalRoster.forEach((recommendation) => { %>
+                <tr>
+                  <td><%= recommendation.scouted_player_id %></td>
+                  <td><span class="badge text-bg-light border"><%= recommendation.status %></span></td>
+                  <td class="text-muted small"><%= recommendation.notes || recommendation.recommended_team_label || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
   <div class="row g-4">
     <div class="col-lg-8">
       <div class="card shadow-sm">

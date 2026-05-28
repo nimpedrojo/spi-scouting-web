@@ -5,6 +5,12 @@ const { getAllSections } = require('../models/sectionModel');
 const { getAllCategories, DEFAULT_CATEGORIES } = require('../models/categoryModel');
 const { getTeamsByClubId, findTeamById } = require('../models/teamModel');
 const { getPlayersForComparison, getPlayerAnalytics } = require('./playerAnalyticsService');
+const {
+  createRecommendation,
+  updateRecommendation,
+  getRecommendationsByTeam,
+} = require('./seasonRecommendationService');
+const { getSeasonTeamRecommendationsByFilters } = require('../models/seasonTeamRecommendationModel');
 
 const CATEGORY_ORDER = DEFAULT_CATEGORIES.slice().reverse();
 const READINESS_LEVELS = {
@@ -35,6 +41,24 @@ const FORECAST_RULES = {
 
 function normalizeSeasonName(season) {
   return season && season.name ? season.name : '';
+}
+
+function normalizeNullableString(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeNullableInteger(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function buildSeasonFilterClause(seasonId, params, alias = 'e') {
@@ -362,6 +386,54 @@ async function getForecastFilters(user, selected = {}) {
   };
 }
 
+function resolveTargetSeasonId(seasons, activeSeason, requestedTargetSeasonId) {
+  if (requestedTargetSeasonId && seasons.some((season) => season.id === requestedTargetSeasonId)) {
+    return requestedTargetSeasonId;
+  }
+
+  const nonActiveSeasons = seasons.filter((season) => !activeSeason || season.id !== activeSeason.id);
+  return nonActiveSeasons.length ? nonActiveSeasons[0].id : (activeSeason ? activeSeason.id : null);
+}
+
+function buildLatestInternalRecommendationMap(recommendations) {
+  return recommendations.reduce((acc, recommendation) => {
+    if (recommendation.source_type !== 'internal' || !recommendation.player_id) {
+      return acc;
+    }
+
+    if (!acc.has(recommendation.player_id)) {
+      acc.set(recommendation.player_id, recommendation);
+    }
+
+    return acc;
+  }, new Map());
+}
+
+function buildTargetTeamConfiguration(targetTeams, recommendations) {
+  const byTeamId = new Map(targetTeams.map((team) => [team.id, {
+    team,
+    internalRecommendations: [],
+    externalRecommendations: [],
+    total: 0,
+  }]));
+
+  recommendations.forEach((recommendation) => {
+    if (!recommendation.recommended_team_id || !byTeamId.has(recommendation.recommended_team_id)) {
+      return;
+    }
+
+    const group = byTeamId.get(recommendation.recommended_team_id);
+    group.total += 1;
+    if (recommendation.source_type === 'internal') {
+      group.internalRecommendations.push(recommendation);
+    } else {
+      group.externalRecommendations.push(recommendation);
+    }
+  });
+
+  return Array.from(byTeamId.values());
+}
+
 async function getSeasonForecastOverview(user, selected = {}) {
   const filterOptions = await getForecastFilters(user, selected);
   if (!filterOptions) {
@@ -370,6 +442,20 @@ async function getSeasonForecastOverview(user, selected = {}) {
 
   const players = await getForecastPlayerPool(filterOptions.club.id, selected);
   const resolvedSeasonId = selected.seasonId || (filterOptions.activeSeason ? filterOptions.activeSeason.id : null);
+  const targetSeasonId = resolveTargetSeasonId(
+    filterOptions.seasons,
+    filterOptions.activeSeason,
+    selected.targetSeasonId,
+  );
+  const targetSeason = filterOptions.seasons.find((season) => season.id === targetSeasonId) || null;
+  const targetTeams = filterOptions.teams.filter((team) => team.season_id === targetSeasonId);
+  const targetRecommendations = targetSeasonId
+    ? await getSeasonTeamRecommendationsByFilters({
+      clubId: filterOptions.club.id,
+      seasonId: targetSeasonId,
+    })
+    : [];
+  const latestInternalRecommendationByPlayer = buildLatestInternalRecommendationMap(targetRecommendations);
   const forecastRows = [];
   for (const player of players) {
     // eslint-disable-next-line no-await-in-loop
@@ -379,7 +465,18 @@ async function getSeasonForecastOverview(user, selected = {}) {
       resolvedSeasonId,
     );
     if (forecast) {
+      const assignedRecommendation = latestInternalRecommendationByPlayer.get(forecast.player.id) || null;
       forecastRows.push(forecast);
+      forecast.assignment = assignedRecommendation ? {
+        recommendationId: assignedRecommendation.id,
+        targetSeasonId: assignedRecommendation.season_id,
+        teamId: assignedRecommendation.recommended_team_id,
+        teamName: assignedRecommendation.recommended_team_name
+          || assignedRecommendation.recommended_team_label
+          || 'Sin equipo',
+        status: assignedRecommendation.status,
+        notes: assignedRecommendation.notes,
+      } : null;
     }
   }
 
@@ -388,6 +485,10 @@ async function getSeasonForecastOverview(user, selected = {}) {
     selectedFilters: selected,
     rows: forecastRows,
     resolvedSeasonId,
+    targetSeasonId,
+    targetSeason,
+    targetTeams,
+    teamConfiguration: buildTargetTeamConfiguration(targetTeams, targetRecommendations),
   };
 }
 
@@ -446,9 +547,10 @@ async function getTeamSeasonForecast(user, teamId, seasonId = null) {
     return null;
   }
 
-  const [filterOptions, aggregateRows] = await Promise.all([
+  const [filterOptions, aggregateRows, plannedRosterResult] = await Promise.all([
     getForecastFilters(user, { seasonId: selectedSeasonId, teamId }),
     getTeamSeasonForecastAggregate(teamId, selectedSeasonId),
+    getRecommendationsByTeam(selectedSeasonId, teamId, { clubId: club.id }),
   ]);
 
   const players = await getForecastPlayerPool(club.id, { seasonId: selectedSeasonId, teamId });
@@ -491,11 +593,71 @@ async function getTeamSeasonForecast(user, teamId, seasonId = null) {
     aggregate: aggregateRows,
     summary,
     forecasts: forecastRows,
+    plannedRoster: plannedRosterResult && !plannedRosterResult.errors
+      ? plannedRosterResult.internalRecommendations
+      : [],
+    plannedExternalRoster: plannedRosterResult && !plannedRosterResult.errors
+      ? plannedRosterResult.externalRecommendations
+      : [],
     seasonLabel: normalizeSeasonName(
       filterOptions.seasons.find((season) => season.id === selectedSeasonId) || filterOptions.activeSeason,
     ),
     seasonId: selectedSeasonId,
   };
+}
+
+async function assignPlayerToNextSeasonTeam(user, payload = {}) {
+  const club = await requireClubForUser(user);
+  if (!club) {
+    return { errors: ['Debes tener un club activo para guardar la previsión.'] };
+  }
+
+  const playerId = normalizeNullableInteger(payload.playerId);
+  const targetSeasonId = normalizeNullableString(payload.targetSeasonId);
+  const targetTeamId = normalizeNullableString(payload.targetTeamId);
+  const sourceSeasonId = normalizeNullableString(payload.sourceSeasonId);
+  const errors = [];
+
+  if (!playerId) {
+    errors.push('Selecciona un jugador valido.');
+  }
+
+  if (!targetSeasonId) {
+    errors.push('Selecciona la temporada destino.');
+  }
+
+  if (!targetTeamId) {
+    errors.push('Selecciona el equipo destino.');
+  }
+
+  if (errors.length) {
+    return { errors };
+  }
+
+  const existing = await getSeasonTeamRecommendationsByFilters({
+    clubId: club.id,
+    seasonId: targetSeasonId,
+    playerId,
+    sourceType: 'internal',
+  });
+
+  if (existing.length) {
+    return updateRecommendation(existing[0].id, {
+      clubId: club.id,
+      recommendedTeamId: targetTeamId,
+      status: 'proposed',
+    });
+  }
+
+  return createRecommendation({
+    clubId: club.id,
+    seasonId: targetSeasonId,
+    sourceType: 'internal',
+    playerId,
+    recommendedTeamId: targetTeamId,
+    createdBy: user.id,
+    notes: sourceSeasonId ? `Propuesta creada desde prevision de temporada ${sourceSeasonId}.` : null,
+  });
 }
 
 module.exports = {
@@ -506,4 +668,5 @@ module.exports = {
   getSeasonForecastOverview,
   getPlayerSeasonForecast,
   getTeamSeasonForecast,
+  assignPlayerToNextSeasonTeam,
 };

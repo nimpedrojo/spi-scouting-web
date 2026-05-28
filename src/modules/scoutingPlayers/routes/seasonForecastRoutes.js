@@ -8,6 +8,7 @@ const router = express.Router();
 const requireScoutingPlayers = requireModule(MODULE_KEYS.SCOUTING_PLAYERS);
 
 router.get('/season-forecast', ensureAdmin, requireScoutingPlayers, controller.renderIndex);
+router.post('/season-forecast/assign', ensureAdmin, requireScoutingPlayers, controller.assignPlayer);
 router.get('/season-forecast/player/:id', ensureAdmin, requireScoutingPlayers, controller.renderPlayer);
 router.get('/season-forecast/team/:id', ensureAdmin, requireScoutingPlayers, controller.renderTeam);
 

@@ -19,6 +19,9 @@ const {
   getRecommendationsByTeam,
   getRecommendationsBySeason,
 } = require('../src/services/seasonRecommendationService');
+const {
+  assignPlayerToNextSeasonTeam,
+} = require('../src/services/seasonForecastService');
 
 const uploadsRoots = [
   path.join(__dirname, '..', 'src', 'public', 'uploads', 'clubs'),
@@ -912,6 +915,55 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       expect(result.groupedByTeam).toHaveLength(2);
       expect(result.statusSummary.proposed).toBe(2);
     });
+
+    it('coloca un jugador interno en un equipo de la siguiente temporada y permite moverlo', async () => {
+      const context = await createEvaluationContext('Club Service Forecast Assignment');
+      const nextSeasonId = randomUUID();
+      const initialTeamId = randomUUID();
+      const targetTeamId = randomUUID();
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+        [
+          initialTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Prevision A',
+          targetTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Prevision B',
+        ],
+      );
+
+      const serviceUser = {
+        ...context.admin,
+        role: 'admin',
+        default_club: context.club.name,
+      };
+
+      const created = await assignPlayerToNextSeasonTeam(serviceUser, {
+        playerId: context.playerId,
+        sourceSeasonId: context.season.id,
+        targetSeasonId: nextSeasonId,
+        targetTeamId: initialTeamId,
+      });
+      const moved = await assignPlayerToNextSeasonTeam(serviceUser, {
+        playerId: context.playerId,
+        sourceSeasonId: context.season.id,
+        targetSeasonId: nextSeasonId,
+        targetTeamId,
+      });
+
+      const result = await getRecommendationsByTeam(nextSeasonId, targetTeamId, {
+        clubId: context.club.id,
+      });
+
+      expect(created.errors).toBeUndefined();
+      expect(moved.errors).toBeUndefined();
+      expect(moved.recommendation.id).toBe(created.recommendation.id);
+      expect(result.internalRecommendations).toHaveLength(1);
+      expect(result.internalRecommendations[0].player_id).toBe(context.playerId);
+    });
   });
 
   describe('seasonRecommendationRoutes', () => {
@@ -1147,6 +1199,47 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       expect(response.body.recommendations).toHaveLength(2);
       expect(response.body.groupedByTeam).toHaveLength(2);
       expect(response.body.statusSummary.proposed).toBe(2);
+    });
+
+    it('POST /season-forecast/assign guarda la colocacion desde la prevision', async () => {
+      const context = await createEvaluationContext('Club Route Forecast Assignment');
+      const nextSeasonId = randomUUID();
+      const nextTeamId = randomUUID();
+      const agent = request.agent(app);
+
+      await db.query(
+        'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+        [nextSeasonId, context.club.id, '2027/28'],
+      );
+      await db.query(
+        `INSERT INTO teams (id, club_id, season_id, section_id, category_id, name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [nextTeamId, context.club.id, nextSeasonId, context.masculina.id, context.juvenil.id, 'Juvenil Forecast Ruta'],
+      );
+
+      await agent
+        .post('/login')
+        .type('form')
+        .send({ email: context.admin.email, password: context.admin.password });
+
+      const response = await agent
+        .post('/season-forecast/assign')
+        .type('form')
+        .send({
+          playerId: context.playerId,
+          sourceSeasonId: context.season.id,
+          targetSeasonId: nextSeasonId,
+          targetTeamId: nextTeamId,
+        });
+
+      const recommendations = await getRecommendationsByTeam(nextSeasonId, nextTeamId, {
+        clubId: context.club.id,
+      });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toContain(`/season-forecast?season_id=${encodeURIComponent(context.season.id)}`);
+      expect(recommendations.internalRecommendations).toHaveLength(1);
+      expect(recommendations.internalRecommendations[0].player_id).toBe(context.playerId);
     });
   });
 
