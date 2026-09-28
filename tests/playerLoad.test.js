@@ -256,6 +256,7 @@ describe('Player Load MVP backend', () => {
 
   test('renders team-oriented Player Load dashboard and player detail', async () => {
     context = await createPlayerLoadContext();
+    await db.query('UPDATE clubs SET product_mode = ? WHERE id = ?', ['pmv_player_tracking', context.club.id]);
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
 
     const agent = request.agent(app);
@@ -296,6 +297,8 @@ describe('Player Load MVP backend', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('Exposicion del equipo');
     expect(res.text).toContain('Player');
+    expect(res.text).toContain('href="/player-load"');
+    expect(res.text).toContain('Player Load');
     expect(res.text).toContain('Training');
     expect(res.text).toContain('Match min');
     expect(res.text).toContain('Exposure 7D');
