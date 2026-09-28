@@ -42,6 +42,12 @@ const {
 const {
   createPlanningMicrocycleTemplatesTable,
 } = require('./modules/planning/models/planningMicrocycleTemplateModel');
+const {
+  createPlayerLoadActivitiesTable,
+} = require('./modules/playerLoad/models/playerLoadActivityModel');
+const {
+  createPlayerLoadEntriesTable,
+} = require('./modules/playerLoad/models/playerLoadEntryModel');
 const { ensureDatabaseExists } = require('./db');
 
 let initializationPromise = null;
@@ -62,10 +68,12 @@ async function initializeDatabase() {
   await createPlanSessionsTable();
   await createPlanSessionTasksTable();
   await createPlanningMicrocycleTemplatesTable();
+  await createPlayerLoadActivitiesTable();
   await createScoutingTeamOpponentsTable();
   await createScoutingTeamReportsTable();
   await createReportsTable();
   await createPlayersTable();
+  await createPlayerLoadEntriesTable();
   await createTeamPlayersTable();
   await createSeasonTeamRecommendationsTable();
   await createEvaluationsTable();

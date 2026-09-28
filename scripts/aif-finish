@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+JOURNAL_DIR="docs/ai"
+JOURNAL_FILE="$JOURNAL_DIR/engineering-journal.md"
+
+mkdir -p "$JOURNAL_DIR"
+
+timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+echo
+echo "AI Engineering Framework"
+echo "Finish work block"
+echo "---------------------"
+echo
+
+read -r -p "Block title: " block_title
+read -r -p "Main objective achieved? (yes/no/partial): " objective_status
+read -r -p "AI assistants used (ChatGPT, Codex, Copilot, none): " ai_tools
+read -r -p "Main AI usage (discovery/design/implementation/refactoring/tests/documentation/none): " ai_usage
+read -r -p "AI usefulness (low/medium/high/none): " ai_usefulness
+read -r -p "Accepted AI output without major changes? (yes/no/partial/not-applicable): " ai_acceptance
+read -r -p "Human contribution: " human_contribution
+read -r -p "Main outcome: " main_outcome
+read -r -p "Next step: " next_step
+
+if [[ ! -f "$JOURNAL_FILE" ]]; then
+  cat > "$JOURNAL_FILE" <<EOF
+# Engineering Journal
+
+This journal captures engineering work blocks and AI assistance evidence.
+
+EOF
+fi
+
+cat >> "$JOURNAL_FILE" <<EOF
+
+---
+
+## $timestamp — $block_title
+
+### Objective
+
+Status: $objective_status
+
+### AI Assistance
+
+Tools: $ai_tools
+
+Main usage: $ai_usage
+
+Usefulness: $ai_usefulness
+
+Accepted without major changes: $ai_acceptance
+
+### Human Contribution
+
+$human_contribution
+
+### Outcome
+
+$main_outcome
+
+### Next Step
+
+$next_step
+EOF
+
+echo
+echo "✔ Work block recorded"
+echo "File: $JOURNAL_FILE"
+echo
