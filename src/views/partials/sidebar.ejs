@@ -14,8 +14,8 @@
       { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players', icon: 'comparison' },
       { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning', icon: 'planning' },
       { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams', icon: 'scouting' },
-      { label: 'Player Load', href: playerLoadEnabled ? '/player-load' : '#', moduleKey: 'player_load', icon: 'comparison' },
     ] : []),
+    { label: 'Player Load', href: playerLoadEnabled ? '/player-load' : '#', moduleKey: 'player_load', icon: 'comparison' },
   ];
   const isItemActive = (item) => {
     if (item.href === '#' || !activeRoute) {
