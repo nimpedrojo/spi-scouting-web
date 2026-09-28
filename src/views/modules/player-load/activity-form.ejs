@@ -1,0 +1,220 @@
+<%
+  const visibleTeams = formData.visibleTeams || [];
+  const selectedTeam = formData.selectedTeam || null;
+  const roster = formData.roster || [];
+  const activeSeason = formData.activeSeason || null;
+  const values = formValues || {};
+  const selectedSeasonId = (seasonView && seasonView.selectedSeasonId) || (activeSeason && activeSeason.id) || '';
+  function valueFor(name, fallback) {
+    return values[name] !== undefined && values[name] !== null ? values[name] : fallback;
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <div class="dashboard-kicker">Player Load</div>
+    <h1 class="mb-1">Nueva actividad</h1>
+    <p class="text-muted mb-0">Registro manual de entrenamientos y minutos de partido.</p>
+  </div>
+  <a href="/player-load?team_id=<%= selectedTeam ? selectedTeam.id : '' %>&season_id=<%= encodeURIComponent(selectedSeasonId) %>" class="btn btn-outline-secondary">Volver</a>
+</div>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0">
+      <% errors.forEach((error) => { %>
+        <li><%= error %></li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/player-load/activities/new" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label for="context_team_id" class="form-label">Equipo</label>
+        <select id="context_team_id" name="team_id" class="form-select">
+          <% visibleTeams.forEach((team) => { %>
+            <option value="<%= team.id %>" <%= selectedTeam && String(selectedTeam.id) === String(team.id) ? 'selected' : '' %>>
+              <%= team.name %> · <%= team.category_name %> · <%= team.section_name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label for="context_season_id" class="form-label">Temporada</label>
+        <select id="context_season_id" name="season_id" class="form-select">
+          <% if (seasonView && seasonView.seasons && seasonView.seasons.length) { %>
+            <% seasonView.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= String(selectedSeasonId) === String(season.id) ? 'selected' : '' %>>
+                <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+              </option>
+            <% }) %>
+          <% } else if (activeSeason) { %>
+            <option value="<%= activeSeason.id %>"><%= activeSeason.name %></option>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-outline-secondary w-100">Cambiar contexto</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (!selectedTeam) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0 text-muted">No hay equipos disponibles para registrar actividad.</p>
+    </div>
+  </div>
+<% } else if (!roster.length) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0 text-muted">El equipo seleccionado no tiene jugadores en plantilla.</p>
+    </div>
+  </div>
+<% } else { %>
+  <form method="POST" action="<%= formAction %>" class="card shadow-sm" data-player-load-form>
+    <div class="card-body">
+      <input type="hidden" name="team_id" value="<%= selectedTeam.id %>" />
+      <input type="hidden" name="season_id" value="<%= selectedSeasonId %>" />
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <label for="activity_type" class="form-label">Tipo</label>
+          <select id="activity_type" name="activity_type" class="form-select" required data-activity-type>
+            <option value="TRAINING" <%= valueFor('activity_type', 'TRAINING') === 'TRAINING' ? 'selected' : '' %>>Entrenamiento</option>
+            <option value="MATCH" <%= valueFor('activity_type', 'TRAINING') === 'MATCH' ? 'selected' : '' %>>Partido</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="activity_date" class="form-label">Fecha</label>
+          <input type="date" id="activity_date" name="activity_date" class="form-control" required value="<%= valueFor('activity_date', '') %>" />
+        </div>
+        <div class="col-md-4">
+          <label for="title" class="form-label">Titulo</label>
+          <input type="text" id="title" name="title" class="form-control" required value="<%= valueFor('title', '') %>" placeholder="Ej. Sesion MD-2 / Jornada 4" />
+        </div>
+        <div class="col-md-2">
+          <label for="duration_minutes" class="form-label">Duracion</label>
+          <input type="number" min="0" id="duration_minutes" name="duration_minutes" class="form-control" value="<%= valueFor('duration_minutes', '') %>" data-duration-minutes />
+        </div>
+        <div class="col-md-3">
+          <label for="status" class="form-label">Estado</label>
+          <select id="status" name="status" class="form-select">
+            <option value="done" <%= valueFor('status', 'done') === 'done' ? 'selected' : '' %>>Realizada</option>
+            <option value="planned" <%= valueFor('status', 'done') === 'planned' ? 'selected' : '' %>>Planificada</option>
+            <option value="cancelled" <%= valueFor('status', 'done') === 'cancelled' ? 'selected' : '' %>>Cancelada</option>
+          </select>
+        </div>
+        <div class="col-md-9">
+          <label for="notes" class="form-label">Notas</label>
+          <input type="text" id="notes" name="notes" class="form-control" value="<%= valueFor('notes', '') %>" />
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Jugadores</h2>
+          <p class="text-muted mb-0">Marca asistencia y registra minutos por jugador.</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-fill-training-minutes>Aplicar duracion a asistentes</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th class="text-center">Asiste</th>
+              <th class="text-end">Minutos</th>
+              <th>Notas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% roster.forEach((player, index) => { %>
+              <tr>
+                <td>
+                  <input type="hidden" name="entries[<%= index %>][player_id]" value="<%= player.player_id %>" />
+                  <div class="fw-semibold"><%= player.first_name %> <%= player.last_name %></div>
+                  <div class="small text-muted">#<%= player.dorsal || '-' %> · <%= player.positions || '-' %></div>
+                </td>
+                <td class="text-center">
+                  <input class="form-check-input" type="checkbox" name="entries[<%= index %>][attended]" value="1" data-attended />
+                </td>
+                <td class="text-end">
+                  <input
+                    type="number"
+                    min="0"
+                    name="entries[<%= index %>][exposure_minutes]"
+                    class="form-control form-control-sm text-end"
+                    value="0"
+                    data-exposure-minutes
+                  />
+                </td>
+                <td>
+                  <input type="text" name="entries[<%= index %>][notes]" class="form-control form-control-sm" />
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap mt-4">
+        <button type="submit" class="btn btn-primary">Guardar actividad</button>
+        <a href="/player-load?team_id=<%= selectedTeam.id %>&season_id=<%= encodeURIComponent(selectedSeasonId) %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </div>
+  </form>
+<% } %>
+
+<script>
+  (function () {
+    var form = document.querySelector('[data-player-load-form]');
+    if (!form) return;
+
+    var activityType = form.querySelector('[data-activity-type]');
+    var durationInput = form.querySelector('[data-duration-minutes]');
+    var fillButton = form.querySelector('[data-fill-training-minutes]');
+    var attendedInputs = Array.prototype.slice.call(form.querySelectorAll('[data-attended]'));
+
+    function rowMinutesInput(checkbox) {
+      var row = checkbox.closest('tr');
+      return row ? row.querySelector('[data-exposure-minutes]') : null;
+    }
+
+    function syncTrainingMinutes() {
+      if (!activityType || activityType.value !== 'TRAINING') return;
+      var duration = Number(durationInput ? durationInput.value : 0);
+      attendedInputs.forEach(function (checkbox) {
+        var minutesInput = rowMinutesInput(checkbox);
+        if (!minutesInput) return;
+        minutesInput.value = checkbox.checked ? String(duration || 0) : '0';
+      });
+    }
+
+    attendedInputs.forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () {
+        var minutesInput = rowMinutesInput(checkbox);
+        if (!minutesInput) return;
+        if (!checkbox.checked) {
+          minutesInput.value = '0';
+          return;
+        }
+        if (activityType && activityType.value === 'TRAINING') {
+          minutesInput.value = String(Number(durationInput ? durationInput.value : 0) || 0);
+        }
+      });
+    });
+
+    if (fillButton) {
+      fillButton.addEventListener('click', syncTrainingMinutes);
+    }
+    if (durationInput) {
+      durationInput.addEventListener('change', syncTrainingMinutes);
+    }
+  })();
+</script>

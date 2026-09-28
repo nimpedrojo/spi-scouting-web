@@ -117,6 +117,16 @@ async function cleanupContext(context) {
   await db.query('DELETE FROM clubs WHERE id = ?', [context.club.id]);
 }
 
+async function loginAsContextAdmin(agent, context) {
+  return agent
+    .post('/login')
+    .set('X-Forwarded-For', `10.10.${context.club.id % 255}.${context.admin.id % 255}`)
+    .send({
+      email: context.admin.email,
+      password: context.admin.password,
+    });
+}
+
 describe('Player Load MVP backend', () => {
   let context = null;
 
@@ -137,10 +147,7 @@ describe('Player Load MVP backend', () => {
     context = await createPlayerLoadContext();
 
     const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
+    await loginAsContextAdmin(agent, context);
 
     const res = await agent
       .get(`/player-load?team_id=${context.teamId}`)
@@ -155,10 +162,7 @@ describe('Player Load MVP backend', () => {
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
 
     const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
+    await loginAsContextAdmin(agent, context);
 
     const previousTraining = await agent.post('/player-load/activities').send({
       team_id: context.teamId,
@@ -260,10 +264,7 @@ describe('Player Load MVP backend', () => {
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
 
     const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
+    await loginAsContextAdmin(agent, context);
 
     await agent.post('/player-load/activities').send({
       team_id: context.teamId,
@@ -318,15 +319,124 @@ describe('Player Load MVP backend', () => {
     expect(res.text).not.toContain('estado físico');
   });
 
+  test('renders manual activity form and accepts browser form submissions', async () => {
+    context = await createPlayerLoadContext();
+    await setModuleEnabledForClub(context.club.id, 'player_load', true);
+
+    const agent = request.agent(app);
+    await loginAsContextAdmin(agent, context);
+
+    const formRes = await agent.get(
+      `/player-load/activities/new?team_id=${context.teamId}&season_id=${context.seasonId}`,
+    );
+
+    expect(formRes.status).toBe(200);
+    expect(formRes.text).toContain('Nueva actividad');
+    expect(formRes.text).toContain('Mario Sanz');
+    expect(formRes.text).toContain('Adrian Lopez');
+    expect(formRes.text).toContain('Guardar actividad');
+
+    const submitRes = await agent
+      .post('/player-load/activities')
+      .type('form')
+      .send({
+        team_id: context.teamId,
+        season_id: context.seasonId,
+        activity_type: 'TRAINING',
+        activity_date: '2026-09-26',
+        title: 'Sesion manual',
+        duration_minutes: 75,
+        'entries[0][player_id]': context.playerOneId,
+        'entries[0][attended]': '1',
+        'entries[0][exposure_minutes]': 75,
+        'entries[1][player_id]': context.playerTwoId,
+        'entries[1][exposure_minutes]': 0,
+      });
+
+    expect(submitRes.status).toBe(302);
+    expect(submitRes.headers.location).toBe(
+      `/player-load?team_id=${context.teamId}&season_id=${context.seasonId}`,
+    );
+
+    const metricsRes = await agent
+      .get(`/player-load?team_id=${context.teamId}&season_id=${context.seasonId}&reference_date=2026-09-28`)
+      .set('Accept', 'application/json');
+    const playerOne = metricsRes.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerOneId);
+
+    expect(playerOne).toEqual(expect.objectContaining({
+      trainingSessions: 1,
+      trainingMinutes: 75,
+      totalExposureMinutes: 75,
+    }));
+  });
+
+  test('imports competition minutes from uploaded CSV after preview confirmation', async () => {
+    context = await createPlayerLoadContext();
+    await setModuleEnabledForClub(context.club.id, 'player_load', true);
+
+    const agent = request.agent(app);
+    await loginAsContextAdmin(agent, context);
+
+    const importFormRes = await agent.get(
+      `/player-load/import?team_id=${context.teamId}&season_id=${context.seasonId}`,
+    );
+
+    expect(importFormRes.status).toBe(200);
+    expect(importFormRes.text).toContain('Importar archivo');
+    expect(importFormRes.text).toContain('Previsualizar');
+
+    const csv = [
+      'NOMBRE;EQUIPO;PARTIDOS;MINUTOS;',
+      'Sanz, Mario - Mario;ALPF;4;169;',
+      'Lopez, Adrian - Adrian;ALPF;2;0;',
+      'No Existe, Jugador - Otro;ALPF;1;30;',
+    ].join('\r\n');
+    const previewRes = await agent
+      .post('/player-load/import/preview')
+      .field('team_id', context.teamId)
+      .field('season_id', context.seasonId)
+      .field('activity_date', '2026-09-28')
+      .field('title', 'Importacion CSV')
+      .attach('file', Buffer.from(csv, 'utf16le'), 'estadisticas.csv');
+
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.text).toContain('2 importables');
+    expect(previewRes.text).toContain('1 con incidencias');
+    expect(previewRes.text).toContain('Mario Sanz');
+    expect(previewRes.text).toContain('Adrian Lopez');
+    expect(previewRes.text).toContain('Jugador no encontrado');
+
+    const confirmRes = await agent.post('/player-load/import/confirm');
+    expect(confirmRes.status).toBe(302);
+    expect(confirmRes.headers.location).toBe(
+      `/player-load?team_id=${context.teamId}&season_id=${context.seasonId}`,
+    );
+
+    const metricsRes = await agent
+      .get(`/player-load?team_id=${context.teamId}&season_id=${context.seasonId}&reference_date=2026-09-28`)
+      .set('Accept', 'application/json');
+    const playerOne = metricsRes.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerOneId);
+    const playerTwo = metricsRes.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerTwoId);
+
+    expect(playerOne).toEqual(expect.objectContaining({
+      matchMinutes: 169,
+      totalExposureMinutes: 169,
+    }));
+    expect(playerTwo).toEqual(expect.objectContaining({
+      matchMinutes: 0,
+      totalExposureMinutes: 0,
+    }));
+  });
+
   test('rejects invalid activity payloads', async () => {
     context = await createPlayerLoadContext();
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
 
     const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
+    await loginAsContextAdmin(agent, context);
 
     const res = await agent.post('/player-load/activities').send({
       team_id: context.teamId,
@@ -345,6 +455,21 @@ describe('Player Load MVP backend', () => {
       'La duracion de la sesion de entrenamiento es obligatoria.',
       'Los minutos de exposicion deben ser enteros positivos.',
     ]));
+
+    const invalidDateRes = await agent.post('/player-load/activities').send({
+      team_id: context.teamId,
+      season_id: context.seasonId,
+      activity_type: 'TRAINING',
+      activity_date: '2026-02-30',
+      title: 'Fecha invalida',
+      duration_minutes: 60,
+      entries: [
+        { player_id: context.playerOneId, attended: true, exposure_minutes: 60 },
+      ],
+    });
+
+    expect(invalidDateRes.status).toBe(422);
+    expect(invalidDateRes.body.errors).toContain('La fecha de actividad es obligatoria.');
   });
 
   test('ignores non-done activities and keeps zero-minute match entries deterministic', async () => {
@@ -352,10 +477,7 @@ describe('Player Load MVP backend', () => {
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
 
     const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
+    await loginAsContextAdmin(agent, context);
 
     await agent.post('/player-load/activities').send({
       team_id: context.teamId,
@@ -436,29 +558,4 @@ describe('Player Load MVP backend', () => {
     ]);
   });
 
-  test('rejects invalid dates before persistence', async () => {
-    context = await createPlayerLoadContext();
-    await setModuleEnabledForClub(context.club.id, 'player_load', true);
-
-    const agent = request.agent(app);
-    await agent.post('/login').send({
-      email: context.admin.email,
-      password: context.admin.password,
-    });
-
-    const res = await agent.post('/player-load/activities').send({
-      team_id: context.teamId,
-      season_id: context.seasonId,
-      activity_type: 'TRAINING',
-      activity_date: '2026-02-30',
-      title: 'Fecha invalida',
-      duration_minutes: 60,
-      entries: [
-        { player_id: context.playerOneId, attended: true, exposure_minutes: 60 },
-      ],
-    });
-
-    expect(res.status).toBe(422);
-    expect(res.body.errors).toContain('La fecha de actividad es obligatoria.');
-  });
 });

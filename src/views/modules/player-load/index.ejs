@@ -10,6 +10,7 @@
   const teamSummary = data.teamSummary || { distribution: [] };
   const playerDetail = data.playerDetail || null;
   const selectedPlayerId = playerDetail && playerDetail.player ? String(playerDetail.player.playerId) : '';
+  const canManagePlayerLoad = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   const periods = [
     { key: 'sevenDays', label: '7 dias' },
     { key: 'twentyEightDays', label: '28 dias' },
@@ -70,6 +71,22 @@
     <h1 class="mb-1">Exposicion del equipo</h1>
     <p class="text-muted mb-0">Minutos registrados en entrenamientos y partidos. No representa una medida fisiologica de carga.</p>
   </div>
+  <% if (canManagePlayerLoad && selectedTeam) { %>
+    <div class="d-flex gap-2 flex-wrap">
+      <a
+        href="/player-load/import?team_id=<%= selectedTeam.id %>&season_id=<%= encodeURIComponent((seasonView && seasonView.selectedSeasonId) || '') %>"
+        class="btn btn-outline-secondary"
+      >
+        Importar archivo
+      </a>
+      <a
+        href="/player-load/activities/new?team_id=<%= selectedTeam.id %>&season_id=<%= encodeURIComponent((seasonView && seasonView.selectedSeasonId) || '') %>"
+        class="btn btn-primary"
+      >
+        Nueva actividad
+      </a>
+    </div>
+  <% } %>
 </div>
 
 <div class="card shadow-sm mb-4">
