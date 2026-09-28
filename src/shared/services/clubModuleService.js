@@ -30,6 +30,14 @@ const CLUB_MODULE_META = {
     defaultEnabled: false,
     roleSummary: 'Usuarios del club pueden crear y editar sus propios informes; admins y superadmins gestionan todos los informes.',
   },
+  [MODULE_KEYS.PLAYER_LOAD]: {
+    key: MODULE_KEYS.PLAYER_LOAD,
+    label: 'Player Load',
+    description: 'Exposición de jugadores a entrenamientos y partidos, sin inferir carga fisiológica ni riesgo de lesión.',
+    entryPath: '/player-load',
+    defaultEnabled: false,
+    roleSummary: 'Usuarios del club pueden consultar la exposición de su contexto; admins y superadmins gestionan registros.',
+  },
 };
 
 const CLUB_MODULE_PRESETS = {

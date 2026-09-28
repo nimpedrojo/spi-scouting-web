@@ -2,6 +2,7 @@
   const scoutingPlayersEnabled = activeModules.includes('scouting_players');
   const planningEnabled = activeModules.includes('planning');
   const scoutingTeamsEnabled = activeModules.includes('scouting_teams');
+  const playerLoadEnabled = activeModules.includes('player_load');
   const isPmvMode = productModeInfo && productModeInfo.isPmvPlayerTracking;
   const managementItems = [
     { label: 'Panel general', href: '/dashboard', icon: 'dashboard' },
@@ -13,6 +14,7 @@
       { label: 'Comparativa 26/27', href: scoutingPlayersEnabled ? '/season-comparison' : '#', moduleKey: 'scouting_players', icon: 'comparison' },
       { label: 'Planning', href: planningEnabled ? '/planning' : '#', moduleKey: 'planning', icon: 'planning' },
       { label: 'Scouting Teams', href: scoutingTeamsEnabled ? '/scouting-teams' : '#', moduleKey: 'scouting_teams', icon: 'scouting' },
+      { label: 'Player Load', href: playerLoadEnabled ? '/player-load' : '#', moduleKey: 'player_load', icon: 'comparison' },
     ] : []),
   ];
   const isItemActive = (item) => {

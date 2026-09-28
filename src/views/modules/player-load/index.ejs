@@ -1,0 +1,372 @@
+<%
+  const data = playerLoad || {};
+  const visibleTeams = data.visibleTeams || [];
+  const selectedTeam = data.selectedTeam || null;
+  const windows = data.windows || {};
+  const selectedPeriod = data.selectedPeriod || 'sevenDays';
+  const selectedWindow = data.selectedWindow || windows[selectedPeriod] || windows.sevenDays || { players: [], teamAverage: {}, evolution: [] };
+  const sevenDays = windows.sevenDays || { players: [] };
+  const twentyEightDays = windows.twentyEightDays || { players: [] };
+  const teamSummary = data.teamSummary || { distribution: [] };
+  const playerDetail = data.playerDetail || null;
+  const selectedPlayerId = playerDetail && playerDetail.player ? String(playerDetail.player.playerId) : '';
+  const periods = [
+    { key: 'sevenDays', label: '7 dias' },
+    { key: 'twentyEightDays', label: '28 dias' },
+    { key: 'season', label: 'Temporada' },
+  ];
+  const playerMap = new Map();
+  (sevenDays.players || []).forEach((player) => {
+    playerMap.set(String(player.playerId), {
+      sevenDays: player,
+      twentyEightDays: null,
+      selected: null,
+    });
+  });
+  (twentyEightDays.players || []).forEach((player) => {
+    const entry = playerMap.get(String(player.playerId)) || { sevenDays: null, twentyEightDays: null, selected: null };
+    entry.twentyEightDays = player;
+    playerMap.set(String(player.playerId), entry);
+  });
+  (selectedWindow.players || []).forEach((player) => {
+    const entry = playerMap.get(String(player.playerId)) || { sevenDays: null, twentyEightDays: null, selected: null };
+    entry.selected = player;
+    playerMap.set(String(player.playerId), entry);
+  });
+  const rows = Array.from(playerMap.values()).map((entry) => ({
+    player: entry.selected || entry.sevenDays || entry.twentyEightDays,
+    sevenDays: entry.sevenDays || {},
+    twentyEightDays: entry.twentyEightDays || {},
+    selected: entry.selected || {},
+  }));
+  function formatNumber(value, suffix) {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return '-';
+    }
+    const rounded = Math.round(Number(value) * 10) / 10;
+    return `${rounded}${suffix || ''}`;
+  }
+  function trendMeta(player) {
+    const variation = player && player.previousPeriodVariation
+      ? player.previousPeriodVariation.totalExposureMinutes
+      : null;
+    const absolute = variation ? Number(variation.absolute || 0) : 0;
+    if (absolute > 0) {
+      return { className: 'text-bg-success', label: `+${formatNumber(absolute, ' min')}` };
+    }
+    if (absolute < 0) {
+      return { className: 'text-bg-warning', label: `${formatNumber(absolute, ' min')}` };
+    }
+    return { className: 'text-bg-light border', label: '0 min' };
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="dashboard-kicker">Player Load</span>
+      <span class="badge text-bg-light border">Exposicion observada</span>
+    </div>
+    <h1 class="mb-1">Exposicion del equipo</h1>
+    <p class="text-muted mb-0">Minutos registrados en entrenamientos y partidos. No representa una medida fisiologica de carga.</p>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/player-load" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label for="team_id" class="form-label">Equipo</label>
+        <select id="team_id" name="team_id" class="form-select">
+          <% if (visibleTeams.length) { %>
+            <% visibleTeams.forEach((team) => { %>
+              <option value="<%= team.id %>" <%= selectedTeam && String(selectedTeam.id) === String(team.id) ? 'selected' : '' %>>
+                <%= team.name %> · <%= team.category_name %> · <%= team.section_name %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option value="">Sin equipos disponibles</option>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="season_id" class="form-label">Temporada</label>
+        <select id="season_id" name="season_id" class="form-select">
+          <% if (seasonView && seasonView.seasons && seasonView.seasons.length) { %>
+            <% seasonView.seasons.forEach((season) => { %>
+              <option value="<%= season.id %>" <%= String((seasonView && seasonView.selectedSeasonId) || '') === String(season.id) ? 'selected' : '' %>>
+                <%= season.name %><%= season.is_active ? ' · Activa' : '' %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option value="">Sin temporadas</option>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="period" class="form-label">Periodo</label>
+        <select id="period" name="period" class="form-select">
+          <% periods.forEach((period) => { %>
+            <option value="<%= period.key %>" <%= selectedPeriod === period.key ? 'selected' : '' %>><%= period.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Aplicar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (!selectedTeam) { %>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="mb-0 text-muted">No hay equipos disponibles para el contexto actual.</p>
+    </div>
+  </div>
+<% } else { %>
+  <section class="mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div>
+            <div class="dashboard-entry-eyebrow">Contexto de equipo</div>
+            <h2 class="h4 mb-1"><%= selectedTeam.name %></h2>
+            <div class="text-muted">
+              <%= selectedTeam.category_name %> · <%= selectedTeam.section_name %> · <%= selectedTeam.season_name %>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge text-bg-light border"><%= rows.length %> jugadores</span>
+            <span class="badge text-bg-light border"><%= periods.find((period) => period.key === selectedPeriod).label %></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="dashboard-entry-eyebrow">Exposicion total</div>
+          <div class="display-6 fw-semibold"><%= formatNumber(teamSummary.totalExposureMinutes || 0, '') %></div>
+          <div class="small text-muted">minutos del equipo</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="dashboard-entry-eyebrow">Media por jugador</div>
+          <div class="display-6 fw-semibold"><%= formatNumber(teamSummary.averageExposureMinutes || 0, '') %></div>
+          <div class="small text-muted">minutos</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="dashboard-entry-eyebrow">Asistencia media</div>
+          <div class="display-6 fw-semibold"><%= formatNumber(teamSummary.averageAttendancePercentage, '%') %></div>
+          <div class="small text-muted">entrenamientos</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-entry-card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="dashboard-entry-eyebrow">Competicion</div>
+          <div class="display-6 fw-semibold"><%= formatNumber(teamSummary.matchMinutes || 0, '') %></div>
+          <div class="small text-muted">minutos de partido</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-9">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Jugadores</h2>
+              <p class="text-muted mb-0">Lectura rapida para comparar participacion y minutos recientes.</p>
+            </div>
+          </div>
+
+          <% if (!rows.length) { %>
+            <p class="mb-0 text-muted">El equipo no tiene jugadores disponibles.</p>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Training</th>
+                    <th class="text-end">Match min</th>
+                    <th class="text-end">Exposure 7D</th>
+                    <th class="text-end">Exposure 28D</th>
+                    <th class="text-end">Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% rows.forEach((row) => { %>
+                    <% const player = row.player || {}; %>
+                    <% const selected = row.selected || {}; %>
+                    <% const trend = trendMeta(selected); %>
+                    <tr>
+                      <td>
+                        <a
+                          href="/player-load?team_id=<%= selectedTeam.id %>&season_id=<%= encodeURIComponent((seasonView && seasonView.selectedSeasonId) || '') %>&period=<%= selectedPeriod %>&player_id=<%= player.playerId %>"
+                          class="fw-semibold text-decoration-none"
+                        >
+                          <%= player.fullName %>
+                        </a>
+                        <div class="small text-muted">#<%= player.dorsal || '-' %> · <%= player.positions || '-' %></div>
+                      </td>
+                      <td>
+                        <div class="fw-semibold">
+                          <%= selected.trainingSessions || 0 %>/<%= selected.availableTrainingSessions || 0 %>
+                          <% if (selected.attendancePercentage !== null && selected.attendancePercentage !== undefined) { %>
+                            · <%= formatNumber(selected.attendancePercentage, '%') %>
+                          <% } %>
+                        </div>
+                        <div class="small text-muted"><%= formatNumber(selected.trainingMinutes || 0, ' min') %> entrenamiento</div>
+                      </td>
+                      <td class="text-end"><%= formatNumber(selected.matchMinutes || 0, ' min') %></td>
+                      <td class="text-end fw-semibold"><%= formatNumber(row.sevenDays.totalExposureMinutes || 0, ' min') %></td>
+                      <td class="text-end fw-semibold"><%= formatNumber(row.twentyEightDays.totalExposureMinutes || 0, ' min') %></td>
+                      <td class="text-end"><span class="badge <%= trend.className %>"><%= trend.label %></span></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Distribucion</h2>
+          <% if (!teamSummary.distribution || !teamSummary.distribution.length) { %>
+            <p class="mb-0 text-muted">Sin minutos registrados.</p>
+          <% } else { %>
+            <div class="d-grid gap-3">
+              <% teamSummary.distribution.forEach((item) => { %>
+                <div>
+                  <div class="d-flex justify-content-between gap-2 small mb-1">
+                    <span class="text-truncate"><%= item.fullName %></span>
+                    <strong><%= formatNumber(item.totalExposureMinutes, ' min') %></strong>
+                  </div>
+                  <div class="progress" role="progressbar" aria-label="<%= item.fullName %>" aria-valuenow="<%= item.percentage %>" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" style="width: <%= Math.max(0, Math.min(100, item.percentage)) %>%"></div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if (playerDetail) { %>
+    <% const detailPlayer = playerDetail.player; %>
+    <section class="card shadow-sm mt-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+          <div>
+            <div class="dashboard-entry-eyebrow">Detalle de jugador</div>
+            <h2 class="h4 mb-1"><%= detailPlayer.fullName %></h2>
+            <p class="text-muted mb-0">Evolucion y comparacion con la media del equipo en el periodo seleccionado.</p>
+          </div>
+          <span class="badge text-bg-light border"><%= periods.find((period) => period.key === selectedPeriod).label %></span>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="small text-uppercase text-muted">Entrenamientos</div>
+              <div class="h3 mb-1"><%= detailPlayer.trainingSessions %>/<%= detailPlayer.availableTrainingSessions %></div>
+              <div class="small text-muted"><%= formatNumber(detailPlayer.attendancePercentage, '%') %> asistencia</div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="small text-uppercase text-muted">Min. entrenamiento</div>
+              <div class="h3 mb-1"><%= formatNumber(detailPlayer.trainingMinutes, '') %></div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="small text-uppercase text-muted">Min. competicion</div>
+              <div class="h3 mb-1"><%= formatNumber(detailPlayer.matchMinutes, '') %></div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="small text-uppercase text-muted">Exposicion total</div>
+              <div class="h3 mb-1"><%= formatNumber(detailPlayer.totalExposureMinutes, '') %></div>
+              <div class="small text-muted">
+                Equipo: <%= formatNumber(selectedWindow.teamAverage ? selectedWindow.teamAverage.totalExposureMinutes : 0, ' min') %>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <h3 class="h6 mb-3">Evolucion temporal</h3>
+            <% if (!playerDetail.evolution.length) { %>
+              <p class="text-muted mb-0">Sin registros en este periodo.</p>
+            <% } else { %>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th class="text-end">Entrenamiento</th>
+                      <th class="text-end">Competicion</th>
+                      <th class="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% playerDetail.evolution.forEach((item) => { %>
+                      <tr>
+                        <td><%= item.date %></td>
+                        <td class="text-end"><%= formatNumber(item.trainingMinutes, ' min') %></td>
+                        <td class="text-end"><%= formatNumber(item.matchMinutes, ' min') %></td>
+                        <td class="text-end fw-semibold"><%= formatNumber(item.totalExposureMinutes, ' min') %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+          </div>
+          <div class="col-lg-5">
+            <h3 class="h6 mb-3">Comparacion con el equipo</h3>
+            <div class="list-group list-group-flush border rounded-3">
+              <div class="list-group-item d-flex justify-content-between">
+                <span>Entrenamiento</span>
+                <strong><%= formatNumber(detailPlayer.teamAverageDifference.trainingMinutes, ' min') %></strong>
+              </div>
+              <div class="list-group-item d-flex justify-content-between">
+                <span>Competicion</span>
+                <strong><%= formatNumber(detailPlayer.teamAverageDifference.matchMinutes, ' min') %></strong>
+              </div>
+              <div class="list-group-item d-flex justify-content-between">
+                <span>Exposicion total</span>
+                <strong><%= formatNumber(detailPlayer.teamAverageDifference.totalExposureMinutes, ' min') %></strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  <% } %>
+<% } %>

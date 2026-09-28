@@ -35,7 +35,12 @@ fs.mkdirSync(playerPhotosDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+    filename: (_req, file, cb) => {
+      const original = String(file.originalname || 'file');
+      const base = path.basename(original);
+      const safe = base.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      cb(null, `${Date.now()}-${safe}`);
+    },
   }),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });

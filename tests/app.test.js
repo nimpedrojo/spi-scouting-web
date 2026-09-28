@@ -239,6 +239,16 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     if (clubIds.length) {
       const clubPlaceholders = buildPlaceholders(clubIds);
       await db.query(
+        `DELETE ple FROM player_load_entries ple
+         INNER JOIN player_load_activities pla ON pla.id = ple.activity_id
+         WHERE pla.club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
+        `DELETE FROM player_load_activities WHERE club_id IN (${clubPlaceholders})`,
+        clubIds,
+      );
+      await db.query(
         `DELETE FROM season_team_recommendations WHERE club_id IN (${clubPlaceholders})`,
         clubIds,
       );
