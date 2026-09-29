@@ -440,8 +440,8 @@ describe('Player Load MVP backend', () => {
 
     const csv = [
       'NOMBRE;1;2;3;',
-      'Sanz, Mario - Mario;A;F;R;',
-      'Lopez, Adrian - Adrian;A;A;L;',
+      'Mario Sanz Garcia;A;F;R;',
+      'Adrian Lopez Perez;A;A;L;',
       'No Existe, Jugador - Otro;A;A;A;',
     ].join('\r\n');
     const previewRes = await agent
