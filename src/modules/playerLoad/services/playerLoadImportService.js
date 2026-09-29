@@ -271,6 +271,18 @@ function extractCandidateNames(rawName) {
   return [...new Set(candidates.map(normalizeText).filter(Boolean))];
 }
 
+function tokenizeName(value) {
+  return normalizeText(value).split(' ').filter(Boolean);
+}
+
+function isSubsetNameMatch(shorterName, longerName) {
+  const shorterTokens = tokenizeName(shorterName);
+  const longerTokens = new Set(tokenizeName(longerName));
+
+  return shorterTokens.length >= 2
+    && shorterTokens.every((token) => longerTokens.has(token));
+}
+
 function buildRosterIndex(roster = []) {
   const index = new Map();
 
@@ -302,6 +314,17 @@ function findRosterPlayer(row, rosterIndex) {
     const matches = rosterIndex.get(candidate) || [];
     if (matches.length === 1) {
       return { player: matches[0], matchKey: candidate };
+    }
+  }
+
+  for (const candidate of candidates) {
+    const uniqueMatches = [...rosterIndex.entries()]
+      .filter(([rosterName]) => isSubsetNameMatch(rosterName, candidate) || isSubsetNameMatch(candidate, rosterName))
+      .flatMap(([, matches]) => matches)
+      .filter((player, index, players) => players.findIndex((item) => Number(item.player_id) === Number(player.player_id)) === index);
+
+    if (uniqueMatches.length === 1) {
+      return { player: uniqueMatches[0], matchKey: candidate };
     }
   }
 
