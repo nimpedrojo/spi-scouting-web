@@ -66,6 +66,14 @@ function normalizeImportType(value) {
   return value === 'training_attendance' ? 'training_attendance' : 'competition';
 }
 
+function resolveImportType(body = {}, file = null) {
+  const filename = String((file && file.originalname) || '').toLowerCase();
+  if (filename.endsWith('.pdf')) {
+    return 'training_attendance';
+  }
+  return normalizeImportType(body.import_type);
+}
+
 async function renderIndex(req, res) {
   const club = getRequestClub(req);
   const activeSeason = getRequestSeason(req);
@@ -209,7 +217,7 @@ async function previewImport(req, res) {
     errors.push('Selecciona un equipo valido.');
   }
   if (!req.file) {
-    errors.push('Selecciona un archivo CSV o Excel.');
+    errors.push('Selecciona un archivo CSV, Excel o PDF.');
   }
   if (!req.body.activity_date) {
     errors.push('La fecha de la actividad es obligatoria.');
@@ -219,8 +227,8 @@ async function previewImport(req, res) {
   }
 
   let preview = null;
+  const importType = resolveImportType(req.body, req.file);
   if (!errors.length) {
-    const importType = normalizeImportType(req.body.import_type);
     preview = importType === 'training_attendance'
       ? buildTrainingAttendanceImportPreview({
         file: req.file,
@@ -240,7 +248,7 @@ async function previewImport(req, res) {
   }
 
   const formValues = {
-    import_type: normalizeImportType(req.body.import_type),
+    import_type: importType,
     team_id: req.body.team_id || '',
     season_id: seasonView.selectedSeasonId || req.body.season_id || '',
     activity_date: req.body.activity_date || '',
@@ -267,7 +275,7 @@ async function previewImport(req, res) {
     activityDate: req.body.activity_date,
     title: req.body.title,
     notes: req.body.notes || null,
-    importType: normalizeImportType(req.body.import_type),
+    importType,
     preview,
   };
 
@@ -433,4 +441,5 @@ module.exports = {
   renderEditActivity,
   updateActivity,
   removeActivity,
+  resolveImportType,
 };

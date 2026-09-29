@@ -4,6 +4,7 @@ const app = require('../src/app');
 const db = require('../src/db');
 const { initDatabaseOnce } = require('../src/initDb');
 const { setModuleEnabledForClub } = require('../src/core/models/clubModuleModel');
+const { resolveImportType } = require('../src/modules/playerLoad/controllers/playerLoadController');
 
 function buildUserEmail() {
   return `player_load_${Date.now()}_${Math.random().toString(16).slice(2)}@local`;
@@ -141,6 +142,17 @@ describe('Player Load MVP backend', () => {
 
   afterAll(async () => {
     await db.end();
+  });
+
+  test('treats uploaded PDFs as training attendance imports', () => {
+    expect(resolveImportType(
+      { import_type: 'competition' },
+      { originalname: 'Informe.pdf' },
+    )).toBe('training_attendance');
+    expect(resolveImportType(
+      { import_type: 'competition' },
+      { originalname: 'minutos.csv' },
+    )).toBe('competition');
   });
 
   test('requires enabled module before exposing Player Load endpoints', async () => {
