@@ -114,6 +114,9 @@ async function cleanupContext(context) {
   await db.query('DELETE FROM users WHERE id = ?', [context.admin.id]);
   await db.query('DELETE FROM club_modules WHERE club_id = ?', [context.club.id]);
   await db.query('DELETE FROM teams WHERE id = ?', [context.teamId]);
+  if (context.extraSeasonId) {
+    await db.query('DELETE FROM seasons WHERE id = ?', [context.extraSeasonId]);
+  }
   await db.query('DELETE FROM seasons WHERE id = ?', [context.seasonId]);
   await db.query('DELETE FROM clubs WHERE id = ?', [context.club.id]);
 }
@@ -316,15 +319,29 @@ describe('Player Load MVP backend', () => {
     expect(res.text).toContain('Match min');
     expect(res.text).toContain('Exposure 7D');
     expect(res.text).toContain('Exposure 28D');
+    expect(res.text).toContain('Δ vs personal 4W');
     expect(res.text).toContain('Trend');
     expect(res.text).toContain('Exposicion total');
     expect(res.text).toContain('Media por jugador');
     expect(res.text).toContain('Asistencia media');
-    expect(res.text).toContain('Distribucion');
+    expect(res.text).toContain('Evolucion semanal');
+    expect(res.text).toContain('playerLoadWeeklyChart');
+    expect(res.text).toContain('Mapa de exposición');
+    expect(res.text).toContain('player-load-heatmap');
+    expect(res.text).toContain('La intensidad compara cada celda');
+    expect(res.text).toContain('Lectura temporal');
+    expect(res.text).toContain('Detalle semanal');
     expect(res.text).toContain('Mario Sanz');
-    expect(res.text).toContain('Detalle de jugador');
-    expect(res.text).toContain('Evolucion temporal');
-    expect(res.text).toContain('Comparacion con el equipo');
+    expect(res.text).toContain('Ficha analitica del jugador');
+    expect(res.text).toContain('Exposicion actual');
+    expect(res.text).toContain('Historico personal');
+    expect(res.text).toContain('Grafico de evolucion');
+    expect(res.text).toContain('playerLoadPlayerWeeklyChart');
+    expect(res.text).toContain('Participacion competitiva');
+    expect(res.text).toContain('No se calcula porcentaje de minutos disponibles');
+    expect(res.text).toContain('Entrenamientos');
+    expect(res.text).toContain('Continuidad');
+    expect(res.text).toContain('Historico de actividades');
     expect(res.text).not.toContain('riesgo de lesión');
     expect(res.text).not.toContain('fatiga');
     expect(res.text).not.toContain('sobrecarga');
@@ -624,6 +641,72 @@ describe('Player Load MVP backend', () => {
         totalExposureMinutes: 20,
       },
     ]);
+  });
+
+  test('ignores activities stored in another season for the selected season metrics', async () => {
+    context = await createPlayerLoadContext();
+    await setModuleEnabledForClub(context.club.id, 'player_load', true);
+    context.extraSeasonId = randomUUID();
+    await db.query(
+      'INSERT INTO seasons (id, club_id, name, is_active) VALUES (?, ?, ?, 0)',
+      [context.extraSeasonId, context.club.id, '2025/26'],
+    );
+
+    const agent = request.agent(app);
+    await loginAsContextAdmin(agent, context);
+
+    await agent.post('/player-load/activities').send({
+      team_id: context.teamId,
+      season_id: context.seasonId,
+      activity_type: 'TRAINING',
+      activity_date: '2026-09-25',
+      title: 'Sesion temporada seleccionada',
+      duration_minutes: 60,
+      entries: [
+        { player_id: context.playerOneId, attended: true, exposure_minutes: 60 },
+        { player_id: context.playerTwoId, attended: false, exposure_minutes: 0 },
+      ],
+    });
+
+    const outsideActivityId = randomUUID();
+    await db.query(
+      `INSERT INTO player_load_activities (
+        id, club_id, season_id, team_id, activity_type, activity_date, title,
+        duration_minutes, status, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        outsideActivityId,
+        context.club.id,
+        context.extraSeasonId,
+        context.teamId,
+        'TRAINING',
+        '2026-09-26',
+        'Sesion otra temporada',
+        90,
+        'done',
+        null,
+        context.admin.id,
+      ],
+    );
+    await db.query(
+      `INSERT INTO player_load_entries (
+        id, activity_id, player_id, attended, exposure_minutes, notes
+      ) VALUES (?, ?, ?, 1, 90, NULL)`,
+      [randomUUID(), outsideActivityId, context.playerOneId],
+    );
+
+    const res = await agent
+      .get(`/player-load?team_id=${context.teamId}&season_id=${context.seasonId}&reference_date=2026-09-28`)
+      .set('Accept', 'application/json');
+
+    expect(res.status).toBe(200);
+    const playerOne = res.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerOneId);
+    const activityWeek = res.body.playerLoad.weeklyEvolution.team
+      .find((week) => week.weekStart === '2026-09-21');
+    expect(playerOne.trainingMinutes).toBe(60);
+    expect(playerOne.totalExposureMinutes).toBe(60);
+    expect(activityWeek.totalExposureMinutes).toBe(60);
   });
 
 });
