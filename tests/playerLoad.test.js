@@ -431,6 +431,62 @@ describe('Player Load MVP backend', () => {
     }));
   });
 
+  test('imports training attendance files as 90 minute sessions per training day', async () => {
+    context = await createPlayerLoadContext();
+    await setModuleEnabledForClub(context.club.id, 'player_load', true);
+
+    const agent = request.agent(app);
+    await loginAsContextAdmin(agent, context);
+
+    const csv = [
+      'NOMBRE;1;2;3;',
+      'Sanz, Mario - Mario;A;F;R;',
+      'Lopez, Adrian - Adrian;A;A;L;',
+      'No Existe, Jugador - Otro;A;A;A;',
+    ].join('\r\n');
+    const previewRes = await agent
+      .post('/player-load/import/preview')
+      .field('import_type', 'training_attendance')
+      .field('team_id', context.teamId)
+      .field('season_id', context.seasonId)
+      .field('activity_date', '2026-09-01')
+      .field('title', 'Asistencia septiembre')
+      .attach('file', Buffer.from(csv, 'utf8'), 'asistencia.csv');
+
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.text).toContain('2 importables');
+    expect(previewRes.text).toContain('1 con incidencias');
+    expect(previewRes.text).toContain('3 sesiones');
+    expect(previewRes.text).toContain('180');
+
+    const confirmRes = await agent.post('/player-load/import/confirm');
+    expect(confirmRes.status).toBe(302);
+    expect(confirmRes.headers.location).toBe(
+      `/player-load?team_id=${context.teamId}&season_id=${context.seasonId}`,
+    );
+
+    const metricsRes = await agent
+      .get(`/player-load?team_id=${context.teamId}&season_id=${context.seasonId}&reference_date=2026-09-03`)
+      .set('Accept', 'application/json');
+    const playerOne = metricsRes.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerOneId);
+    const playerTwo = metricsRes.body.playerLoad.windows.sevenDays.players
+      .find((player) => player.playerId === context.playerTwoId);
+
+    expect(playerOne).toEqual(expect.objectContaining({
+      trainingSessions: 2,
+      availableTrainingSessions: 3,
+      trainingMinutes: 180,
+      totalExposureMinutes: 180,
+    }));
+    expect(playerTwo).toEqual(expect.objectContaining({
+      trainingSessions: 2,
+      availableTrainingSessions: 3,
+      trainingMinutes: 180,
+      totalExposureMinutes: 180,
+    }));
+  });
+
   test('rejects invalid activity payloads', async () => {
     context = await createPlayerLoadContext();
     await setModuleEnabledForClub(context.club.id, 'player_load', true);
