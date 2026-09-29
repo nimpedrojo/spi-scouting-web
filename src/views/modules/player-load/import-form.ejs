@@ -13,7 +13,7 @@
   <div>
     <div class="dashboard-kicker">Player Load</div>
     <h1 class="mb-1">Importar archivo</h1>
-    <p class="text-muted mb-0">Carga minutos de competicion desde CSV o Excel y confirma antes de guardar.</p>
+    <p class="text-muted mb-0">Carga minutos de competicion o asistencia a entrenamientos desde CSV, Excel o PDF y confirma antes de guardar.</p>
   </div>
   <a href="/player-load?team_id=<%= selectedTeam ? selectedTeam.id : '' %>&season_id=<%= encodeURIComponent(selectedSeasonId) %>" class="btn btn-outline-secondary">Volver</a>
 </div>
@@ -32,6 +32,13 @@
   <div class="card-body">
     <form method="POST" action="/player-load/import/preview" enctype="multipart/form-data" class="row g-3 align-items-end">
       <div class="col-md-4">
+        <label for="import_type" class="form-label">Tipo</label>
+        <select id="import_type" name="import_type" class="form-select" required>
+          <option value="competition" <%= valueFor('import_type', 'competition') === 'competition' ? 'selected' : '' %>>Competicion</option>
+          <option value="training_attendance" <%= valueFor('import_type', 'competition') === 'training_attendance' ? 'selected' : '' %>>Entrenamientos 90'</option>
+        </select>
+      </div>
+      <div class="col-md-4">
         <label for="team_id" class="form-label">Equipo</label>
         <select id="team_id" name="team_id" class="form-select" required>
           <% visibleTeams.forEach((team) => { %>
@@ -41,7 +48,7 @@
           <% }) %>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <label for="season_id" class="form-label">Temporada</label>
         <select id="season_id" name="season_id" class="form-select" required>
           <% if (seasonView && seasonView.seasons && seasonView.seasons.length) { %>
@@ -55,18 +62,18 @@
           <% } %>
         </select>
       </div>
-      <div class="col-md-2">
-        <label for="activity_date" class="form-label">Fecha</label>
+      <div class="col-md-3">
+        <label for="activity_date" class="form-label">Fecha / mes de referencia</label>
         <input type="date" id="activity_date" name="activity_date" class="form-control" required value="<%= valueFor('activity_date', '') %>" />
       </div>
-      <div class="col-md-3">
+      <div class="col-md-9">
         <label for="title" class="form-label">Titulo</label>
         <input type="text" id="title" name="title" class="form-control" required value="<%= valueFor('title', 'Importacion competitiva') %>" />
       </div>
       <div class="col-md-8">
-        <label for="file" class="form-label">Archivo CSV o Excel</label>
-        <input type="file" id="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required />
-        <div class="form-text">Formato esperado: columnas NOMBRE y MINUTOS. Si existe PARTIDOS se guarda como nota.</div>
+        <label for="file" class="form-label">Archivo CSV, Excel o PDF</label>
+        <input type="file" id="file" name="file" class="form-control" accept=".csv,.xlsx,.xls,.pdf" required />
+        <div class="form-text">Competicion: NOMBRE y MINUTOS. Entrenamientos: informe de asistencia con Deportista y dias 1-31; cada A o R suma 90 minutos.</div>
       </div>
       <div class="col-md-4">
         <label for="notes" class="form-label">Notas</label>
@@ -91,20 +98,35 @@
           <span class="badge text-bg-light border"><%= preview.totalRows %> filas</span>
           <span class="badge text-bg-success"><%= preview.importableRows %> importables</span>
           <span class="badge text-bg-warning"><%= preview.errorRows %> con incidencias</span>
+          <% if (preview.importType === 'training_attendance') { %>
+            <span class="badge text-bg-primary"><%= preview.totalSessions %> sesiones</span>
+            <span class="badge text-bg-light border"><%= preview.sessionMinutes %>' por sesion</span>
+          <% } %>
         </div>
       </div>
 
       <div class="table-responsive mb-4">
         <table class="table table-sm align-middle">
           <thead>
-            <tr>
-              <th>Fila</th>
-              <th>Nombre archivo</th>
-              <th>Jugador detectado</th>
-              <th class="text-end">Partidos</th>
-              <th class="text-end">Minutos</th>
-              <th>Estado</th>
-            </tr>
+            <% if (preview.importType === 'training_attendance') { %>
+              <tr>
+                <th>Fila</th>
+                <th>Nombre archivo</th>
+                <th>Jugador detectado</th>
+                <th class="text-end">Dias</th>
+                <th class="text-end">Minutos</th>
+                <th>Estado</th>
+              </tr>
+            <% } else { %>
+              <tr>
+                <th>Fila</th>
+                <th>Nombre archivo</th>
+                <th>Jugador detectado</th>
+                <th class="text-end">Partidos</th>
+                <th class="text-end">Minutos</th>
+                <th>Estado</th>
+              </tr>
+            <% } %>
           </thead>
           <tbody>
             <% preview.rows.forEach((row) => { %>
@@ -112,7 +134,11 @@
                 <td><%= row.rowNumber %></td>
                 <td><%= row.sourceName || '-' %></td>
                 <td><%= row.matchedPlayerName || '-' %></td>
-                <td class="text-end"><%= row.matches === null || row.matches === undefined ? '-' : row.matches %></td>
+                <% if (preview.importType === 'training_attendance') { %>
+                  <td class="text-end"><%= row.attendedDays %>/<%= preview.totalSessions %></td>
+                <% } else { %>
+                  <td class="text-end"><%= row.matches === null || row.matches === undefined ? '-' : row.matches %></td>
+                <% } %>
                 <td class="text-end"><%= row.minutes === null || row.minutes === undefined ? '-' : row.minutes %></td>
                 <td>
                   <% if (row.importable) { %>

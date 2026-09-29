@@ -8,7 +8,8 @@ const {
 } = require('../services/playerLoadService');
 const {
   buildCompetitionImportPreview,
-  buildActivityPayloadFromPreview,
+  buildTrainingAttendanceImportPreview,
+  buildActivityPayloadsFromPreview,
 } = require('../services/playerLoadImportService');
 const { resolveSeasonView } = require('../../../services/seasonViewHelper');
 
@@ -59,6 +60,10 @@ function buildIndexRedirect(query = {}) {
 
   const suffix = params.toString();
   return `/player-load${suffix ? `?${suffix}` : ''}`;
+}
+
+function normalizeImportType(value) {
+  return value === 'training_attendance' ? 'training_attendance' : 'competition';
 }
 
 async function renderIndex(req, res) {
@@ -172,6 +177,7 @@ async function renderImportForm(req, res) {
     preview: null,
     errors: [],
     formValues: {
+      import_type: req.query.import_type || 'competition',
       team_id: formData.selectedTeam ? formData.selectedTeam.id : '',
       season_id: seasonView.selectedSeasonId || (formData.activeSeason ? formData.activeSeason.id : ''),
       activity_date: req.query.activity_date || new Date().toISOString().slice(0, 10),
@@ -214,16 +220,27 @@ async function previewImport(req, res) {
 
   let preview = null;
   if (!errors.length) {
-    preview = buildCompetitionImportPreview({
-      file: req.file,
-      roster: formData.roster,
-    });
+    const importType = normalizeImportType(req.body.import_type);
+    preview = importType === 'training_attendance'
+      ? buildTrainingAttendanceImportPreview({
+        file: req.file,
+        roster: formData.roster,
+        fallbackDate: req.body.activity_date,
+      })
+      : buildCompetitionImportPreview({
+        file: req.file,
+        roster: formData.roster,
+      });
     if (!preview.importableRows) {
       errors.push('No hay filas importables en el archivo.');
+    }
+    if (importType === 'training_attendance' && !preview.totalSessions) {
+      errors.push('No se han detectado dias de entrenamiento validos en el archivo.');
     }
   }
 
   const formValues = {
+    import_type: normalizeImportType(req.body.import_type),
     team_id: req.body.team_id || '',
     season_id: seasonView.selectedSeasonId || req.body.season_id || '',
     activity_date: req.body.activity_date || '',
@@ -250,6 +267,7 @@ async function previewImport(req, res) {
     activityDate: req.body.activity_date,
     title: req.body.title,
     notes: req.body.notes || null,
+    importType: normalizeImportType(req.body.import_type),
     preview,
   };
 
@@ -272,22 +290,29 @@ async function confirmImport(req, res) {
     return res.redirect('/player-load/import');
   }
 
-  const payload = buildActivityPayloadFromPreview(storedPreview.preview, {
+  const payloads = buildActivityPayloadsFromPreview(storedPreview.preview, {
     teamId: storedPreview.teamId,
     seasonId: storedPreview.seasonId,
     activityDate: storedPreview.activityDate,
     title: storedPreview.title,
     notes: storedPreview.notes,
   });
-  const result = await createActivityForUser(req.session.user, club.id, payload);
+  const results = [];
 
-  if (result.errors) {
-    req.flash('error', result.errors.join(' '));
-    return res.redirect(`/player-load/import?team_id=${encodeURIComponent(storedPreview.teamId)}&season_id=${encodeURIComponent(storedPreview.seasonId)}`);
+  for (const payload of payloads) {
+    const result = await createActivityForUser(req.session.user, club.id, payload);
+    if (result.errors) {
+      req.flash('error', result.errors.join(' '));
+      return res.redirect(`/player-load/import?team_id=${encodeURIComponent(storedPreview.teamId)}&season_id=${encodeURIComponent(storedPreview.seasonId)}`);
+    }
+    results.push(result);
   }
 
   req.session.playerLoadImportPreview = null;
-  req.flash('success', `Importacion completada. ${storedPreview.preview.importableRows} jugadores importados.`);
+  const activityCount = results.length;
+  const activityLabel = activityCount === 1 ? 'actividad' : 'actividades';
+  req.flash('success', `Importacion completada. ${activityCount} ${activityLabel} y ${storedPreview.preview.importableRows} jugadores importados.`);
+  const result = results[0];
   return res.redirect(buildIndexRedirect({
     team_id: result.activity.team_id,
     season_id: result.activity.season_id,

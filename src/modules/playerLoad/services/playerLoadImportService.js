@@ -1,4 +1,33 @@
 const XLSX = require('xlsx');
+const zlib = require('zlib');
+
+const TRAINING_SESSION_MINUTES = 90;
+const TRAINING_ATTENDED_CODES = new Set(['A', 'R']);
+const TRAINING_KNOWN_CODES = new Set(['A', 'F', 'J', 'R', 'P', 'L', 'S', 'O']);
+const TRAINING_CODE_NOTES = {
+  F: 'Falta injustificada en archivo',
+  J: 'Falta justificada en archivo',
+  R: 'Retraso en archivo',
+  P: 'Permiso en archivo',
+  L: 'Lesion/enfermedad en archivo',
+  S: 'Convocatoria seleccion en archivo',
+  O: 'Otros en archivo',
+};
+const MONTH_NAMES = {
+  enero: 1,
+  febrero: 2,
+  marzo: 3,
+  abril: 4,
+  mayo: 5,
+  junio: 6,
+  julio: 7,
+  agosto: 8,
+  septiembre: 9,
+  setiembre: 9,
+  octubre: 10,
+  noviembre: 11,
+  diciembre: 12,
+};
 
 function normalizeText(value) {
   return String(value || '')
@@ -95,12 +124,123 @@ function parseWorkbook(buffer) {
     }, {}));
 }
 
+function decodePdfString(value) {
+  return String(value || '')
+    .replace(/\\([\\()])/g, '$1')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t');
+}
+
+function extractPdfInfo(buffer) {
+  const source = buffer.toString('latin1');
+  const titleMatch = source.match(/\/Title\s*\((.*?)\)/s);
+  const creationMatch = source.match(/\/CreationDate\s*\(D:(\d{4})/);
+  return {
+    title: titleMatch ? decodePdfString(titleMatch[1]) : '',
+    year: creationMatch ? Number(creationMatch[1]) : null,
+  };
+}
+
+function extractPdfTextItems(buffer) {
+  const source = buffer.toString('latin1');
+  const streamPattern = /stream\s*([\s\S]*?)\s*endstream/g;
+  const items = [];
+  let streamMatch;
+
+  while ((streamMatch = streamPattern.exec(source)) !== null) {
+    let content = null;
+    try {
+      content = zlib.inflateSync(Buffer.from(streamMatch[1], 'latin1')).toString('latin1');
+    } catch (_error) {
+      content = null;
+    }
+    if (!content) {
+      continue;
+    }
+
+    const blockPattern = /BT\s*([\s\S]*?)\s*ET/g;
+    let blockMatch;
+    while ((blockMatch = blockPattern.exec(content)) !== null) {
+      const block = blockMatch[1];
+      const coordMatch = block.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Td/);
+      const textMatch = block.match(/\(([\s\S]*?)\)\s*Tj/);
+      if (coordMatch && textMatch) {
+        items.push({
+          x: Number(coordMatch[1]),
+          y: Number(coordMatch[2]),
+          text: decodePdfString(textMatch[1]).trim(),
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+function monthFromText(value) {
+  const normalized = normalizeText(value);
+  const match = Object.entries(MONTH_NAMES)
+    .find(([name]) => normalized.includes(name));
+  return match ? match[1] : null;
+}
+
+function parsePdfAttendanceRows(file) {
+  const info = extractPdfInfo(file.buffer);
+  const items = extractPdfTextItems(file.buffer);
+  const header = items.find((item) => normalizeText(item.text) === 'deportista');
+  if (!header) {
+    return [];
+  }
+
+  const dayColumns = items
+    .filter((item) => Math.abs(item.y - header.y) < 1 && /^\d{1,2}$/.test(item.text))
+    .map((item) => ({ day: Number(item.text), x: item.x }))
+    .filter((item) => item.day >= 1 && item.day <= 31)
+    .sort((a, b) => a.day - b.day);
+
+  if (!dayColumns.length) {
+    return [];
+  }
+
+  const rowNames = items
+    .filter((item) => item.y < header.y && item.x <= header.x + 80)
+    .filter((item) => item.text && !/^[A-Z\s]+$/.test(item.text))
+    .sort((a, b) => b.y - a.y);
+
+  const month = monthFromText(info.title);
+  const year = info.year;
+
+  return rowNames.map((nameItem) => {
+    const row = {
+      nombre: nameItem.text,
+      _sourceMonth: month,
+      _sourceYear: year,
+    };
+    const cells = items.filter((item) => Math.abs(item.y - nameItem.y) < 1 && item.x > header.x + 80);
+
+    cells.forEach((cell) => {
+      const nearestColumn = dayColumns
+        .map((column) => ({ ...column, distance: Math.abs(column.x - cell.x) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (nearestColumn && nearestColumn.distance <= 8) {
+        row[String(nearestColumn.day)] = cell.text;
+      }
+    });
+
+    return row;
+  }).filter((row) => Object.keys(row).some((key) => /^\d{1,2}$/.test(key)));
+}
+
 function parseImportFile(file) {
   if (!file || !file.buffer) {
     return [];
   }
 
   const filename = String(file.originalname || '').toLowerCase();
+  if (filename.endsWith('.pdf')) {
+    return parsePdfAttendanceRows(file);
+  }
   if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
     return parseWorkbook(file.buffer);
   }
@@ -219,6 +359,105 @@ function buildCompetitionImportPreview({ file, roster = [] }) {
   };
 }
 
+function resolveImportYearMonth(rawRows, fallbackDate) {
+  const fallback = String(fallbackDate || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
+  const rowWithSourceDate = rawRows.find((row) => row._sourceYear && row._sourceMonth) || {};
+  return {
+    year: Number(rowWithSourceDate._sourceYear) || (fallback ? Number(fallback[1]) : null),
+    month: Number(rowWithSourceDate._sourceMonth) || (fallback ? Number(fallback[2]) : null),
+  };
+}
+
+function toDateForMonthDay(year, month, day) {
+  if (!year || !month || !day) {
+    return null;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function extractTrainingStatuses(row) {
+  return Array.from({ length: 31 }, (_value, index) => index + 1)
+    .reduce((statuses, day) => {
+      const rawValue = row[String(day)] ?? row[`dia ${day}`] ?? row[`day ${day}`] ?? '';
+      const code = String(rawValue || '').trim().toUpperCase();
+      if (TRAINING_KNOWN_CODES.has(code)) {
+        statuses[day] = code;
+      }
+      return statuses;
+    }, {});
+}
+
+function buildTrainingAttendanceImportPreview({ file, roster = [], fallbackDate = null }) {
+  const rawRows = parseImportFile(file);
+  const rosterIndex = buildRosterIndex(roster);
+  const seenPlayerIds = new Set();
+  const { year, month } = resolveImportYearMonth(rawRows, fallbackDate);
+  const trainingDays = [...new Set(rawRows.flatMap((row) => Object.keys(extractTrainingStatuses(row)).map(Number)))]
+    .sort((a, b) => a - b)
+    .map((day) => ({ day, date: toDateForMonthDay(year, month, day) }))
+    .filter((day) => day.date);
+
+  const validTrainingDaySet = new Set(trainingDays.map((day) => Number(day.day)));
+
+  const rows = rawRows.map((row, index) => {
+    const sourceName = row.nombre ?? row.jugador ?? row.player ?? row.name ?? row.deportista ?? '';
+    const statuses = extractTrainingStatuses(row);
+    const attendedDays = Object.entries(statuses)
+      .filter(([day, code]) => validTrainingDaySet.has(Number(day)) && TRAINING_ATTENDED_CODES.has(code))
+      .length;
+    const recordedDays = Object.keys(statuses)
+      .filter((day) => validTrainingDaySet.has(Number(day)))
+      .length;
+    const { player, matchKey } = findRosterPlayer({ ...row, nombre: sourceName }, rosterIndex);
+    const errors = [];
+
+    if (!sourceName) {
+      errors.push('Fila sin nombre de jugador.');
+    }
+    if (!recordedDays) {
+      errors.push('Fila sin dias de entrenamiento reconocidos.');
+    }
+    if (!player) {
+      errors.push('Jugador no encontrado en la plantilla seleccionada.');
+    }
+    if (player && seenPlayerIds.has(Number(player.player_id))) {
+      errors.push('Jugador duplicado en el archivo.');
+    }
+    if (player) {
+      seenPlayerIds.add(Number(player.player_id));
+    }
+
+    return {
+      rowNumber: index + 2,
+      sourceName,
+      matchedPlayerId: player ? Number(player.player_id) : null,
+      matchedPlayerName: player ? `${player.first_name || ''} ${player.last_name || ''}`.trim() : null,
+      matchKey,
+      statuses,
+      recordedDays,
+      attendedDays,
+      minutes: attendedDays * TRAINING_SESSION_MINUTES,
+      errors,
+      importable: errors.length === 0,
+    };
+  });
+
+  return {
+    importType: 'training_attendance',
+    totalRows: rows.length,
+    importableRows: rows.filter((row) => row.importable).length,
+    errorRows: rows.filter((row) => !row.importable).length,
+    sessionMinutes: TRAINING_SESSION_MINUTES,
+    trainingDays,
+    totalSessions: trainingDays.length,
+    rows,
+  };
+}
+
 function buildActivityPayloadFromPreview(preview, {
   teamId,
   seasonId,
@@ -247,9 +486,49 @@ function buildActivityPayloadFromPreview(preview, {
   };
 }
 
+function buildTrainingActivityPayloadsFromPreview(preview, {
+  teamId,
+  seasonId,
+  title,
+  notes = null,
+}) {
+  const importableRows = (preview && preview.rows ? preview.rows : [])
+    .filter((row) => row.importable);
+
+  return (preview.trainingDays || []).map((trainingDay) => ({
+    team_id: teamId,
+    season_id: seasonId,
+    activity_type: 'TRAINING',
+    activity_date: trainingDay.date,
+    title: `${title} - Dia ${trainingDay.day}`,
+    duration_minutes: TRAINING_SESSION_MINUTES,
+    status: 'done',
+    notes,
+    entries: importableRows.map((row) => {
+      const code = row.statuses[String(trainingDay.day)] || '';
+      const attended = TRAINING_ATTENDED_CODES.has(code);
+      return {
+        player_id: row.matchedPlayerId,
+        attended,
+        exposure_minutes: attended ? TRAINING_SESSION_MINUTES : 0,
+        notes: TRAINING_CODE_NOTES[code] || null,
+      };
+    }),
+  }));
+}
+
+function buildActivityPayloadsFromPreview(preview, options) {
+  if (preview && preview.importType === 'training_attendance') {
+    return buildTrainingActivityPayloadsFromPreview(preview, options);
+  }
+  return [buildActivityPayloadFromPreview(preview, options)];
+}
+
 module.exports = {
   normalizeText,
   parseImportFile,
   buildCompetitionImportPreview,
+  buildTrainingAttendanceImportPreview,
   buildActivityPayloadFromPreview,
+  buildActivityPayloadsFromPreview,
 };

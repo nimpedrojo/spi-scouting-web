@@ -11,7 +11,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const name = String(file.originalname || '').toLowerCase();
-    if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.pdf')) {
       cb(null, true);
       return;
     }
@@ -29,7 +29,7 @@ function uploadImportFile(req, res, next) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       req.flash('error', 'El archivo no puede superar los 5MB.');
     } else {
-      req.flash('error', 'El archivo debe ser CSV o Excel.');
+      req.flash('error', 'El archivo debe ser CSV, Excel o PDF.');
     }
     res.redirect('/player-load/import');
   });
