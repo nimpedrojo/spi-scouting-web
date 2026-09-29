@@ -162,3 +162,19 @@
     </div>
   </div>
 <% } %>
+
+<script>
+  (function () {
+    var fileInput = document.getElementById('file');
+    var importType = document.getElementById('import_type');
+    if (!fileInput || !importType) {
+      return;
+    }
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (file && /\.pdf$/i.test(file.name || '')) {
+        importType.value = 'training_attendance';
+      }
+    });
+  }());
+</script>
