@@ -23,6 +23,11 @@ const {
   calculateExposureForPeriod,
   decorateComparisons,
   buildTemporalEvolution,
+  buildExposureComposition,
+  buildWeeklyEvolution,
+  buildExposureMap,
+  buildPersonalHistory,
+  buildPlayerAnalyticalDetail,
 } = require('./playerLoadMetricsService');
 
 const ACTIVITY_TYPES = ['TRAINING', 'MATCH'];
@@ -345,6 +350,10 @@ async function buildWindowSummary({
     players: decorateComparisons(current.players, previous.players, current.teamAverage),
     teamAverage: current.teamAverage,
     previousTeamAverage: previous.teamAverage,
+    composition: buildExposureComposition(
+      current.players.reduce((sum, player) => sum + Number(player.trainingMinutes || 0), 0),
+      current.players.reduce((sum, player) => sum + Number(player.matchMinutes || 0), 0),
+    ),
     evolution: buildTemporalEvolution(currentEntries),
   };
 }
@@ -376,40 +385,18 @@ function buildTeamSummary(windowSummary) {
   };
 }
 
-function buildPlayerDetail(selectedPlayerId, selectedWindow, allEntries) {
-  if (!selectedPlayerId || !selectedWindow || !Array.isArray(selectedWindow.players)) {
-    return null;
-  }
+function attachPersonalHistoryToWindows(windows, personalHistory) {
+  const historyByPlayer = new Map(personalHistory.map((history) => [String(history.playerId), history]));
 
-  const player = selectedWindow.players.find((entry) => String(entry.playerId) === String(selectedPlayerId));
-  if (!player) {
-    return null;
-  }
-
-  const dateFrom = selectedWindow.dateFrom || null;
-  const dateTo = selectedWindow.dateTo || null;
-  const playerEntries = allEntries.filter((entry) => {
-    if (String(entry.player_id) !== String(selectedPlayerId)) {
-      return false;
+  Object.values(windows).forEach((window) => {
+    if (!window || !Array.isArray(window.players)) {
+      return;
     }
-    const isoDate = toIsoDate(entry.activity_date);
-    if (!isoDate) {
-      return false;
-    }
-    if (dateFrom && isoDate < dateFrom) {
-      return false;
-    }
-    if (dateTo && isoDate > dateTo) {
-      return false;
-    }
-    return true;
+    window.players = window.players.map((player) => ({
+      ...player,
+      personalHistory: historyByPlayer.get(String(player.playerId)) || null,
+    }));
   });
-
-  return {
-    player,
-    evolution: buildTemporalEvolution(playerEntries),
-    entries: playerEntries,
-  };
 }
 
 async function getPlayerLoadHomeData(user, club, activeSeason, filters = {}) {
@@ -455,6 +442,9 @@ async function getPlayerLoadHomeData(user, club, activeSeason, filters = {}) {
     }),
   ]);
   const metricWindows = buildMetricWindows(referenceDate);
+  const weeklyEvolution = buildWeeklyEvolution(roster, entries, referenceDate, 8);
+  const exposureMap = buildExposureMap(weeklyEvolution, { weekLimit: 8 });
+  const personalHistory = buildPersonalHistory(roster, entries, referenceDate);
 
   const windows = {};
   for (const [key, window] of Object.entries(metricWindows)) {
@@ -467,6 +457,7 @@ async function getPlayerLoadHomeData(user, club, activeSeason, filters = {}) {
       previousWindow: window.previous,
     });
   }
+  attachPersonalHistoryToWindows(windows, personalHistory);
   const selectedPeriod = windows[requestedPeriod] ? requestedPeriod : 'sevenDays';
   const selectedWindow = windows[selectedPeriod];
 
@@ -481,7 +472,21 @@ async function getPlayerLoadHomeData(user, club, activeSeason, filters = {}) {
     selectedPeriod,
     selectedWindow,
     teamSummary: buildTeamSummary(selectedWindow),
-    playerDetail: buildPlayerDetail(requestedPlayerId, selectedWindow, entries),
+    playerDetail: buildPlayerAnalyticalDetail({
+      selectedPlayerId: requestedPlayerId,
+      roster,
+      activities,
+      entries,
+      windows,
+      weeklyEvolution,
+      personalHistory,
+      selectedTeam,
+      activeSeason,
+      referenceDate,
+    }),
+    weeklyEvolution,
+    exposureMap,
+    personalHistory,
     referenceDate,
     exposureDefinition: 'Player Load MVP registra exposicion observada: minutos de entrenamiento y partido. No es una medida fisiologica de carga.',
   };
