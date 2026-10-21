@@ -2895,6 +2895,50 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
     expect(rows.length).toBe(0);
   });
 
+  test('exporta el informe XLSM conservando macros, hojas, formulas y celdas combinadas', async () => {
+    const admin = await createTestUser({ name: 'Admin XLSM', role: 'superadmin' });
+    const [insert] = await db.query(
+      'INSERT INTO reports (player_name, player_surname, year, created_by) VALUES (?, ?, ?, ?)',
+      ['Jugador XLSM', 'Apellido XLSM', 2010, admin.id],
+    );
+    const templatePath = path.join(__dirname, '..', 'src', 'templates', 'report_template.xlsm');
+    const original = XLSX.readFile(templatePath, { bookVBA: true, cellStyles: true });
+    const previousTemplatePath = process.env.REPORT_TEMPLATE_PATH;
+    process.env.REPORT_TEMPLATE_PATH = templatePath;
+
+    try {
+      const agent = request.agent(app);
+      await agent.post('/login').send({ email: admin.email, password: 'password123' });
+      const res = await agent.get(`/reports/${insert.insertId}/excel`)
+        .buffer(true).parse(parseBinaryExcelResponse);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/vnd.ms-excel.sheet.macroEnabled.12');
+      expect(res.headers['content-disposition']).toContain(`Informe_${insert.insertId}.xlsm`);
+      const exported = XLSX.read(res.body, { type: 'buffer', bookVBA: true, cellStyles: true });
+      expect(original.vbaraw.length).toBeGreaterThan(0);
+      expect(exported.vbaraw.equals(original.vbaraw)).toBe(true);
+      expect(exported.SheetNames).toEqual(original.SheetNames);
+      expect(exported.Sheets['INFORME 1'].B16.v).toBe('Jugador XLSM');
+      expect(exported.Sheets['INFORME 1'].B17.v).toBe('Apellido XLSM');
+      expect(exported.Sheets['INFORME 1'].B18.v).toBe('2010');
+      let formulaCount = 0;
+      for (const name of original.SheetNames) {
+        expect(exported.Sheets[name]['!merges']).toEqual(original.Sheets[name]['!merges']);
+        for (const [address, cell] of Object.entries(original.Sheets[name])) {
+          if (cell && cell.f) {
+            formulaCount += 1;
+            expect(exported.Sheets[name][address].f).toBe(cell.f);
+          }
+        }
+      }
+      expect(formulaCount).toBeGreaterThan(0);
+    } finally {
+      if (previousTemplatePath === undefined) delete process.env.REPORT_TEMPLATE_PATH;
+      else process.env.REPORT_TEMPLATE_PATH = previousTemplatePath;
+    }
+  });
+
   test('un admin puede exportar los informes a CSV con encabezado', async () => {
     const admin = await createTestUser({
       name: 'Admin CSV',
