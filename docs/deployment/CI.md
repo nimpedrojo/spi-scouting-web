@@ -109,3 +109,11 @@ player_load). The isolated CI commit was rebased onto that remote master, so
 this PR does not introduce or revert the player_load changes. The 182-test run
 describes the earlier local-master baseline; the current base includes the
 eight player_load cases, previously validated as part of the 190-test run.
+
+## GitHub runner timezone
+
+The first PR #18 run passed 189/190 tests. The last-login display fixture stores
+a timezone-less DATETIME and expects its wall-clock value in the Madrid view.
+The runner default UTC interpreted that fixture differently from local execution.
+CI explicitly sets TZ=Europe/Madrid for deterministic parsing aligned with the
+existing view timezone; the assertion and application code remain unchanged.

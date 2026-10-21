@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
+      TZ: Europe/Madrid
       NODE_ENV: test
       DB_HOST: 127.0.0.1
       DB_PORT: '3306'
