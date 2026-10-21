@@ -422,7 +422,9 @@ An empty result means no tracked content differences reported by Git with mode d
 
 The next missing owner confirmations remain: whether player_iq_db is this application's configured DB_NAME, existing database/upload backup coverage, and whether a restore has been tested. Follow those with the already documented PM2 owner/home/reboot, environment, SSH and proxy checks. No further server diff is needed unless the production worktree changes.
 
-## Owner confirmation: target database and missing backups
+## Historical owner confirmation: target database and missing backups
+
+Superseded for backup existence/basic restore evidence by the verified backup update below.
 
 The owner confirmed that the application's DB_NAME is player_iq_db and answered no to having backups of the database and uploads. Database/upload backup coverage is therefore **absent by owner report**, rather than merely undocumented. No restore rehearsal is evidenced; the owner did not separately answer the restore-test question.
 
@@ -451,3 +453,267 @@ see [CI.md](CI.md) for their contract, isolation, tests and validation limits.
 Earlier statements about absent workflows/health endpoints describe the original
 audit snapshot. No deployment workflow, VPS modification, schema-code change or
 backup preparation was performed; production deployment blockers remain open.
+
+## Verified backup and basic restore update — 2026-10-21
+
+Evidence: owner-provided command output and confirmations, not direct agent VPS
+access. This update supersedes earlier statements that no backup or restore
+rehearsal exists. The owner explicitly authorized the short target-app stop and
+executed the backup and isolated restore commands.
+
+- PR #18 was merged into master (merge commit eedcd7a7fda81d4fee245f2b1eeb0a54b104ad85).
+  Its GitHub CI passed 190 tests across seven suites. This did not deploy the app.
+- Backup tool: /usr/bin/mariadb-dump, MariaDB 11.4.13. Destination:
+  /home/ubuntu/spi-backup-GwkmI4YZ. An earlier authentication failure in a separate
+  directory produced no successful backup; it must not be treated as one.
+- Only soccer-report was stopped during the successful dump/archive and restarted
+  by the shell exit trap. Other PM2 apps remained online in the supplied output.
+  The owner subsequently confirmed the public HTTPS login returned 200.
+- database.sql (~112 KiB) contains the player_iq_db dump, using single-transaction,
+  quick, routines/events/triggers and hex-blob options. The archive (~424 KiB)
+  includes .env, uploads, templates, the production-local src/server.js,
+  package.json and package-lock.json. Both files and SHA256SUMS were shown as
+  ubuntu-owned with mode 600; the directory was created under umask 077.
+- SHA256SUMS verification passed on the VPS and again after the owner downloaded
+  the backup to the Mac. No backup contents, credentials or hashes of passwords
+  have been added to this repository. Backup encryption at rest is not verified.
+- Read-only production queries reported no events, routines or triggers; the
+  inspected dump had no matching top-level CREATE DATABASE/USE statements.
+  Restore was performed through a new user limited to the temporary schema,
+  without event/routine/trigger creation privileges, rather than importing as root.
+- The SQL import into spi_restore_check_20261021 on the same MariaDB 11.4.13
+  instance completed: 29 base tables, 5 users, 16 players, 16 reports and 336
+  player_load_entries. These are restored snapshot counts, not a full content
+  comparison with the live database; earlier SHOW TABLE STATUS estimates are
+  not authoritative exact counts.
+- Archive extraction into /home/ubuntu/spi-files-check-XrIGkU6D completed. Nonempty
+  checks passed for .env, server.js, package.json, package-lock.json and the report
+  template. All 32 upload files were recovered. No code from the extracted copy
+  was started, and no production files were overwritten.
+- The owner confirmed completing cleanup of the temporary schema/user, extracted
+  directory and private client configuration. Cleanup was not independently
+  inspected. The successful VPS backup and Mac copy were to be retained.
+
+### Current recovery limits and next preparation
+
+Backup existence, transfer integrity, SQL importability and basic file extraction
+are now evidenced. Full application recovery, login/decryption of the stored
+ProcessIQ credential, candidate schema upgrade, upload URL behavior and PM2
+recovery have not been rehearsed. The archive is not a complete source/runtime
+image: recovery also needs the identified Git commit plus local override, runtime
+and process configuration. Environment/key continuity still requires verification.
+Stopping this app does not by itself prove no other process writes the same DB.
+
+A recurring backup schedule, retention, protected off-host storage policy and a
+fresh pre-release backup are still required; this single snapshot is not a
+permanent deployment safeguard. Next collect the PM2 daemon owner/home, PM2
+version and boot-unit configuration, then design the release/shared-upload layout
+and a separately reviewed candidate startup rehearsal. Do not deploy or alter
+production source merely because the basic restore succeeded.
+
+## PM2 daemon and boot-unit inventory update
+
+Owner-supplied output confirms PM2 6.0.14 and daemon PID 1468648 running as
+ubuntu, parent PID 1, with daemon home /home/ubuntu/.pm2. PM2_HOME is unset in
+the collecting shell; daemon output establishes the effective home. The earlier
+project-directory PM2_HOME_DIR value was a mistaken inventory variable, not the
+observed daemon home.
+
+systemctl list-unit-files reports pm2-ubuntu.service enabled and
+pm2-root.service disabled. The latter still exists; this is not evidence of an
+active root daemon. No service was enabled, disabled or restarted in this step.
+The enabled flag alone does not prove a successful reboot restore: inspect the
+ubuntu unit's User, environment/PATH/PM2_HOME, ExecStart/ExecStop and live status,
+and compare its saved dump with the intended processes. Do not run pm2 save
+or pm2 startup during inventory because the daemon manages several applications.
+
+## PM2 service and saved process-list confirmation
+
+Further owner output confirms /etc/systemd/system/pm2-ubuntu.service is active /
+running, Type=forking, User=ubuntu, PM2_HOME=/home/ubuntu/.pm2 and
+PIDFile=/home/ubuntu/.pm2/pm2.pid. ExecStart invokes
+/usr/lib/node_modules/pm2/bin/pm2 resurrect. ExecReload reloads all applications
+and ExecStop kills the shared daemon; do not use service-level reload/restart for
+this app's deployment. The PATH line supplied through the pager was truncated,
+so the complete boot PATH remains unverified.
+
+The sanitized saved dump includes soccer-report, soccertag, api-processiq and
+playertrack, each marked online in fork mode. Saved soccer-report CWD and script
+match /var/www/spi-scouting-web and its src/server.js; interpreter is node rather
+than an explicit absolute binary. This establishes a configured resurrection
+list, not a successful reboot rehearsal or proof of every saved environment value.
+
+/home/ubuntu/.pm2/dump.pm2 is ubuntu:ubuntu mode 664. This is overly permissive
+for a file that can contain runtime secrets: group members can modify it and
+other identities may read it if parent traversal permits. Parent-directory mode
+has not been supplied, so effective access cannot be concluded from file mode
+alone. Plan owner-only mode 600 for dump.pm2 and any existing dump.pm2.bak, with
+parent access verified. Do not print raw dump contents or apply recursive chmod.
+No permissions, service state or saved process list were changed by this update.
+
+## Environment flags and secret-file permissions confirmed
+
+Owner output confirms .pm2 is ubuntu:ubuntu 775, dump.pm2 and dump.pm2.bak
+are ubuntu:ubuntu 664, and application .env remains root:root 644. The previously
+observed /home/ubuntu 750 limits traversal by other identities; group-readable
+and group-writable PM2 state still warrants restricting the dump files. Effective
+access may also depend on ACLs and privileged identities, which were not audited.
+
+Parsing the application .env without importing app code reports
+NODE_ENV=production, a nonempty SESSION_SECRET and no nonempty APP_SECRET_KEY or
+PROCESSIQ_SECRET_KEY. This confirms file configuration, not secret strength or
+the absence of every possible key source in a running process. Do not add a key
+blindly: one ProcessIQ credential is stored and its format/key continuity must
+be assessed separately.
+
+Next proposed permission-only preparation: mode 600 on both PM2 dump files;
+root:ubuntu ownership and mode 640 on the application .env, retaining root write
+and ubuntu-group read for the observed application identity. No recursive mode
+changes, PM2 save, environment value edits or restarts are required. These are
+instructions for the owner; execution has not yet been confirmed.
+
+## Permission preparation verified by owner
+
+Subsequent stat output confirms dump.pm2 and dump.pm2.bak are ubuntu:ubuntu 600,
+and /var/www/spi-scouting-web/.env is root:ubuntu 640. The owner ran test -r as
+ubuntu and confirmed .env remains readable. This supersedes the earlier file-mode
+findings for those three files. No secret values, encryption keys, source code
+or process configuration were changed in this permission-only step. Future PM2
+save/backup operations should have their resulting file modes checked again.
+
+## Nginx/Hestia domain routing inventory
+
+Owner-supplied filtered nginx -T output identifies these active config files:
+/etc/nginx/conf.d/domains/soccer-report.processiq.es.conf and the corresponding
+soccer-report.processiq.es.ssl.conf. The HTTP server redirects location / with
+301 to https://$host$request_uri. The HTTPS server's location / proxies to
+http://127.0.0.1:3002, matching the observed target process socket. TLS terminates
+at Nginx; certificate and include paths are beneath the observed Hestia account
+/home/devlaf/conf/web/soccer-report.processiq.es. This is a distinct account from
+the ubuntu application/PM2 owner; do not conflate ownership or relocate app files
+into its web tree without reviewing access.
+
+The excerpt shows HTTP/1.1, Upgrade and Connection headers plus 300-second
+proxy read/connect/send timeouts. Lines containing the remaining forwarded
+headers were omitted by the filter, so HTTPS/client-IP forwarding is not yet
+fully verified. No root or alias appeared in the supplied target-server excerpt;
+this does not prove absence in all included configuration. Domain include globs
+for nginx.conf_* and nginx.ssl.conf_* exist. Hestia template selection and
+regeneration persistence are not yet established. ACME challenge response values
+were omitted from this report.
+
+The observed routing supports keeping the existing backend port while changing
+PM2 release paths; a releases/shared layout does not inherently require Nginx
+changes. Do not edit generated vhosts, restart Nginx or alter Hestia templates in
+this inventory phase. Full target HTTPS config and applicable custom includes
+must still be checked before declaring proxy configuration complete.
+
+## Complete HTTPS proxy configuration confirmed
+
+The owner's full target vhost confirms Host=$host, X-Real-IP=$remote_addr,
+X-Forwarded-For=$proxy_add_x_forwarded_for and X-Forwarded-Proto=https, in addition
+to the previously observed loopback upstream. This matches the audited one-hop
+trust-proxy setting for the shown Nginx-to-Node path. Any external proxy/CDN
+layer remains outside the supplied evidence.
+
+readlink -f resolves the active SSL vhost to
+/home/devlaf/conf/web/soccer-report.processiq.es/nginx.ssl.conf. The shown main
+server contains no root/alias; applicable custom includes still require review
+if static routing is suspected. Hestia account devlaf owns the domain namespace,
+while ubuntu runs the application. The current file alone does not establish
+which Hestia template generated it or whether manual proxy edits survive a domain
+rebuild. Verify template selection before changing generated configuration. No
+Nginx reload, Hestia rebuild or port/path change was performed.
+
+## Hestia domain template selection confirmed
+
+Owner output from v-list-web-domain confirms domain account devlaf, proxy template
+PROXY=scouting, TPL=default and BACKEND=default. SSL and Let's Encrypt are enabled;
+SSL_FORCE is no even though the active HTTP vhost redirects to HTTPS. The domain
+is not suspended. Its Hestia DOCUMENT_ROOT is
+/home/devlaf/web/soccer-report.processiq.es/public_html/, distinct from the Node
+source tree. PROXY_EXT lists static extensions, but the observed active vhost
+proxies location / to Node; template/include contents, not metadata alone,
+determine actual static routing.
+
+Proxy template selection is now known. The scouting .tpl/.stpl files must still
+be located and inspected to verify that regeneration preserves the loopback
+upstream, headers and HTTP redirect; no rebuild was requested or performed.
+Do not replace the selected template with default or use the Hestia document
+root as the application release root solely based on this metadata.
+
+## Hestia scouting template contents verified
+
+Owner supplied both /usr/local/hestia/data/templates/web/nginx/scouting.tpl and
+scouting.stpl. The HTTP template explicitly redirects location / with 301 to
+https://$host$request_uri, explaining the redirect despite SSL_FORCE=no. The TLS
+template specifies http://127.0.0.1:3002 and the same Host, X-Real-IP,
+X-Forwarded-For, X-Forwarded-Proto=https, upgrade headers and timeouts as the active
+vhost. Both preserve the domain-specific custom include globs. No static root or
+alias is declared in these template bodies.
+
+The selected templates therefore encode the observed routing; it is not solely
+an unexplained edit to the generated vhost. No actual Hestia rebuild/reboot was
+performed, so this is template correspondence rather than a regeneration test.
+The scouting upstream is hard-coded to this port: do not reuse this template for
+another app expecting a different port without separate review. Preserve custom
+templates in infrastructure recovery planning; the existing application archive
+does not include them. No Nginx or Hestia modification is needed for the proposed
+release/shared design while the backend port remains 3002.
+
+## Filesystem layout inventory and proposed first cutover
+
+Owner output shows /var/www is ubuntu:ubuntu 755 and the existing application
+root /var/www/spi-scouting-web is ubuntu:ubuntu 775. No top-level symlinks were
+returned by the supplied find. du reported 84 MiB for the application; separate
+node_modules/uploads totals were not returned, since overlapping du arguments
+can be counted once. The previously collected upload total remains separate
+evidence. No paths were created or moved in this step.
+
+Proposed new root (not an observed or created directory):
+/var/www/spi-scouting-deploy, with releases/, shared/ and current beneath it.
+First verify that this proposed path is unused. Retain the existing
+/var/www/spi-scouting-web installation intact during initial preparation; do not
+turn it into a symlink or copy its live uploads while writes are occurring.
+
+Shared would contain .env, uploads/ and any configured persistent logs or custom
+template. Each candidate release would link .env and src/public/uploads to these
+shared paths before any application import. A write pause and fresh backup are
+required for final upload/config synchronization. Protect secrets with the
+verified root/ubuntu access contract; PM2 dump backups contain environment
+secrets and must also be kept private. Do not assume current relative log paths
+or report-template overrides without inspecting their nonsecret destinations.
+
+Before cutover, version and test the production HOST/loopback behavior, verify
+session/encryption-key continuity, rehearse the candidate on an isolated MariaDB
+clone, and prepare a per-app PM2 declaration/rollback procedure. Keep port 3002
+and existing Nginx routing. Use explicit selected release CWD/script paths when
+activating the target PM2 process; changing current alone does not prove PM2
+executes the new release. Do not kill/reload the shared daemon. Record the
+original CWD/script/environment and preserve compatible database semantics for
+rollback; untouched old code cannot reverse startup schema/data changes.
+
+No release preparation, PM2 update, shared-state migration or production
+cutover is performed by documenting this proposal. GitHub-to-VPS restricted SSH
+access and automated delivery remain later work.
+
+## Release directory preparation confirmed by owner
+
+Owner confirmed creating /var/www/spi-scouting-deploy and releases/ as
+ubuntu:ubuntu 750, with shared/ as ubuntu:ubuntu 700. These are now observed,
+created directories, superseding the earlier proposed-only status. No current
+symlink, shared configuration/uploads copy, candidate release or PM2 path switch
+was performed in this step; the original app directory remains the active path.
+
+The production-local HOST behavior is being incorporated in the separate
+production-host-binding branch: server.js reads HOST with default 127.0.0.1 and
+passes it to app.listen, preserving PORT and initialization ordering. This
+matches the reviewed live override, but changes the repository's historical
+all-interface default for other installations. Explicit HOST overrides remain
+available. .env.example documents HOST/PORT; server unit tests exercise defaults,
+overrides, initialization gating and failure. This code has not been deployed.
+
+HOST change local validation: eight suites / 194 tests passed with Node 22.23.3,
+TZ=Europe/Madrid and the dedicated local MySQL test schema. JavaScript syntax
+and git diff whitespace checks passed. No production database or socket was
+used by the new server tests, which mock app/initDb/logger.
