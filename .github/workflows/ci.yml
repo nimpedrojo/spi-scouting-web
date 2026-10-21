@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TZ: Europe/Madrid
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: spi_scouting_ci
+      DB_USER: spi_ci
+      DB_PASSWORD: ci-only-disposable-password
+      SESSION_SECRET: ci-only-session-secret
+      ADMIN_EMAIL: admin@local
+      ADMIN_PASSWORD: ''
+      LOG_LEVEL: error
+      LOG_FILE_PATH: ''
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.23.3'
+          cache: npm
+      - name: Prepare runner-local test database
+        run: |
+          sudo systemctl start mysql.service
+          # Match CURRENT_TIMESTAMP to Node/mysql2 local DATETIME interpretation.
+          mysql --host=127.0.0.1 --user=root --password=root \
+            --execute="SET GLOBAL time_zone = '$(date +%:z)';"
+          mysql --host=127.0.0.1 --user=root --password=root <<'SQL'
+          CREATE DATABASE spi_scouting_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE USER 'spi_ci'@'127.0.0.1' IDENTIFIED BY 'ci-only-disposable-password';
+          GRANT ALL PRIVILEGES ON spi_scouting_ci.* TO 'spi_ci'@'127.0.0.1';
+          SQL
+      - run: npm ci
+      - run: npm test
