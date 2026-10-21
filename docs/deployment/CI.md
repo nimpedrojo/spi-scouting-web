@@ -122,3 +122,11 @@ The runner MySQL global time_zone is also set to the current Madrid UTC offset
 before opening application connections. This aligns CURRENT_TIMESTAMP with
 Node/mysql2 interpretation of timezone-less DATETIME values for the short test
 run. It affects only the disposable CI server, never production.
+
+## Reuse for master delivery
+
+CI also exposes workflow_call. deploy-production.yml reuses the identical test
+job on pushes to master before its separately gated production job. PR validation
+continues without production secrets. See AUTOMATED_DEPLOYMENT.md for the disabled
+bootstrap gate, SSH restrictions, backup behavior and remaining server checks.
+Deployment helper tests use mocked operations and never contact the production VPS.

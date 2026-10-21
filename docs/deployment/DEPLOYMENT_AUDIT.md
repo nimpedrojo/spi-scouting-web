@@ -916,3 +916,186 @@ the existing template for a shared copy; neither was moved or permission-edited.
 Rotation policy and log confidentiality/access beyond these modes remain separate
 operational checks. The application/archive permission changes previously
 recorded do not imply these existing log modes were tightened.
+
+## Isolated PM2 replacement and rollback rehearsal completed
+
+Owner confirmed PR #22 merged as aeff9a19e8450fd8766c9d29a98131b10e18607f.
+A disposable PM2 home was created at /home/ubuntu/spi-pm2-trial-gNxOqAXN/pm2,
+separate from /home/ubuntu/.pm2. Two auxiliary HTTP scripts under release-a and
+release-b listened only on 127.0.0.1:3102 and identified their directory in JSON.
+They used neither the real application nor a database or production secrets.
+
+Owner outputs confirm isolated process spi-pm2-rehearsal was started as A,
+deleted/recreated with explicit script/CWD/interpreter as B, then deleted/recreated
+as A for rollback. Responses identified each expected release with HTTP 200.
+Brief connection refusal during startup was followed by successful bounded curl
+retries. Initial trial logs showed no errors. The owner was instructed to kill
+only the explicitly prefixed disposable PM2 daemon; subsequent output confirms
+no listener on 3102 and public production login HTTP 200. Daemon exit itself was
+not independently inspected; the trial directory is retained.
+
+This validates basic scoped delete/start path selection and code rollback in a
+separate PM2 home. It does not exercise ecosystem.config.cjs against a real app,
+shared upload synchronization, database backward compatibility, PM2 save/resurrect,
+boot recovery, current-pointer atomicity or failure injection. These limits remain
+part of the supervised activation plan; no production process was replaced.
+
+## Shared report template prepared and compared
+
+Owner confirmed creation of shared/templates and copying the existing production
+report_template.xlsm to
+/var/www/spi-scouting-deploy/shared/templates/report_template.xlsm. cmp completed
+successfully, and stat reports ubuntu:ubuntu 600 on the copy. This supersedes the
+planned-only status of this specific template destination. The active production
+template was not replaced; .env/uploads and PM2 activation are still separate.
+Refresh/compare again during final synchronization if the source changes.
+
+## Shared production environment snapshot verified
+
+Owner output confirms /var/www/spi-scouting-deploy/shared/.env is root:ubuntu 640,
+byte-identical to the original production .env by cmp and readable by ubuntu.
+No values/keys were changed or printed; this is a private configuration copy,
+not a process environment update. It supersedes planned-only status for the shared
+.env. Recompare/refresh during final cutover synchronization; the active process
+still runs from the original checkout, with no current pointer switched.
+
+## Initial shared uploads copy verified
+
+Owner confirmed copying the active uploads tree to
+/var/www/spi-scouting-deploy/shared/uploads without moving/removing source files
+or using rsync delete. Source and shared copies each contain 32 regular files;
+checksum-based recursive dry-run reported no content differences in that direction
+at collection time. Shared creation used private directory/file permissions.
+No active app link was changed. Because the original app remains writable, this
+is a preliminary snapshot: final synchronized additions/updates/deletions require
+a write pause and fresh backup before activation. The one-way dry-run is not a
+proof against extra destination-only files after later synchronizations.
+
+## SHA-named production release prepared without activation
+
+Owner confirmed preparing
+/var/www/spi-scouting-deploy/releases/aeff9a19e8450fd8766c9d29a98131b10e18607f
+at exact reviewed PR #22 merge SHA, with ecosystem.config.cjs present and no .env
+before dependency installation. Node 22.23.3 / npm 10.9.9 were guarded in the
+supplied preparation procedure. npm ci --omit=dev completed with 126 packages;
+runtime audit reported zero findings. Multer's deprecation warning remains and
+is not a zero-risk guarantee. No process startup, current-pointer update or PM2
+change was part of that preparation. Shared linking/preflight is the next step.
+
+## Production release links and PM2 declaration inspected
+
+Owner confirms the SHA release .env resolves to the prepared shared/.env and
+src/public/uploads resolves to shared/uploads. The repository upload directory
+was preserved separately as repository-uploads. Reading ecosystem.config.cjs
+(without importing app/server code) reports only soccer-report, the exact SHA
+CWD/script, /usr/bin/node, 127.0.0.1:3002 and the prepared shared report-template
+path. No SQL initialization, PM2 activation or current pointer was changed by
+these steps. This production-linked release must not be started as a trial.
+
+Next prepare a private target-only rollback declaration from the current daemon,
+then verify final consistency/backup before the explicit activation window.
+Because the old app hardcodes its own upload directory, rollback after writes
+resume must share the authoritative uploads too; original upload-path relinking
+(if chosen) requires a separately authorized write pause and preservation of the
+original directory. Parent public directory ownership may require sudo for that
+scoped filesystem change. Do not silently fall back to the old stale copy.
+
+## Private target rollback declaration captured
+
+Owner confirmed creation of
+/var/www/spi-scouting-deploy/shared/recovery-S4b0DS0d/rollback.ecosystem.config.cjs,
+ubuntu:ubuntu 600, from the checked online soccer-report entry at the original
+CWD/script. The generation procedure retained captured target environment values
+privately and explicitly selected the observed interpreter/listener/log and shared
+template. No file contents/secrets were supplied or committed. It is prepared
+rollback metadata, not evidence of applying it to the real application.
+
+Repository diff from inventoried production checkout 24b2499 to release aeff9a1
+shows no db.js, initDb.js or model/schema-initializer changes. Runtime dependency
+changes still require verification, and startup still performs the existing
+schema/data initialization; absence of a new migration is not absence of writes.
+Before activation, revalidate original source/environment drift, current backup
+and final shared-state consistency and obtain explicit cutover authorization.
+
+## First authorized production activation: HTTP checks passed
+
+Owner explicitly authorized the production stop/activation and supplied complete
+successful output from the reviewed first-activation script. Fresh private backup:
+/home/ubuntu/spi-preactivation-CbJkbuGH. SHA256 verification passed for database.sql,
+application-files.tar.gz and the private target rollback declaration. Only the
+soccer-report PM2 entry was stopped/deleted/recreated; no SQL restoration occurred.
+
+The successful script path performed final shared uploads synchronization including
+deletions, refreshed/compared configuration/template, preserved original uploads
+as uploads.before-aeff9a19e8450fd8766c9d29a98131b10e18607f, and linked the original
+code's uploads path to shared/uploads for code rollback consistency. The new
+release also uses shared .env/uploads and the configured shared report template.
+
+PM2 now reports soccer-report ID 5, PID 2048649, with CWD and script in
+/var/www/spi-scouting-deploy/releases/aeff9a19e8450fd8766c9d29a98131b10e18607f.
+The script verified the actual /proc PID CWD. Private pre/post comparisons reported
+other application/module PIDs and statuses unchanged. Initial loopback connection
+refusals were followed by successful bounded retries. Script assertions passed
+for exact backend/public health JSON, public login HTTP 200 and the atomic current
+pointer update. This is an actual supervised production activation, superseding
+earlier preparation-only status; no automated GitHub deployment exists yet.
+
+PM2 save was deliberately not executed. Post-activation authenticated/business
+smoke checks, initialization log inspection, reviewed process-list persistence,
+post-save dump permissions and off-VPS transfer of the fresh backup remain open.
+Do not claim a reboot test or successful live rollback: those were not executed.
+
+## Owner post-activation functional confirmation
+
+Owner reports the requested post-activation checks correct after being asked to
+verify fresh login, dashboard/player photos and report Excel download, and to
+inspect recent logs. No raw log output or browser artifacts were supplied; this
+is an owner functional confirmation rather than independently observed coverage
+of every role/module. Production release remains aeff9a1; reviewed PM2 persistence
+and transfer of the fresh preactivation backup are the next operational steps.
+
+## Reviewed post-activation PM2 persistence saved
+
+Owner supplied successful output from the guarded persistence block: target
+release and other application PID/status comparisons passed before pm2 save.
+The old dump.pm2 and any dump.pm2.bak were copied into a private mktemp directory
+under /home/ubuntu/spi-preactivation-CbJkbuGH before saving. The supplied procedure
+then restores mode 600 on the current PM2 dump files.
+
+The saved target CWD is the exact aeff9a1 release directory. Sanitized saved names
+are soccertag, api-processiq, playertrack and soccer-report. No unrelated process
+was intentionally restarted or removed. This supersedes the pending-pm2-save
+status of earlier activation notes; it establishes saved configuration, not an
+actual reboot/resurrection test. Owner has not yet supplied transfer/integrity
+confirmation for the fresh preactivation backup and PM2 recovery copies off-VPS.
+The older backup's successful Mac transfer does not cover this new snapshot.
+
+## Fresh activation backup off-VPS integrity confirmed
+
+Owner supplied successful Mac-side transfer and SHA256 verification for the fresh
+spi-preactivation-CbJkbuGH snapshot: application-files.tar.gz (~5.8 MiB),
+database.sql, other-apps-before.json, private rollback declaration and both PM2
+pre-save dump files under pm2-before-save-MKP20SJ5. All six file checks passed.
+This supersedes the pending-transfer status for this snapshot. No private backup
+content is included in the repository. It is a preactivation recovery baseline,
+not a continuously current copy of subsequent production writes or proof of a
+new full-source restore/reboot exercise. Recurring schedule/retention and backup
+storage encryption remain separate operational decisions.
+
+Manual release activation, functional checks, saved PM2 state and off-host backup
+are now evidenced. Automatic master-triggered GitHub delivery is still absent.
+Next establish the approved SSH destination/port, independently verified server
+host key and restricted deployment-key/command contract before configuring any
+GitHub deployment secrets or enabling a production deployment workflow.
+
+## SSH destination and disabled automation preparation
+
+Owner confirms SSH at 51.75.255.4:22, PermitRootLogin no,
+PubkeyAuthentication yes, PasswordAuthentication yes, authorized key files
+.ssh/authorized_keys and .ssh/authorized_keys2. The supplied ED25519 server key
+matches SHA256:cLDo0RcYLc5/iY5CmgRPoovjnxGEoRtcz+uqkI22LTo locally.
+This is host identity evidence; it is not a dedicated CI client key or proof of
+its authorization. Workflow/helper preparation is documented in
+AUTOMATED_DEPLOYMENT.md. Delivery remains gated off pending review, server helper
+installation, restricted key provisioning and installed-helper recovery rehearsal.
+No secret, SSH configuration or VPS file was changed by this implementation.
