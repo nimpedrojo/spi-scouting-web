@@ -117,3 +117,8 @@ a timezone-less DATETIME and expects its wall-clock value in the Madrid view.
 The runner default UTC interpreted that fixture differently from local execution.
 CI explicitly sets TZ=Europe/Madrid for deterministic parsing aligned with the
 existing view timezone; the assertion and application code remain unchanged.
+
+The runner MySQL global time_zone is also set to the current Madrid UTC offset
+before opening application connections. This aligns CURRENT_TIMESTAMP with
+Node/mysql2 interpretation of timezone-less DATETIME values for the short test
+run. It affects only the disposable CI server, never production.

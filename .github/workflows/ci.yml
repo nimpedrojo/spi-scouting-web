@@ -35,6 +35,9 @@ jobs:
       - name: Prepare runner-local test database
         run: |
           sudo systemctl start mysql.service
+          # Match CURRENT_TIMESTAMP to Node/mysql2 local DATETIME interpretation.
+          mysql --host=127.0.0.1 --user=root --password=root \
+            --execute="SET GLOBAL time_zone = '$(date +%:z)';"
           mysql --host=127.0.0.1 --user=root --password=root <<'SQL'
           CREATE DATABASE spi_scouting_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE USER 'spi_ci'@'127.0.0.1' IDENTIFIED BY 'ci-only-disposable-password';
