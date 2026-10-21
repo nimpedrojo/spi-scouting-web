@@ -809,3 +809,110 @@ Merge dependency PR #20 first. The SheetJS PR targets master for the existing CI
 trigger and temporarily includes #20's prerequisite commit until it is merged.
 No production/candidate update or schema change has been performed. A fresh
 post-merge candidate and isolated MariaDB startup rehearsal remain necessary.
+
+## Updated candidate isolated startup and HTTP checks
+
+Owner confirmed PR #20 merged as e28c7fdc51b22c9c7d5cf4f6c8275c26ecef684f and
+PR #21 as 4c1e3811030644cdcb25cc7bcb76d0d727158506. The new candidate at
+/var/www/spi-scouting-deploy/releases/rehearsal-5MGigLAe is checked out at the
+latter exact commit. Production dependencies installed with Node 22.23.3 /
+npm 10.9.9, with zero reported runtime npm audit findings; the multer deprecation
+warning remains separate. This supersedes the old candidate's audit result only
+for the new candidate, not the currently active production installation.
+
+Owner restored 29 tables into spi_rehearsal_20261021 with the restricted
+spi_rehearsal@127.0.0.1 account, and generated a separate mode-restricted .env
+with new DB/session credentials, HOST=127.0.0.1, PORT=3102 and NODE_ENV=production.
+ADMIN_PASSWORD is empty, no encryption key was introduced, and PROCESSIQ_API_URL
+points at an intentionally unavailable loopback destination to prevent normal
+upstream imports. The application was not pointed at the production schema.
+The backup upload extraction/move procedure was supplied; the owner has not yet
+provided its file-count output. Verify DB-to-file references before declaring
+asset recovery complete for this candidate.
+
+Owner started node src/server.js in the foreground under an environment cleared
+with env -i. Logs report successful initialization/listening on 3102, no new
+bootstrap superadmin, and the expected missing-secret-key warning. No visible
+initialization error was supplied; this is not proof that every schema invariant
+holds, since some model ALTER errors can be swallowed/logged.
+
+Subsequent owner checks confirm /health returns exactly {"status":"ok"} with
+HTTP 200, /login returns 200, and ss maps candidate PID 2040407 to
+127.0.0.1:3102. Public production /login still returns 200. The candidate is a
+foreground rehearsal, not a PM2 production release; no current symlink, shared
+upload activation, proxy change or production schema initialization occurred.
+Authenticated scope/login flows, upload references and ProcessIQ credential
+continuity remain to be verified. No successful deployment or automatic
+production delivery is claimed.
+
+## Rehearsal asset references and authenticated access verified
+
+Owner confirmed 32 files under the candidate uploads tree. The read-only check
+against the guarded rehearsal DB configuration inspected nine nonempty asset
+references from players.photo_path, clubs.crest_path and
+plan_session_tasks.explanatory_image_path: zero missing and zero unexpected
+paths. This supersedes the earlier missing candidate file-count evidence. The
+check does not cover template asset references, file contents/decoding or every
+possible URL consumer.
+
+Owner ran the credential-prompted loopback login smoke against port 3102,
+simulating the existing proxy's X-Forwarded-Proto=https and forwarding the returned
+cookie only in memory. Result: login 302 to /dashboard, a session cookie received,
+and authenticated /account and /dashboard both HTTP 200. No password/cookie was
+recorded here. This validates one restored account and these routes, not every
+role/club scope, full browser TLS flow, or ProcessIQ credential decryption.
+Only rehearsal last-login/session state was intentionally changed by that check.
+
+Candidate remains a foreground process, not the active PM2 application. Before
+production cutover: verify all necessary scoped business flows/credential
+continuity, prepare and review a scoped PM2 declaration and explicit rollback,
+confirm persistent log/template destinations, take a fresh coordinated backup,
+and synchronize uploads/config under a write pause. Shared activation, current
+symlink changes, port 3002 takeover and automated delivery remain unperformed.
+
+## Foreground rehearsal stopped cleanly
+
+Owner confirmed the port-3102 socket inventory returned only its header after
+stopping the foreground candidate; public production login still returned HTTP
+200. The trial process is no longer listening. No PM2 process, Nginx upstream,
+production database or current symlink was switched. Rehearsal database/assets
+remain isolated and retained pending the next preparation step.
+
+Before drafting the final PM2 activation/rollback contract, collect effective
+LOG_FILE_PATH and REPORT_TEMPLATE_PATH (file plus PM2 overrides), resolving
+relative paths against the confirmed active CWD. A release-path change must not
+silently strand logs or omit a production-specific spreadsheet template.
+
+## Persistent log/template destinations and activation plan preparation
+
+Owner supplied .env parsing resolves LOG_FILE_PATH to
+/var/www/soccer_report/shared/logs/app.log and the effective template fallback to
+/var/www/spi-scouting-web/src/templates/report_template.xlsm. The sanitized PM2
+inspection confirms original CWD and null LOG_FILE_PATH/REPORT_TEMPLATE_PATH
+overrides. Keep the current absolute log destination, subject to permission and
+rotation checks, rather than inventing a new log path during cutover.
+
+production-pm2-plan adds a reviewable ecosystem.config.cjs and
+[ACTIVATION_PLAN.md](ACTIVATION_PLAN.md), without executing PM2 or any production
+activation. The declaration requires an explicit full-SHA child of the known
+releases root, targets only soccer-report in one fork instance, fixes the observed
+interpreter/listener/log destinations, and plans a shared production-template
+copy. It rejects rehearsal/implicit-current selections. The shared template and
+configuration/uploads are not yet copied; applying this config now is premature.
+
+The plan explicitly includes fresh backup/final synchronization, private
+original target metadata, isolated PM2 behavior rehearsal, current-pointer
+verification and shared-file consistency during rollback. PM2 save is a separate
+reviewed all-daemon persistence action, not a target-only deployment step.
+No automated delivery, deployment script or production transition is created.
+
+## Log and template permissions confirmed
+
+Owner stat output confirms /var/www/soccer_report/shared/logs is ubuntu:ubuntu
+775, app.log is ubuntu:ubuntu 664 and the production report_template.xlsm is
+root:root 644. A test -w run as ubuntu confirms the existing log is writable.
+These findings support keeping the current absolute log destination and reading
+the existing template for a shared copy; neither was moved or permission-edited.
+Rotation policy and log confidentiality/access beyond these modes remain separate
+operational checks. The application/archive permission changes previously
+recorded do not imply these existing log modes were tightened.
