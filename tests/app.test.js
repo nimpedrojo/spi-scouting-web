@@ -32,6 +32,9 @@ const uploadsRoots = [
 const STATIC_TEST_REPORT_CLUBS = ['Club Manual', 'Club Test', 'Club Default'];
 
 let testState = null;
+const realDateNow = Date.now.bind(Date);
+let rateLimitClockOffset = 0;
+let dateNowSpy;
 
 function buildPlaceholders(values) {
   return values.map(() => '?').join(', ');
@@ -159,10 +162,14 @@ function parseBinaryExcelResponse(response, callback) {
 
 describe('Aplicación SoccerProcessIQ Suite', () => {
   beforeAll(async () => {
+    dateNowSpy = jest.spyOn(Date, 'now').mockImplementation(() => realDateNow() + rateLimitClockOffset);
     await initDatabaseOnce();
   });
 
   beforeEach(async () => {
+    // Each test gets a fresh limiter window; requests within a test still
+    // exercise the real limiter and share the same clock.
+    rateLimitClockOffset += 61000;
     testState = {
       clubIds: new Set(),
       clubNames: new Set(),
@@ -361,6 +368,7 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
   });
 
   afterAll(async () => {
+    dateNowSpy.mockRestore();
     await db.end();
   });
 
@@ -1749,10 +1757,11 @@ describe('Aplicación SoccerProcessIQ Suite', () => {
       'SELECT module_key, enabled FROM club_modules WHERE club_id = ? ORDER BY module_key ASC',
       [rows[0].id],
     );
-    expect(moduleRows).toHaveLength(3);
+    expect(moduleRows).toHaveLength(4);
     expect(moduleRows.find((row) => row.module_key === 'scouting_players').enabled).toBe(1);
     expect(moduleRows.find((row) => row.module_key === 'planning').enabled).toBe(0);
     expect(moduleRows.find((row) => row.module_key === 'scouting_teams').enabled).toBe(0);
+    expect(moduleRows.find((row) => row.module_key === 'player_load').enabled).toBe(0);
   });
 
   test('superadmin puede editar club en /clubs', async () => {

@@ -1,0 +1,453 @@
+# Production deployment audit
+
+Date: 2026-10-21. Repository inspected: `spi-scouting-web`, commit `5b3e55a5c9fab017165c1a5d406182ebb1fc4c4d`. Production branch: `master` (provided by owner).
+
+## Decision and scope
+
+Recommend GitHub Actions validation followed by SSH delivery of an exact commit to a new VPS release directory, shared persistent state, an atomic active-release symlink switch, and a restart of only this application's existing PM2 process. Keep Nginx/HestiaCP and MySQL. Start with one fork-mode instance and accept a brief restart interruption; this code does not support a credible zero-downtime promise.
+
+**Implementation is blocked pending production inventory, persistence reconciliation, database rehearsal/backup verification, and an agreed restart/session policy.** No VPS was accessed, no deployment or secret creation occurred, and no application behavior was changed. Production facts supplied in the four owner-provided inventory transcripts are recorded below; they were not independently collected through a VPS connection. Paths, ports and process names in older documentation are examples, not discovered production facts.
+
+## Confirmed current architecture
+
+| Area | Repository evidence and consequence |
+| --- | --- |
+| Runtime | CommonJS Node.js, Express 5.2.1, EJS, Bootstrap and MySQL through `mysql2/promise`. MVC plus `src/core`, `src/shared`, and modules for planning, scouting teams, scouting players and player load. |
+| Startup | `package.json` main is `src/server.js`; `npm start` runs `node src/server.js`; development uses nodemon. No compile/build step. Views, public assets and `src/templates/report_template.xlsm` must ship with source. |
+| Listener | `src/server.js` uses `PORT`, falling back to 3000; no explicit bind address, so it is not constrained to loopback by the code. The supplied inventory maps the target PID to `127.0.0.1:3002`; public routing/firewall policy remains unverified. This loopback listener differs from the repository listener without an explicit host, so inspect deployed source before assuming parity. |
+| Dependencies | Only `package-lock.json`, lockfile version 3. Use `npm ci`, not lockfile regeneration. No `engines`, `packageManager`, `.nvmrc`, `.node-version` or versioned `.npmrc` found. Locked Express requires Node >=18, and imports use global `fetch`; that lower bound is not a recommendation to deploy an obsolete runtime. Select a supported LTS and pin an exact tested Node/npm combination after inventory. |
+| Process manager | Owner reports PM2 on a private Linux VPS shared with other ProcessIQ apps; no ecosystem file exists in the repository. PM2 is not a package dependency. |
+| HTTP/proxy | `src/app.js` sets `trust proxy` to one hop and enables secure session cookies only when `NODE_ENV=production`. Verify the real Hestia/Nginx proxy chain, forwarded headers, HTTPS and direct backend accessibility. |
+| Sessions | `express-session` has no configured store: default MemoryStore, eight-hour cookies, default cookie name. Restart loses sessions and session-held import previews. Multiple workers do not share sessions or rate limits (`src/middleware/simpleRateLimiter.js`). Shared-hostname applications may also have cookie-name/path collisions. |
+| Tests | Jest 29 + Supertest; `npm test` is `jest --runInBand`; six test files, configured under `tests/`. Routes, authentication, uploads, evaluations and module flows have integration coverage; metrics/context/rate-limiter tests also exist. There is no recorded clean CI baseline in this audit. |
+| Test side effects | `tests/app.test.js` and `tests/playerLoad.test.js` import the app, initialize schema, insert/delete database rows; app tests snapshot/clean upload directories. The dummy-auth test also imports the app. No enforced dedicated test DB guard was found. Never run the full suite against production configuration or in a live release. |
+| Health | No dedicated liveness/readiness endpoint found. `/` redirects to `/login` or `/dashboard`; `/login` is a possible HTTP smoke check, not a comprehensive database/readiness check. Static responses or PM2 `online` are insufficient evidence. |
+
+### Environment and filesystem dependencies
+
+`dotenv.config()` reads `.env` relative to process CWD; inherited environment takes precedence by default. `logger.js` and `secretStore.js` capture settings at module load, before the explicit dotenv call in `app.js`. In the inspected entry path, the imported DB module loads dotenv first. Preserve a deliberate startup environment and CWD rather than depending on incidental import order. Old PM2 environment values may override a newly linked `.env`.
+
+| Variables | Current behavior / deployment requirement |
+| --- | --- |
+| `NODE_ENV`, `PORT` | Set production mode and the inventoried dedicated application port. Neither appears in `.env.example`. |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Connection settings; code defaults include localhost, 3306, root, empty password and `soccer_report`. `.env.example` uses a different example database name. Supply explicit real settings; never accept defaults silently. |
+| `SESSION_SECRET` | Falls back to `session_secret_dev`; require a strong existing production value, kept stable between releases. Rotation invalidates cookies and should be planned separately. |
+| `APP_SECRET_KEY`, fallback `PROCESSIQ_SECRET_KEY` | AES-GCM key for stored ProcessIQ credentials; absent key makes encryption/decryption a no-op. Preserve the exact existing key and backup it securely; blindly adding/rotating a key can make historical credentials unreadable. Neither is documented in `.env.example`. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Startup bootstrap settings. Default email is `admin@local`; missing password or literal `admin` skips creation; any other nonempty password can create a superadmin if email is absent. Inventory intended bootstrap behavior without disclosing values. |
+| `LOG_LEVEL`, `LOG_FILE_PATH`, `APP_NAME` | JSON stdout/stderr and optional file. Relative file paths resolve against CWD; directory creation happens on import. An inaccessible log directory can prevent startup. Use an inventoried shared absolute file path or deliberate PM2 log capture, with rotation. |
+| `REPORT_TEMPLATE_PATH` | Optional spreadsheet template override; otherwise shipped `src/templates/report_template.xlsm`. Preserve any production customization and read permissions. |
+| `PROCESSIQ_API_URL` | Optional upstream override; default in code is `https://api.processiq.es`. Imports depend on outbound HTTPS/DNS and credentials stored in MySQL. |
+
+Persistent writes **do exist inside the project**:
+
+- `src/public/uploads/players`: player photos; created on module import, uploaded/replaced/deleted by `src/routes/playerAdminRoutes.js`.
+- `src/public/uploads/clubs`: club crests, created/written by `src/routes/clubConfigRoutes.js`.
+- `src/public/uploads/planning`: planning images, including copied template images; see planning routes and `planningTaskAssetService.js`.
+- Optional logs, such as `.env.example`'s `./logs/app.log`.
+
+Imports in player/evaluation handlers use `os.tmpdir()` and attempt cleanup; failed requests/process termination may leave temporary files. Confirm available space and the actual runtime temp directory. MySQL is the primary persistence layer. PM2 state/logs are outside application source but their actual locations depend on its owner and `PM2_HOME`.
+
+There are **20 tracked JPG uploads** (19 player photos and one club crest), plus `.gitkeep` files. Uploads are not excluded by `.gitignore`. Future release artifacts must exclude runtime uploads and must never overwrite shared uploads with repository copies. Before the first switch, reconcile live files with tracked files and database paths; do not discard either blindly. Upload URLs are served through public static middleware; preserve existing URL structure, while separately reviewing access/privacy requirements.
+
+### Database initialization and changes
+
+`src/app.js` invokes `initDatabaseOnce()` on import, and `src/server.js` waits for that same cached promise before listening. This is once per Node process, not a cross-process migration lock.
+
+`src/db.js` issues `CREATE DATABASE IF NOT EXISTS`, and `src/initDb.js` sequentially creates tables, invokes model-level ALTER operations, seeds sections/categories/modules/platform settings, synchronizes user club assignments, and may bootstrap a superadmin. A one-off SQL file exists at `sql/2026-04-20_create_season_team_recommendations.sql`, but there is no versioned migration runner, schema-version ledger, dedicated migration npm script, or automatic down migration.
+
+Several ALTER catches, including `userModel.js`, log unexpected errors and continue. Successful startup therefore does not prove all expected schema changes succeeded. MySQL DDL and data backfills are not an atomic release transaction; partial changes/metadata locks can occur. The runtime needs permissions for its actual CREATE/ALTER/index/foreign-key and data operations; do not grant global/root access as a shortcut. Validate the existing grants against startup on a disposable clone.
+
+Startup failure is logged without an explicit nonzero exit or guaranteed pool shutdown. There are no signal handlers, HTTP draining, pool-close shutdown, or PM2 readiness messages. A failed initialization may leave a process alive without an HTTP listener. Check HTTP with a bounded timeout and inspect initialization errors/schema assertions; do not trust the PM2 status alone.
+
+## Existing deployment mechanism
+
+- `docs/deploy-production.md` documents a manual release/shared/current approach, backups, staging rehearsal, dependency installation and rollback. It prioritizes systemd with PM2 as an alternative; the owner now explicitly requires existing PM2.
+- Its example root, service/process names, users, ports and historical production commits are unverified. The guide's initialization command **writes to MySQL**; it is not a read-only healthcheck. It also omits concrete shared-upload linkage, atomic symlink replacement, and proof that PM2 resolves the new release.
+- `docs/logging-and-observability.md` describes JSON logs and example paths. `security-audit-report.md` records historical concerns about sessions, secrets and dependencies; it is not a current dependency scan or evidence of production remediation.
+- No deployment scripts, PM2 ecosystem, or GitHub Actions workflows found. `.github` contains only Copilot instructions. `scripts/aif-finish` is a developer helper, not established production delivery. `cleanup:test-data` deletes data and must never be a deployment step. `import:players` references a missing `scripts/import_players_from_excel.js`.
+- Existing infrastructure automation, GitHub branch protections/environments/secrets and any VPS-side scripts were not accessible through repository inspection.
+
+## Risks and blockers
+
+| Priority | Risk | Required resolution |
+| --- | --- | --- |
+| Blocker (partially resolved) | Target name, CWD, script, interpreter and loopback port identified; daemon ownership/home, reboot setup and future release root remain unverified | Complete focused inventory below; preserve isolation from other apps. |
+| Blocker | Release replacement can lose uploads or strand database file references | Inventory, backup, reconcile and move/link shared uploads in a planned first cutover. |
+| Blocker | Startup changes production schema/data, sometimes swallowing errors | Rehearse the exact production-to-candidate upgrade on an isolated clone; inspect errors and resulting schema. Verify consistent DB + upload backups and a restore rehearsal before enabling automation. |
+| Blocker | SSH access/network route from Actions and host identity unknown | Confirm reachable route and least-privilege account, independently verified SSH host key, and approved access policy. |
+| Decision required | MemoryStore loses logins/previews; no request draining | Accept brief downtime and session loss explicitly, or implement/test a MySQL-backed session store and graceful shutdown in a separate change before rollout. Do not enable cluster mode. |
+| High | PM2 may retain a resolved old release path/environment despite a `current` switch | Declare explicit CWD/script/interpreter and target only the confirmed process. Test activation and rollback path resolution; verify PID CWD and reported release SHA after restart. |
+| High | Shared VPS blast radius, Hestia-managed ownership/config, accidental PM2 daemon mismatch | No root deployment, recursive permission rewrites, `pm2 restart all`, daemon kill, or unscoped process operations. Operate as the correct PM2 owner/home; confirm isolation or a restricted per-app helper if owner manages other apps. |
+| High | Weak/default or historically exposed credentials; encryption key continuity | Review historical security report with owner, verify rotation status privately, preserve keys/data compatibility. Never print `.env`, full PM2 environment or dump files into CI logs. |
+| High | Blind DB rollback destroys writes made after release | Code rollback only when schema/data remain compatible. Otherwise maintenance and a reviewed recovery procedure; automatic DB restoration is prohibited. |
+| High | Tests can modify a real database/filesystem | CI must use isolated ephemeral MySQL credentials and workspace-only upload paths; no production secrets in validation jobs. |
+| Medium | Old dependencies, runtime drift, package installation scripts | Pin/test runtime and lockfile; perform a fresh dependency review before automation. Historical `xlsx` finding is not revalidated here. Do not run `npm audit fix` during deployment. |
+| Medium | Disk/inode exhaustion, temp files, logs/backups/releases accumulation | Define rotation, backup retention and safe release cleanup; never prune active/previous releases or shared files. |
+
+## Unknown production configuration and read-only collection
+
+Run these manually on the VPS through the existing administrative access. They are inventory commands, **not a deployment script**. Substitute placeholders only with observed values. Do not paste raw secrets, personal data, full configs or private keys into chat. No application import, startup, `npm test`, schema initialization, dump restore, service reload or filesystem write is needed for inventory.
+
+### Host and process discovery
+
+```bash
+id
+cat /etc/os-release
+uname -m
+df -h
+df -i
+free -h
+ps -eo user,pid,ppid,comm | rg 'PM2|node|nginx|mysql|mariadb'
+ss -ltnp
+command -v node npm pm2 nginx mysql mysqldump
+node --version
+npm --version
+systemctl list-units --type=service --all --no-pager | rg -i 'pm2|nginx|mysql|mariadb|hestia'
+```
+
+`node` in the login shell may differ from the runtime interpreter. PM2 commands can start a daemon if none is running: **only run the following after confirming the existing daemon's owner and PM2 home**, in that owner's existing session with its verified `PM2_HOME`. Do not run PM2 as root merely to obtain output.
+
+```bash
+pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>console.log(JSON.stringify(JSON.parse(s).map(p=>({id:p.pm_id,name:p.name,pid:p.pid,cwd:p.pm2_env.pm_cwd,script:p.pm2_env.pm_exec_path,interpreter:p.pm2_env.exec_interpreter,mode:p.pm2_env.exec_mode,instances:p.pm2_env.instances,status:p.pm2_env.status,nodeVersion:p.pm2_env.node_version,outLog:p.pm2_env.pm_out_log_path,errorLog:p.pm2_env.pm_err_log_path,watch:p.pm2_env.watch})),null,2)))'
+```
+
+After choosing the target, collect only the deployment-relevant environment keys (redacted) and its nonsecret port/mode:
+
+```bash
+export TARGET_PM2_ID='<observed numeric ID>'
+pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const p=JSON.parse(s).find(p=>String(p.pm_id)===process.env.TARGET_PM2_ID);if(!p)throw Error("Target missing");const e=p.pm2_env;console.log({PORT:e.PORT,NODE_ENV:e.NODE_ENV,configuredKeys:Object.keys(e).filter(k=>/^(DB_|ADMIN_|SESSION_|APP_SECRET_KEY$|PROCESSIQ_|REPORT_TEMPLATE_PATH$|LOG_|APP_NAME$)/.test(k))})})'
+export APP_PID='<observed target PID>'
+readlink -f "/proc/$APP_PID/cwd"
+readlink -f "/proc/$APP_PID/exe"
+```
+
+If OS access restrictions hide process details, an administrator should run those specific reads. Inspect the identified PM2 boot unit locally with `systemctl cat '<observed PM2 unit>'`; report owner, PATH, PM2 home and restart persistence without exposing embedded environment secrets.
+
+### Target files, permissions and configuration
+
+```bash
+export APP_DIR='<observed application directory>'
+export ENV_FILE='<observed env file, if present>'
+export PM2_HOME_DIR='<observed PM2 home>'
+readlink -f "$APP_DIR"
+stat -c '%U:%G %a %n' "$APP_DIR" "$ENV_FILE" "$PM2_HOME_DIR"
+namei -l "$APP_DIR/src/public/uploads"
+find "$APP_DIR/src/public/uploads" -maxdepth 2 -type d -printf '%u:%g %m %p\n'
+du -sh "$APP_DIR/src/public/uploads"
+find "$APP_DIR/src/public/uploads" -type f | wc -l
+awk -F= '/^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=/{print $1 "=<redacted>"}' "$ENV_FILE"
+git -C "$APP_DIR" rev-parse HEAD
+git -C "$APP_DIR" status --short
+git -C "$APP_DIR" ls-files 'src/public/uploads/*'
+cat "$APP_DIR/package.json"
+sha256sum "$APP_DIR/package-lock.json"
+```
+
+Git commands apply only if a checkout exists. If deployed as copied files, obtain release identity from the current operator; do not assume local HEAD equals production. Inventory custom report templates, symlink targets, log and backup locations/permissions similarly. Verify writable upload/log/temp locations as the actual app identity; avoid `touch` during this read-only phase. Existing unreadable directories remain unknown until inspected by their owner.
+
+An administrator can inspect `sudo nginx -T` locally (read-only configuration output; it may contain sensitive material). Return only this application's `server_name`, proxy hop chain, upstream address/port, forwarded headers, TLS termination, static aliases and body-size limits. Identify Hestia's persistent customization mechanism so future Hestia regeneration cannot undo the setup. Do not publish the full multi-application configuration.
+
+### MySQL and recovery inventory
+
+Use the existing approved credential mechanism; `--password` prompts interactively and avoids command-line password values. Do not source `.env` as shell code. Fill host, port, user and schema from verified settings privately:
+
+```bash
+mysql --host='<observed host>' --port='<observed port>' --user='<observed user>' --password --database='<observed schema>' --execute='SELECT VERSION(), DATABASE(), CURRENT_USER(); SHOW GRANTS FOR CURRENT_USER(); SHOW TABLE STATUS;'
+mysql --host='<observed host>' --port='<observed port>' --user='<observed user>' --password --database='<observed schema>' --execute='SHOW CREATE TABLE users; SHOW CREATE TABLE players; SHOW CREATE TABLE clubs; SHOW CREATE TABLE plan_session_tasks; SELECT COUNT(*) AS users_without_club FROM users WHERE club_id IS NULL; SELECT COUNT(*) AS stored_processiq_credentials FROM users WHERE processiq_password IS NOT NULL;'
+```
+
+If a table/column is absent, record that fact rather than creating it. Review all candidate schema changes against production, not just the tables above. Treat schema/grant output as restricted operational information. Request the current backup schedule, latest successful backup and restore-test dates, storage location, encryption/access policy, retention and whether uploads/keys are included. Inspect metadata only at the observed backup directory:
+
+```bash
+export BACKUP_DIR='<observed backup directory>'
+stat -c '%U:%G %a %n' "$BACKUP_DIR"
+find "$BACKUP_DIR" -maxdepth 1 -type f -printf '%TY-%Tm-%Td %TH:%TM %s %f\n'
+```
+
+No backup or restore is performed by these commands. Actual restore verification belongs to a separately authorized isolated rehearsal.
+
+### Network, GitHub and HTTP inventory
+
+Obtain SSH hostname/address, SSH port, allowed source networks, target account, verified host-key fingerprint, GitHub runner reachability and whether a jump host/private route is necessary. On the VPS, an administrator can read `sshd -T` to inspect effective SSH policy. Read public host-key fingerprints using `ssh-keygen -lf '<observed SSH host public-key file>'`; never read private host keys. A fingerprint from the VPS's trusted administrative session is the independent trust anchor; `ssh-keyscan` alone is insufficient.
+
+Inspect GitHub Settings for branch protection/rulesets on `master`, required checks, Actions policy, environment restrictions and existing secret **names only**. Confirm repository visibility and available environment protection features. No GitHub configuration was inspected or changed by this audit.
+
+After confirming this app's URLs, issue bounded GETs without redirect-following, and inspect only relevant response status/headers:
+
+```bash
+curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}\n' '<observed backend base URL>/login'
+curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}\n' '<observed public HTTPS base URL>/login'
+```
+
+These GETs can generate ordinary access logs but do not intentionally change business data. A 200 login page does not verify authenticated flows, upload access or database completeness. Determine an operator-approved smoke procedure using existing data; avoid creating entities during this inventory.
+
+## Recommended target architecture
+
+1. PR validation and a `push` trigger limited to `master`. Protect master with required checks/reviews so a merge generates the production trigger. A push trigger also responds to direct pushes; rules must prohibit those if only PR merges may release.
+2. GitHub-hosted runner by default, with read-only repository token permissions and actions pinned to reviewed commit SHAs. Use native OpenSSH for transfer/execution. No persistent runner on the shared production VPS. If the VPS is unreachable, agree a private network route or dedicated isolated runner before implementation.
+3. Validate the exact event SHA using a pinned Node/npm runtime, `npm ci`, and `npm test` against a disposable MySQL instance on an isolated runner/VM. Do not provision containers for this solution. Keep test DB credentials separate and non-production; include required DDL privileges and deterministic environment. Confirm all six suites pass from a clean checkout.
+4. Package that same SHA as source/assets plus a release manifest, excluding `.git`, `.env*`, `node_modules`, logs, uploads, caches and test artifacts. Preserve the lockfile and report template. Verify archive digest in transit; install runtime dependencies in the candidate using `npm ci --omit=dev` under the tested runtime. Do not copy local macOS node_modules to Linux.
+5. Use a dedicated application deployment root, with `releases/<SHA-or-unique-id>`, `shared` and `current` beneath it; actual absolute root must come from inventory. Keep `.env`, persistent uploads and optional logs in shared storage. Link the candidate's `src/public/uploads` to the shared uploads directory before any app import. Persist customized templates where required. Keep backups outside public web paths.
+6. Restrict SSH credentials to the deployment account and application scope, ideally through a fixed helper/wrapper, with no unrestricted sudo. Pin `known_hosts` from verified host keys; do not disable host-key verification. Transfer only validated artifacts; validate SHA/path inputs and archive contents.
+7. Serialize production delivery with GitHub concurrency (`cancel-in-progress: false`) and an application-specific VPS `flock` covering backup, initialization, switch, restart and rollback. Reject stale/out-of-order SHAs before mutations, using the latest eligible master commit. GitHub concurrency is not a FIFO delivery guarantee: intermediate pushes may be superseded. If every merged SHA must actually be deployed, add a durable FIFO rather than relying on concurrency alone.
+8. Prepare all candidate files/dependencies without running app code against production. Take and verify database/uploads backups under a defined consistency policy before initialization; pause business writes during first shared-upload cutover and any schema operation requiring it. The old process may still write while backing up: specify InnoDB-consistent DB backup and coordinated filesystem/write handling. Rehearse candidate startup on an isolated production clone first. Never call the initialization command a dry run.
+9. For the initial conservative implementation, stop only the target PM2 app for the short activation window, atomically replace `current` using a temporary sibling symlink plus same-filesystem rename, then start/restart that target with explicit verified paths. Use a single fork instance, `watch: false`, no readiness-message option until implemented. Startup performs the reviewed DB changes. Avoid overlapping initializers and untested new code against the live DB while the old app serves traffic.
+10. Verify resolved PID CWD/script/interpreter and expected SHA, bounded backend/public login checks, initialization logs and schema postconditions. The ecosystem must use either deliberately refreshed stable-symlink paths or an explicit selected release path; test that PM2 cannot keep executing a resolved old path. Preserve the production port and Nginx upstream.
+11. On failure, restore the prior symlink/process configuration only when database compatibility permits; verify the previous SHA and HTTP response. Otherwise stop and follow the recovery runbook. Never automatically restore the database. Retain previous releases and report the deployment result/commit without leaking secrets. No default email/Slack messaging is required.
+
+PM2 reboot persistence must be set up once under the correct owner and interpreter. Verify the saved process list is current after tested configuration changes; do not run unreviewed `pm2 save` against a daemon hosting unrelated applications. An eventual MySQL session store and graceful shutdown would improve continuity but are separate behavior changes, outside this audit.
+
+## Files to create or modify later
+
+| File | Proposed purpose |
+| --- | --- |
+| `.github/workflows/ci.yml` | PR/master validation with isolated MySQL and pinned runtime. |
+| `.github/workflows/deploy-production.yml` | Master push, validated exact-SHA artifact, production environment, least permissions, serialization and SSH delivery. Keep validation required before deployment. |
+| `ecosystem.config.cjs` | One app declaration using inventoried identity, CWD/script/interpreter, mode, log paths and environment contract; no secrets in source. |
+| `scripts/deploy-production.sh` | Scoped, validated release preparation, shared links, locking, backup integration, atomic switch, targeted PM2 restart and verification. |
+| `scripts/rollback-production.sh` | Explicit compatible-code rollback with prior release verification; no automatic SQL restore. |
+| `.nvmrc`, `package.json` | Pin chosen Node line/exact runtime policy and supported engine range; npm version policy after validation. Do not regenerate lockfile casually. |
+| `.env.example` | Document missing operational keys with safe placeholders and key continuity/bootstrap warnings. |
+| `.gitignore` and packaging rules | Exclude runtime uploads going forward. Existing tracked files require a separate reviewed reconciliation/untracking change; ignore rules alone do not untrack them. |
+| `docs/deploy-production.md` | Replace unverified examples/systemd preference with inventoried PM2 runbook, shared uploads, backup, restore and rollback rules. |
+| Future app/test changes, only if agreed | Dedicated DB-aware readiness route, nonzero startup failure, graceful shutdown and MySQL-backed sessions; route/validation tests required. Not prerequisites to write scaffolding, but necessary if session continuity or stronger readiness is required. |
+
+Only this audit document is created now.
+
+## Required GitHub secrets and configuration
+
+Proposed names below are new interface names, not claims about existing configuration. Store deployment credentials in a `production` environment restricted to `master`. To meet automatic-on-merge delivery, do not add a per-deployment approval requirement unless the owner changes that requirement.
+
+| Name | Type | Purpose |
+| --- | --- | --- |
+| `PROD_SSH_PRIVATE_KEY` | Secret | Dedicated restricted deployment credential; never a personal/admin or shared root key. |
+| `PROD_SSH_KNOWN_HOSTS` | Integrity-protected environment secret or variable | Independently verified host-key entry, with correct nonstandard-port syntax if applicable. |
+| `PROD_SSH_HOST`, `PROD_SSH_PORT`, `PROD_SSH_USER` | Environment variables, or secrets if private topology policy requires | Actual SSH destination and deploy identity. |
+| `PROD_APP_ROOT`, `PROD_PM2_APP_NAME`, `PROD_PM2_HOME`, `PROD_NODE_BIN`, `PROD_PM2_BIN`, `PROD_HEALTH_URL` | Environment variables or VPS-side fixed configuration | Observed app paths/identity and backend/public probe contract. Prefer fixed server-side values in the restricted helper. |
+
+No long-lived GitHub PAT is needed for artifact-based delivery; use the workflow's scoped `GITHUB_TOKEN`. A VPS repository deploy key is unnecessary when transferring artifacts. Production DB passwords, session/encryption keys, bootstrap credentials and `.env` should stay on the VPS and in secure backup, not be copied into Actions. SSH passphrase or private-route credentials are conditional on the selected access method, not established requirements. Add no secrets until inventory and access design are approved.
+
+## Required VPS preparation (future work only)
+
+- Identify the existing app owner/PM2 daemon and establish a restricted deployment identity/helper without control over unrelated apps; inventory SSH access and host keys.
+- Confirm/pin Node, npm, PM2 and their noninteractive absolute paths without upgrading other applications. Verify required shell tools, archive transfer, `flock`, MySQL backup clients, CA certificates and free disk/inodes.
+- Choose the actual release/shared root within Hestia-compatible ownership constraints; give app identity write access only where needed (uploads, logs, temp), and read access to source/template/config. Secrets must be restricted to the required identities; no `chmod 777`.
+- Back up/reconcile existing uploads and custom templates, preserve URLs and keys, then plan the first shared-directory cutover with a write pause. Confirm Nginx static aliases, if any, point to persistent content correctly.
+- Verify database privileges/schema, clone-based upgrade rehearsal, backup consistency, retention, off-host copy and restoration. Define maintenance and DB recovery ownership.
+- Test target-only PM2 activation/rollback and reboot recovery with the correct interpreter/CWD/env. Validate proxy headers/HTTPS and ensure backend access is restricted appropriately.
+- Establish log rotation, temp cleanup, release retention, deployment timeouts and failure handling. Do not modify Nginx/Hestia merely to introduce CI delivery if existing routing works.
+
+## Proposed implementation sequence and exit criteria
+
+1. Collect read-only inventory above and resolve all production identifiers; confirm desired downtime/session policy and latest-eligible vs every-merge deployment semantics.
+2. Validate runtime/dependency/test baseline in a clean isolated environment. Investigate failures without applying automatic package upgrades to production.
+3. Rehearse the exact schema/data upgrade and compatible rollback against a disposable production clone; verify backups/restoration and key/upload continuity. Escalate incompatible DB changes into a separately reviewed release procedure.
+4. Create and review CI, deployment/helper scripts, ecosystem and corrected runbooks using confirmed values. Exercise lock contention, stale SHA rejection, failed install, failed initialization, wrong PM2 CWD, failed HTTP probe and rollback without production credentials.
+5. Prepare the VPS and GitHub configuration in a separately authorized implementation phase, preserving shared-host isolation. No preparation is executed by this audit.
+6. Perform one supervised first release/cutover with backup and rollback checks; enable subsequent automatic master delivery only after the acceptance checks pass.
+
+**Remaining implementation blockers after supplied inventory:** preservation in the release source of the now-reviewed production loopback-binding modification; daemon owner/home, PM2 version and reboot persistence; future release/shared root and upload reconciliation; effective production-mode value, encryption-key continuity and actual log/template configuration; remaining MariaDB schema comparison and upgrade compatibility; verified backup/restore coverage; proxy topology and HTTP redirect destination; SSH route/restricted identity/host key; GitHub protections/environment capability; accepted downtime/session-loss policy. Known identifiers are recorded in the inventory update below; no future root, deploy account or public URL is invented.
+
+## Production inventory update from owner-provided transcripts
+
+Sources: `fichero salida 1` through `fichero salida 4`, supplied after the initial audit. These are evidence transcripts, not executable instructions. Collection timestamps were not supplied; PIDs and resource figures are snapshots. Raw files are not copied into the repository.
+
+| Confirmed observation | Evidence / implication |
+| --- | --- |
+| Host | Ubuntu 22.04.5 LTS, x86_64; collection session is `ubuntu`, UID/GID 1000, with sudo-group membership. This establishes the collecting identity, not conclusively the PM2 daemon owner. |
+| Runtime/tool paths | Shell Node `v22.23.3`, npm `10.9.9`; `/usr/bin/node`, `/usr/bin/npm`, `/usr/bin/pm2`, `/usr/sbin/nginx`, `/usr/bin/mysql`, `/usr/bin/mysqldump`. PM2 version still missing. Target `/proc` executable resolves to `/usr/bin/node`; PM2 also reports Node 22.23.3. |
+| Target process | PM2 name `soccer-report`, snapshot ID 1, PID 1722885, online, fork mode, watch false. No instances field was returned; do not infer a configured instance count from that omission. |
+| Target paths | PM2 CWD and `/proc` CWD both `/var/www/spi-scouting-web`; script `/var/www/spi-scouting-web/src/server.js`. No release/shared/current layout is established by the supplied evidence. |
+| Listener | PM2 inherited `PORT=3002`; socket inventory maps the same PID to `127.0.0.1:3002`. Verify deployed listener source because repository code does not explicitly bind loopback. |
+| Shared daemon | Inventory also contains `soccertag`, `api-processiq`, `playertrack` and `pm2-logrotate`. Target logs are under `/home/ubuntu/.pm2/logs/`. These paths suggest a PM2 home, but do not prove daemon identity or an effective `PM2_HOME` override. Never restart/save all apps as part of delivery. |
+| Capacity snapshot | Root filesystem ~55 GiB available, 6% inode use; memory ~5.6 GiB available, no swap. Capacity appears sufficient for initial planning but must be rechecked before release/backup; memory requirements are not measured. |
+| File ownership | Project root `ubuntu:ubuntu 775`; `src` and `public` parents `root:root 755`; uploads and its three child directories `ubuntu:ubuntu 755`. Existing writes can work as ubuntu while code replacement may encounter mixed ownership. `.git` ownership has not yet been inspected. |
+| Persistent files | Upload tree totals 320 KiB / 32 files, including unknown file types and possibly placeholders. Compare file manifests/database paths before any cutover; this is not proof of 32 user uploads. |
+| Environment file | `/var/www/spi-scouting-web/.env` is `root:root 644`, hence readable by local identities that can traverse the directory. Treat permissions as a confirmed confidentiality risk; remediation must preserve read access for the actual app user. Do not change permissions during inventory. |
+| Environment keys | `.env` includes PORT, NODE_ENV, DB connection keys, SESSION_SECRET, ADMIN_EMAIL/PASSWORD, LOG_LEVEL/FILE_PATH and APP_NAME; values were redacted. No APP_SECRET_KEY/PROCESSIQ_SECRET_KEY, upstream or template override key appeared in this file's listing. Their absence there does not prove no other configuration source exists. |
+| PM2 environment | PM2 reports NODE_ENV undefined and no matching DB/secret keys. App-loaded dotenv values are not reflected back into PM2 daemon metadata. Effective NODE_ENV and key values therefore remain unknown; do not claim production mode is disabled or enabled. |
+| Source parity | Production package.json matches the inspected local package.json. Production lockfile SHA-256 `374db7dfc67dd42a36f7dc99cbfb4d4187e252db4c55d65d072c848e7e23ae8c` matches local. This does not establish source/schema parity. |
+| Git identity | Initial reads failed with dubious ownership; a subsequent owner-supplied transcript using sudo succeeded. Checkout HEAD is `24b2499d02ea9dee4459e2be731614e05c39e418`, with modified `src/server.js` and upload entries. This identifies checkout state, not conclusively the code loaded by the running process. No global Git trust change is required. |
+| Incomplete discovery | `rg` is absent, so process and systemd inventory pipelines failed. No installation is needed: use grep for these reads. MySQL is listening on loopback 3306, but the app's actual DB destination/version remains unverified. SSH sockets include port 22, but Actions reachability and permitted authentication are unverified. |
+
+### Follow-up: successful production Git inventory
+
+The additional pasted transcript supersedes the initial Git failures. `sudo git` returned checkout HEAD `24b2499d02ea9dee4459e2be731614e05c39e418`. This differs from the locally audited commit; equal package/lock files do not imply equal application code. The process could also have loaded an earlier filesystem state, so checkout HEAD alone is not proof of the in-memory running release.
+
+The worktree reports:
+
+- Modified `src/server.js`: a production-local code change whose contents are still unknown. It may explain the loopback listener, but that is not confirmed until the diff is inspected. Preserve it and assess whether its behavior needs to be incorporated in version control before release automation.
+- Modified entries for all 20 tracked JPGs and both upload `.gitkeep` files. Status alone cannot distinguish content changes from executable-mode changes; compare diff summaries before concluding images were replaced.
+- Ten untracked image files: one club crest and nine player photos. Together with the 22 tracked upload files this accounts for the observed 32 files. All require preservation/reconciliation with database references, regardless of Git status.
+
+**Additional first-release blocker:** blindly replacing this checkout would discard the local server change and can lose or replace live uploads. Do not use `git reset --hard`, `git clean`, an in-place checkout, or a transfer with delete semantics against the live tree. Capture/review the code diff and plan shared-upload preservation before any cutover; no cleanup or deployment is authorized by this audit.
+
+Collect the following read-only diffs in the existing trusted checkout. Since the supplied sudo Git reads succeeded, the same form is shown; do not add a persistent global safe.directory exception. Review output locally for sensitive literals before sharing it.
+
+```bash
+sudo git -C /var/www/spi-scouting-web diff --no-ext-diff --no-textconv HEAD -- src/server.js
+sudo git -C /var/www/spi-scouting-web diff --no-ext-diff --no-textconv --summary HEAD -- src/public/uploads
+sudo git -C /var/www/spi-scouting-web diff --no-ext-diff --no-textconv --numstat HEAD -- src/public/uploads
+```
+
+The subsequently supplied server diff establishes the loopback-binding override (see follow-up below). Upload mode changes are confirmed; binary numstat alone does not establish byte equality. Binary image contents need not be posted. Remaining MySQL, backup/restore, SSH, proxy, PM2 ownership/reboot and environment questions are unchanged.
+
+### Focused next read-only collection
+
+Run in the existing VPS session. Commands below correct the failed/ambiguous reads; do not install tools, change ownership, set global Git trust, reload services or start another PM2 daemon. Inspect output for secrets before sharing.
+
+```bash
+ps -eo user,pid,ppid,comm | grep -Ei 'PM2|node|nginx|mysql|mariadb'
+systemctl list-units --type=service --all --no-pager | grep -Ei 'pm2|nginx|mysql|mariadb|hestia'
+stat -c '%U:%G %a %n' /home/ubuntu/.pm2 /home/ubuntu/.pm2/pm2.pid /var/www/spi-scouting-web/.git
+cat /home/ubuntu/.pm2/pm2.pid
+stat -c '%U:%G %a %n' /var/www/spi-scouting-web/.git/config /var/www/spi-scouting-web/.git/HEAD
+sed -n '1,100p' /var/www/spi-scouting-web/src/server.js
+```
+
+If the PM2 PID file exists, use its numeric value to read the daemon's identity and only its PM2_HOME environment entry (never dump its complete environment):
+
+```bash
+ps -o user,pid,ppid,comm -p '<observed daemon PID>'
+tr '\0' '\n' < /proc/'<observed daemon PID>'/environ | grep '^PM2_HOME='
+```
+
+An absent PM2_HOME entry is not an error; combine daemon identity, PID file and existing paths to establish the default. Only after confirming the running daemon/account/home, obtain `pm2 --version` from that owner's session. Read the identified boot unit with `systemctl cat '<observed PM2 unit>'` locally and return its nonsecret user/home/interpreter settings.
+
+After inspecting ownership and confirming that this specific checkout is the intended trusted application repository, these per-command overrides allow read-only Git inspection without persisting a global exception:
+
+```bash
+git -c safe.directory=/var/www/spi-scouting-web -C /var/www/spi-scouting-web rev-parse HEAD
+git -c safe.directory=/var/www/spi-scouting-web -C /var/www/spi-scouting-web status --short
+git -c safe.directory=/var/www/spi-scouting-web -C /var/www/spi-scouting-web ls-files 'src/public/uploads/*'
+```
+
+Check production-mode equality without importing app code or printing secrets; this reads the file only and does not initialize MySQL:
+
+```bash
+cd /var/www/spi-scouting-web
+node -e 'const fs=require("fs");const d=require("dotenv").parse(fs.readFileSync(".env"));console.log({dotenvNodeEnvIsProduction:d.NODE_ENV==="production",dotenvPortMatchesPM2:d.PORT==="3002",sessionSecretNonempty:Boolean(d.SESSION_SECRET),encryptionKeyNonempty:Boolean(d.APP_SECRET_KEY||d.PROCESSIQ_SECRET_KEY),logFileConfigured:Boolean(d.LOG_FILE_PATH),templateOverrideConfigured:Boolean(d.REPORT_TEMPLATE_PATH)})'
+```
+
+This checks file configuration, not values already loaded by the running process; do not assume an edited .env reflects its startup state. With no PM2 NODE_ENV override shown, the file result helps establish the next-start contract. Keep encryption key introduction/rotation separate until existing stored-credential compatibility is established.
+
+The original MySQL, backup, Nginx/Hestia, SSH host-key, HTTP and GitHub collection sections still apply. Backend smoke URL can now use the observed `http://127.0.0.1:3002/login`; public HTTPS login URL is now confirmed by the supplied HTTP results below. MariaDB version/grants and four table definitions have now been supplied (see below); backup/restore evidence and remaining schema comparison are still missing. The safest architecture remains isolated releases plus shared persistence and a target-only PM2 restart; the observed mixed ownership and shared daemon strengthen the case for a restricted per-application deployment helper.
+
+## Database inventory update from supplied SQL output
+
+The owner supplied results for version/database/current-user, grants, table status, four CREATE TABLE definitions and two aggregate counts. No SQL was executed by this agent. The connection reports schema `player_iq_db` and account `player_iq@localhost`. **Owner subsequently confirmed that player_iq_db is soccer-report's configured DB_NAME.** The reported account is the one used for the supplied SQL connection; the application DB_USER value was not separately confirmed.
+
+| Observation | Deployment consequence |
+| --- | --- |
+| Server version `11.4.13-MariaDB-ubu2204` | Production SQL evidence is MariaDB, despite the generic MySQL stack description. Use this same engine/version family for the upgrade/restore rehearsal; do not assume a successful test on a different MySQL engine proves compatibility. No database replacement is proposed. |
+| Grants | Account has USAGE globally and ALL PRIVILEGES on the single reported schema. No global ALL PRIVILEGES or grant option is shown. This is broad schema-scoped access, not demonstrated least privilege. Rehearse the existing CREATE DATABASE IF NOT EXISTS and all model initialization under this account; do not widen grants to global/root or remove DDL rights blindly. |
+| Tables | 29 tables listed, all InnoDB, including legacy club_teams, planning, scouting, recommendations and player-load tables. Their existence does not establish complete column/index parity. Preserve legacy data; do not drop apparently unused tables during delivery. |
+| Collation | Listed table defaults and the four inspected definitions use utf8mb4_uca1400_ai_ci. Repository table declarations generally specify utf8mb4 without a collation; database creation specifies utf8mb4_unicode_ci. Inspect schema/server/connection defaults and rehearse new tables/foreign keys on the production clone. Do not normalize collations during deployment. |
+| users definition | Club and default-team foreign keys are present; ProcessIQ credential columns, last_login_at and password_hash columns exist. No user records/password values are needed for this audit. |
+| players / clubs definitions | Player photo_path/current-team relation and club crest_path/product_mode fields exist; inspected players definition has no club_id foreign key. This is an observation, not an instruction to alter integrity constraints. |
+| plan_session_tasks definition | Extended task fields and explanatory_image_path exist, with its session foreign key and ordering index. This reduces uncertainty for this table only. |
+| Aggregate counts | users_without_club = 0; stored_processiq_credentials = 1 (non-NULL values). Zero unassigned users does not establish valid scope for every role or application flow. One stored value does not reveal plaintext/encrypted format or prove successful decryption. |
+| Table row statistics | SHOW TABLE STATUS row figures are not a verified exact data census. Zero estimates do not justify skipping backups, dropping tables or assuming module data is absent. |
+
+The supplied grant text contains an authentication hash. It is intentionally **not reproduced** in this document or retained as a repository attachment. Redact authentication clauses from future grant outputs before sharing. Do not rotate credentials/keys as an automatic deployment action: evaluate any credential exposure privately and preserve access and encrypted-data continuity.
+
+### Remaining database evidence
+
+First confirm that the connection matches the target app, without sharing the .env values. Then use the same approved interactive connection mechanism to run only these read-only statements; no new credentials or paths are assigned here:
+
+```sql
+SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
+FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE();
+SELECT @@character_set_server, @@collation_server,
+       @@character_set_connection, @@collation_connection;
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE,
+       COLUMN_DEFAULT, COLLATION_NAME
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX;
+SELECT TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME,
+       REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL
+ORDER BY TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION;
+```
+
+Review metadata output for any sensitive defaults before sharing. A full schema comparison and candidate initialization on an isolated copy remain required; these SELECTs do not exercise startup permissions or prove upgrade success. Backups must include this confirmed target schema, uploads and required keys, and their restoration must be rehearsed. Use backup/restore tools compatible with the observed MariaDB server; a tool named mysqldump on PATH has not yet had its actual version established. Collect `mysql --version` and `mysqldump --version` as read-only client inventory. No live backup, restore, schema alteration or credential change is performed in this phase.
+
+## Public HTTP smoke-check update
+
+The owner supplied two curl results for `soccer-report.processiq.es/login`, both with a ten-second timeout and without redirect following:
+
+| Request | Returned status | Confirmed scope |
+| --- | --- | --- |
+| `soccer-report.processiq.es/login` (scheme omitted) | 301 | This invocation received a permanent redirect. The Location header was not captured, so its destination is unverified. Use an explicit http:// URL for reproducible follow-up. |
+| `https://soccer-report.processiq.es/login` | 200 | The public HTTPS login URL responded successfully from the owner's collection location, with normal curl TLS verification (no insecure flag). |
+
+Public hostname is now established as `soccer-report.processiq.es`; use `https://soccer-report.processiq.es/login` as the proposed external smoke URL. These observations do not identify the proxy upstream, prove backend/process identity, validate login/database behavior, or demonstrate GitHub Actions SSH reachability. No response body or proxy configuration was supplied.
+
+To inspect only the relevant response status and redirect location, without following redirects or printing cookies:
+
+```bash
+curl --silent --show-error --max-time 10 --dump-header - --output /dev/null 'http://soccer-report.processiq.es/login' | grep -Ei '^(HTTP/|Location:)'
+curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}\n' 'http://127.0.0.1:3002/login'
+```
+
+Run the loopback check on the VPS; no backend response has yet been supplied. These checks generate ordinary request logs but do not intentionally modify business data. The supplied HTTPS success establishes a useful public baseline; schema rehearsal, upload/server-change preservation, backup verification, PM2 ownership/reboot and SSH access remain unresolved.
+
+## Follow-up: production server diff and upload modes
+
+The owner supplied the requested diffs. The complete reported server change adds:
+
+```js
+const HOST = process.env.HOST || "127.0.0.1";
+```
+
+and passes HOST as the second argument to app.listen. This explains the observed loopback binding and introduces an additional production-local environment setting, HOST, absent from the audited repository entry point. The actual HOST value need not be inferred: the observed socket is already confirmed as 127.0.0.1:3002.
+
+**The code difference is now understood; preserving it remains a release requirement.** Before deploying repository source, incorporate and review the bind-host behavior in a separate implementation change, document HOST with a production loopback value/default, and verify against the existing proxy. Merely setting HOST in an ecosystem/.env file will not work with the currently audited repository code, which never reads it. Do not replace production source and inadvertently broaden the listener. No source behavior has been changed by this audit.
+
+All 22 tracked upload entries have executable-bit changes from 100644 to 100755. The two .gitkeep files show zero line changes. The 20 binary images show '-' in numstat; that notation does not by itself prove identical file bytes. Executable permission is unnecessary for image/static placeholder files, but no chmod or ownership change is performed here. The ten previously identified untracked live images still require preservation.
+
+If exact tracked-image content parity is needed, this read-only comparison suppresses mode-only changes and reports any remaining content changes, without printing images:
+
+```bash
+sudo git -c core.fileMode=false -C /var/www/spi-scouting-web diff --no-ext-diff --no-textconv --name-only HEAD -- src/public/uploads
+```
+
+An empty result means no tracked content differences reported by Git with mode differences ignored; it does not cover untracked files, which must still be included in backup/shared-upload reconciliation.
+
+The next missing owner confirmations remain: whether player_iq_db is this application's configured DB_NAME, existing database/upload backup coverage, and whether a restore has been tested. Follow those with the already documented PM2 owner/home/reboot, environment, SSH and proxy checks. No further server diff is needed unless the production worktree changes.
+
+## Owner confirmation: target database and missing backups
+
+The owner confirmed that the application's DB_NAME is player_iq_db and answered no to having backups of the database and uploads. Database/upload backup coverage is therefore **absent by owner report**, rather than merely undocumented. No restore rehearsal is evidenced; the owner did not separately answer the restore-test question.
+
+**Hard blocker before the first production deployment:** establish a recoverable baseline for this database, the complete live upload tree (tracked and untracked), the production-local server modification, and required configuration/keys. Store secrets and backup data outside public web paths with restricted access, and keep a protected off-VPS copy. Do not commit these artifacts to GitHub.
+
+The next preparation phase must first identify a suitable private backup destination and its ownership/capacity, inspect the installed MariaDB backup client version, and define a coordinated write pause so database references and uploaded/deleted files can be recovered together. Then create and verify the backup, and rehearse restoration into an isolated database/filesystem with the same MariaDB family. A successful dump or nonempty archive alone is not proof of recoverability. Do not test restoration over production or run application tests against the live database.
+
+Backup creation, access changes and restore rehearsal are future work, not actions performed or authorized by the original audit-only scope. No backup destination, database credentials or retention policy is invented here. This confirmation does not authorize deployment. Other unresolved items, including PM2 owner/home/reboot, effective environment/key protection, SSH access and schema upgrade rehearsal, remain open.
+
+## Reference material
+
+Repository evidence is cited inline by file. External operational recommendations were checked against primary documentation on the audit date:
+
+- [Node.js release policy](https://nodejs.org/en/about/previous-releases): select a supported production LTS and validate compatibility.
+- [PM2 ecosystem declaration](https://pm2.keymetrics.io/docs/usage/application-declaration/): explicit CWD, interpreter, per-app environment and process options.
+- [PM2 graceful shutdown](https://pm2.keymetrics.io/docs/usage/signals-clean-restart/): application cooperation is required for draining/cleanup.
+- [GitHub deployment controls](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments) and [environment restrictions](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments): concurrency and branch-scoped deployment configuration.
+
+Validation of this deliverable: repository/static configuration inspection and document review only. Tests were not run because this is documentation-only and the existing integration suite can modify the configured database/uploads; no isolated test database was established.
+
+## Subsequent implementation: CI and liveness
+
+The owner subsequently authorized minimum CI and healthcheck implementation.
+GET /health and a PR-to-master validation workflow are now implemented locally;
+see [CI.md](CI.md) for their contract, isolation, tests and validation limits.
+Earlier statements about absent workflows/health endpoints describe the original
+audit snapshot. No deployment workflow, VPS modification, schema-code change or
+backup preparation was performed; production deployment blockers remain open.

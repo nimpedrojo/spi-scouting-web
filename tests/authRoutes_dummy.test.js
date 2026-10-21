@@ -1,3 +1,6 @@
+jest.mock("../src/initDb", () => ({ initDatabaseOnce: jest.fn().mockResolvedValue() }));
+jest.mock("../src/db", () => ({ query: jest.fn().mockResolvedValue([[]]) }));
+
 jest.mock("../src/models/userModel", () => ({
   createUser: jest.fn(),
   findUserByEmail: jest.fn().mockResolvedValue(null),

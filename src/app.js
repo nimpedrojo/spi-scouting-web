@@ -21,6 +21,7 @@ const app = express();
 app.set("trust proxy", 1);
 // Middlewares
 app.use(requestLogger);
+app.use(require("./routes/healthRoutes"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
