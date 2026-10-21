@@ -1,0 +1,50 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+# Never cancel a deployment while the application is stopped.
+concurrency:
+  group: spi-scouting-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: validate
+    # Bootstrap gate: enable only after the reviewed VPS helper/key is installed.
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
+      PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Deploy validated commit through restricted SSH command
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$DEPLOY_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          SSH_DIR=$(mktemp -d "$RUNNER_TEMP/spi-ssh-XXXXXXXX")
+          trap 'rm -rf -- "$SSH_DIR"' EXIT
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$SSH_DIR/key"
+          ssh-keygen -y -P '' -f "$SSH_DIR/key" > /dev/null
+          env -u PROD_SSH_PRIVATE_KEY ssh -F /dev/null \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$GITHUB_WORKSPACE/docs/deployment/production_known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            -i "$SSH_DIR/key" -p 22 ubuntu@51.75.255.4 "deploy $DEPLOY_SHA"

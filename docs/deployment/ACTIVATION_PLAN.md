@@ -147,3 +147,33 @@ evidence and outstanding operational prerequisites.
 Local validation: Node 22.23.3, nine suites / 202 tests passed against the
 dedicated local MySQL schema; syntax and whitespace checks passed. Actual PM2
 replacement/rollback rehearsal has not yet been run.
+
+## Subsequent isolated PM2 rehearsal evidence
+
+The owner completed an auxiliary HTTP A-to-B-to-A scoped delete/start trial with
+explicit script/CWD/interpreter in /home/ubuntu/spi-pm2-trial-gNxOqAXN/pm2.
+Expected release JSON and HTTP 200 were observed for both activation and rollback.
+After the isolated daemon shutdown instruction, port 3102 was vacant and public
+production login remained 200. This supersedes the earlier statement that no PM2
+replacement trial has run, within this narrow auxiliary-process scope only.
+The actual production ecosystem/app, shared files, DB compatibility and reboot
+persistence were not exercised by that trial. No production activation occurred.
+
+## First production activation result
+
+Owner authorized/executed first activation of aeff9a1. Script HTTP/process checks
+passed, original and new upload paths share authoritative storage, current was
+updated, and other daemon application identities/statuses were unchanged. Fresh
+verified backup is /home/ubuntu/spi-preactivation-CbJkbuGH. Post-activation login /
+business checks, initialization logs and reviewed PM2 persistence remain pending.
+No pm2 save, reboot test or automated deployment has been performed by this step.
+See the audit update for detailed evidence and limitations.
+
+## Post-activation verification and persistence
+
+Owner confirmed the requested browser checks correct. The guarded other-app
+comparison subsequently passed, the pre-save dumps were backed up privately and
+pm2 save completed. Sanitized saved state contains the aeff9a1 target release and
+all four expected applications. No reboot was performed. Transfer the fresh
+preactivation backup/recovery files off-VPS and verify their manifest; automatic
+GitHub-to-VPS delivery remains unimplemented.
