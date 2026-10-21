@@ -717,3 +717,77 @@ HOST change local validation: eight suites / 194 tests passed with Node 22.23.3,
 TZ=Europe/Madrid and the dedicated local MySQL test schema. JavaScript syntax
 and git diff whitespace checks passed. No production database or socket was
 used by the new server tests, which mock app/initDb/logger.
+
+## Candidate installation and dependency audit update
+
+Owner confirmed candidate /var/www/spi-scouting-deploy/releases/rehearsal-M7Oww7Mk
+at exact merged commit a9ea2ad9c2b14f7157926a18fa8f9f2a9c7a2fe3. Node 22.23.3,
+npm 10.9.9 and npm ci --omit=dev completed; git status returned no changes.
+No .env, process startup or production activation has been performed.
+
+The owner's runtime npm audit reports seven affected packages: body-parser (low),
+brace-expansion (high), morgan (moderate), mysql2 (high), proxy-addr (critical),
+qs (moderate) and xlsx (high). It reports fixes through npm audit fix for the
+first six, but this is not proof that any resulting upgrade is compatible or
+that all findings will clear. Review exact dependency/lockfile changes on a new
+branch and run the complete tests/CI; do not patch the VPS candidate in place.
+
+The critical proxy-addr advisory GHSA-jqcg-44mw-7w3h specifically concerns malformed
+IPv4-mapped IPv6 trust subnets; audited app.js uses numeric trust proxy=1, so that
+specific trigger was not found. The affected installed version should still be
+updated; severity alone is not proof of exploitability of this app configuration.
+mysql2 auth downgrade depends on a malicious server/MITM; the compressed-protocol
+finding needs separate reachability review (compression is not explicitly enabled
+in the inspected db.js). morgan is declared but no use was found in src.
+
+xlsx is actively used to parse uploaded workbooks in player/evaluation/player-load
+imports, so export-only exemptions do not apply to the whole app. The official
+advisories explain that the npm-hosted xlsx distribution has no patched release;
+fixed SheetJS releases are distributed separately. No fix available in npm audit
+does not mean no upstream remediation exists. Evaluate a pinned official upstream
+artifact or replacement, preserving XLSM/VBA template export and testing import
+compatibility. No dependency or lockfile change is made by this audit update.
+
+References: https://github.com/advisories/GHSA-jqcg-44mw-7w3h,
+https://github.com/advisories/GHSA-3f6p-5ww8-9rcr,
+https://github.com/advisories/GHSA-4r6h-8v6p-xvw6 and
+https://github.com/advisories/GHSA-5pgg-2g8v-p4x9.
+
+Recommendation: resolve/review dependency findings before public candidate
+activation. Isolated startup rehearsal can be designed separately; no evidence
+of compromise is established by the audit report alone.
+
+## Compatible dependency remediation prepared
+
+On dependency-security-fixes, a targeted npm update regenerated the lockfile with
+Node 22.23.3 / npm 10.9.9 without changing package.json or application code:
+
+| Package | Previous locked version | Updated locked version |
+| --- | --- | --- |
+| body-parser | 2.2.2 | 2.3.0 |
+| brace-expansion (runtime) | 2.1.1 | 2.1.7 |
+| morgan | 1.10.1 | 1.12.1 |
+| mysql2 | 3.18.2 | 3.24.6 |
+| proxy-addr | 2.0.7 | 2.0.8 |
+| qs | 6.15.2 | 6.16.1 |
+
+Necessary transitive updates include type-is/content-type, iconv-lite,
+side-channel and sql-escaper. Other existing brace-expansion copies are also
+updated within their current major versions (1.1.21 and 5.0.12). Obsolete denque
+and morgan's nested on-finished entry disappear from the resolved graph. No
+forced major upgrade, blanket audit fix, npm upgrade or dependency override was
+used. Keep using npm ci; package.json ranges alone do not ensure these versions.
+
+A fresh npm ci passed, and all eight suites / 194 tests passed on Node 22.23.3
+against the dedicated local test database. Post-change npm audit --omit=dev
+reports one high finding (xlsx), zero critical, zero moderate and zero low,
+versus seven affected packages before. This is a runtime audit snapshot, not a
+claim that all development dependencies or deprecated libraries are remediated.
+No test was weakened, skipped or removed. xlsx remains 0.18.5 unchanged, with its
+uploaded-file parsing risk and XLSM compatibility work explicitly pending.
+
+These lockfile changes are local/PR preparation, not installed on the VPS.
+Candidate rehearsal-M7Oww7Mk remains at the previous merged commit and lockfile;
+prepare a new exact-commit candidate after review/merge, rather than patching
+that candidate with npm audit fix. The retained xlsx risk needs separate
+resolution or explicit evaluated risk acceptance before public activation.
