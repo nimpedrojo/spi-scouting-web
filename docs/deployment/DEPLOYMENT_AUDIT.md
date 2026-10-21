@@ -791,3 +791,21 @@ Candidate rehearsal-M7Oww7Mk remains at the previous merged commit and lockfile;
 prepare a new exact-commit candidate after review/merge, rather than patching
 that candidate with npm audit fix. The retained xlsx risk needs separate
 resolution or explicit evaluated risk acceptance before public activation.
+
+## SheetJS remediation prepared separately
+
+The owner selected resolving xlsx in a separate PR. sheetjs-security-update is
+based on the pending dependency-security-fixes branch, retaining its fixes.
+SheetJS CE 0.20.3 is installed from the authoritative versioned CDN tarball with
+SHA-512 lockfile integrity, preserving the xlsx CommonJS API and XLSM template.
+Clean installation and eight suites / 195 tests passed on Node 22.23.3. The added
+integration test verifies actual report download, full VBA bytes, sheet names,
+formulas and merged ranges. Runtime npm audit now reports zero findings; external
+tarball coverage limits and known-advisory version thresholds are documented in
+[SHEETJS.md](SHEETJS.md). No audit exclusions are used. The earlier xlsx finding
+is superseded for this branch only, not for the unchanged VPS candidate.
+
+Merge dependency PR #20 first. The SheetJS PR targets master for the existing CI
+trigger and temporarily includes #20's prerequisite commit until it is merged.
+No production/candidate update or schema change has been performed. A fresh
+post-merge candidate and isolated MariaDB startup rehearsal remain necessary.
