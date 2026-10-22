@@ -74,6 +74,8 @@ superados (45 casos nuevos). No se ha ejecutado en MariaDB de producción.
 
 ## Entrega de esquema: detenerse antes del merge automático
 
+Procedimiento y scripts preparados: [ACCESS_REQUESTS_RELEASE.md](deployment/ACCESS_REQUESTS_RELEASE.md).
+
 Esta rama cambia initDb, un modelo y SQL. El helper instalado bloquea esas rutas
 ANTES de parar la aplicación. No se ha cambiado ni desactivado esa protección.
 Crear previamente la tabla no hace desaparecer el bloqueo del diff de código.
