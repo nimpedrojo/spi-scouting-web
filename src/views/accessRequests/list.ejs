@@ -1,0 +1,36 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h1 class="h3 mb-0">Solicitudes de acceso</h1>
+  <a href="/admin/platform" class="btn btn-outline-secondary">Administración de plataforma</a>
+</div>
+<form method="GET" action="/admin/access-requests" class="d-flex align-items-end gap-2 mb-3">
+  <div><label for="status" class="form-label">Estado</label>
+    <select id="status" name="status" class="form-select">
+      <option value="" <%= status === '' ? 'selected' : '' %>>Todos</option>
+      <% Object.entries(labels).forEach(([key, label]) => { %>
+        <option value="<%= key %>" <%= status === key ? 'selected' : '' %>><%= label %></option>
+      <% }) %>
+    </select>
+  </div>
+  <button class="btn btn-primary">Filtrar</button>
+</form>
+<p><%= total %> solicitudes · Página <%= page %></p>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead><tr><th>Nombre</th><th>Email</th><th>Organización</th><th>Estado</th><th>Fecha</th><th>Detalle</th></tr></thead>
+    <tbody>
+      <% if (!rows.length) { %><tr><td colspan="6">No hay solicitudes para este filtro.</td></tr><% } %>
+      <% rows.forEach(item => { %>
+        <tr>
+          <td><%= item.name %></td><td class="text-break"><%= item.email %></td><td><%= item.organization %></td>
+          <td><span class="badge text-bg-secondary"><%= labels[item.status] %></span></td>
+          <td><%= new Date(item.created_at).toLocaleString('es-ES') %></td>
+          <td><a href="/admin/access-requests/<%= item.id %>" class="btn btn-sm btn-outline-primary" aria-label="Ver solicitud de <%= item.name %>">Ver</a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<nav aria-label="Páginas de solicitudes" class="d-flex gap-2">
+  <% if (page > 1) { %><a class="btn btn-outline-secondary" href="?status=<%= encodeURIComponent(status) %>&amp;page=<%= page - 1 %>">Anterior</a><% } %>
+  <% if (page * pageSize < total) { %><a class="btn btn-outline-secondary" href="?status=<%= encodeURIComponent(status) %>&amp;page=<%= page + 1 %>">Siguiente</a><% } %>
+</nav>

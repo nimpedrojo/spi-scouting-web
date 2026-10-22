@@ -1,6 +1,7 @@
 const express = require('express');
 
 const authRoutes = require('../../routes/authRoutes');
+const accessRequestRoutes = require('../../routes/accessRequestRoutes');
 const legalRoutes = require('../../routes/legalRoutes');
 const userAdminRoutes = require('../../routes/userAdminRoutes');
 const clubAdminRoutes = require('../../routes/clubAdminRoutes');
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.use('/', legalRoutes);
 router.use('/', authRoutes);
+router.use('/', accessRequestRoutes);
 router.use('/admin/users', userAdminRoutes);
 router.use('/admin/clubs', clubAdminRoutes);
 router.use('/clubs', clubAdminRoutes);

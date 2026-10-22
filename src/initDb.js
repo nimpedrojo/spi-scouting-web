@@ -1,3 +1,4 @@
+const { createAccessRequestsTable } = require('./models/accessRequestModel');
 const { createUsersTable, ensureAdminUser, syncUserClubAssignments } = require('./models/userModel');
 const { createReportsTable } = require('./models/reportModel');
 const { createPlayersTable } = require('./models/playerModel');
@@ -61,6 +62,7 @@ async function initializeDatabase() {
   await createCategoriesTable();
   await createTeamsTable();
   await createUsersTable();
+  await createAccessRequestsTable();
   await createClubModulesTable();
   await createPlatformSettingsTable();
   await createSeasonPlansTable();

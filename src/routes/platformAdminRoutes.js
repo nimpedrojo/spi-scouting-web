@@ -2,6 +2,7 @@ const express = require('express');
 const { requireRole } = require('../middleware/roleMiddleware');
 const { getAllClubs } = require('../models/clubModel');
 const { getAllUsers } = require('../models/userModel');
+const { countPendingAccessRequests } = require('../models/accessRequestModel');
 const {
   getPlatformProductSettings,
   setPlatformDefaultProductMode,
@@ -12,16 +13,18 @@ const router = express.Router();
 
 router.get('/', requireRole('superadmin'), async (req, res) => {
   try {
-    const [platformSettings, clubs, users] = await Promise.all([
+    const [platformSettings, clubs, users, pendingRequests] = await Promise.all([
       getPlatformProductSettings(),
       getAllClubs(),
       getAllUsers(),
+      countPendingAccessRequests(),
     ]);
 
     return res.render('platform/config', {
       pageTitle: 'Administración de plataforma',
       platformSettings,
       stats: {
+        pendingRequests,
         clubs: clubs.length,
         users: users.length,
         admins: users.filter((user) => user.role === 'admin').length,

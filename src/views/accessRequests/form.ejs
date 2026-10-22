@@ -1,0 +1,49 @@
+<section class="row justify-content-center">
+  <div class="col-12 col-md-9 col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body p-4 p-md-5">
+        <p class="text-muted"><%= productBranding.productLabel %></p>
+        <h1 class="h3">Solicitar acceso</h1>
+        <p>Cuéntanos quién eres y en qué club u organización trabajas. Revisaremos tu solicitud antes de contactar contigo. Enviarla no crea una cuenta ni concede acceso.</p>
+        <% if (errors.length) { %>
+          <div class="alert alert-danger" role="alert"><ul class="mb-0"><% errors.forEach(error => { %><li><%= error %></li><% }) %></ul></div>
+        <% } %>
+        <form method="POST" action="/request-access">
+          <input type="hidden" name="_csrf" value="<%= csrf %>" />
+          <div class="visually-hidden" aria-hidden="true">
+            <label for="website">Deja este campo vacío</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div class="mb-3">
+            <label for="name" class="form-label">Nombre *</label>
+            <input id="name" name="name" class="form-control" autocomplete="name" maxlength="<%= limits.name %>" value="<%= values.name || '' %>" required />
+          </div>
+          <div class="mb-3">
+            <label for="email" class="form-label">Email *</label>
+            <input id="email" name="email" type="email" class="form-control" autocomplete="email" maxlength="<%= limits.email %>" value="<%= values.email || '' %>" required />
+          </div>
+          <div class="mb-3">
+            <label for="organization" class="form-label">Club u organización *</label>
+            <input id="organization" name="organization" class="form-control" autocomplete="organization" maxlength="<%= limits.organization %>" value="<%= values.organization || '' %>" required />
+          </div>
+          <div class="mb-3">
+            <label for="position" class="form-label">Cargo (opcional)</label>
+            <input id="position" name="position" class="form-control" autocomplete="organization-title" maxlength="<%= limits.position %>" value="<%= values.position || '' %>" />
+          </div>
+          <div class="mb-3">
+            <label for="message" class="form-label">Motivo de la solicitud (opcional)</label>
+            <textarea id="message" name="message" class="form-control" rows="4" maxlength="<%= limits.message %>" aria-describedby="message-help"><%= values.message || '' %></textarea>
+            <div id="message-help" class="form-text">No incluyas contraseñas ni datos personales de jugadores.</div>
+          </div>
+          <p class="small text-muted">Los datos se usarán para revisar tu solicitud y contactar contigo. Solo el administrador de plataforma puede gestionar las solicitudes. Consulta la <a href="/privacy" target="_blank" rel="noopener noreferrer">información de privacidad</a>.</p>
+          <div class="form-check mb-3">
+            <input id="privacy" name="privacy" type="checkbox" class="form-check-input" value="1" required />
+            <label for="privacy" class="form-check-label">He leído la información de privacidad.</label>
+          </div>
+          <button class="btn btn-primary" type="submit">Enviar solicitud</button>
+          <a href="/login" class="btn btn-link">Volver a iniciar sesión</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
