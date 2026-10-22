@@ -1,5 +1,7 @@
 
-[![CI](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml/badge.svg)](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml)# SoccerProcessIQ Suite
+[![CI](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml/badge.svg)](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml)
+
+# SoccerProcessIQ Suite
 
 SoccerProcessIQ Suite — Modular Football Club Platform.
 
