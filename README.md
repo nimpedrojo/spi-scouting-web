@@ -1,5 +1,5 @@
 
-[![CI](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml/badge.svg)](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml)
+[![CI](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml/badge.svg)](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/ci.yml) [![Deploy production](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/deploy-production.yml/badge.svg)](https://github.com/nimpedrojo/spi-scouting-web/actions/workflows/deploy-production.yml)
 
 # SoccerProcessIQ Suite
 
