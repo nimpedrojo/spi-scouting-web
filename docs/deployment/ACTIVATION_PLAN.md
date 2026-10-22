@@ -177,3 +177,18 @@ pm2 save completed. Sanitized saved state contains the aeff9a1 target release an
 all four expected applications. No reboot was performed. Transfer the fresh
 preactivation backup/recovery files off-VPS and verify their manifest; automatic
 GitHub-to-VPS delivery remains unimplemented.
+
+
+## Status update: restricted SSH delivery and Actions enablement
+
+Owner supplied successful real deployment of c82401205a06f7d48a679156e8a6925d924dadf8
+through the installed restricted SSH helper, confirmed post-deployment checks and
+verified all five backup manifest entries after transfer off-VPS. Helpers are
+root-owned 755; dedicated SSH authorization, invalid-command rejection, locking
+and DB dump permissions were checked. Isolated lifecycle recovery passed with
+mocked deployment callbacks and real private PM2; complete production rollback
+was not exercised. Owner reports the production environment/key secret configured
+and PRODUCTION_DEPLOY_ENABLED=true. First end-to-end GitHub Actions delivery is
+pending the next master merge, which will restart production even for docs-only
+changes. See AUTOMATED_DEPLOYMENT.md for exact evidence and remaining limitations.
+This update supersedes earlier pending bootstrap/transfer/enablement notes.
