@@ -2,13 +2,12 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const rateLimiter = require("../middleware/simpleRateLimiter");
 const {
-  createUser,
   findUserByEmail,
   findUserById,
   updateUserAccount,
   updateUserLastLogin,
 } = require("../models/userModel");
-const { getClubByCode, getClubByName } = require("../models/clubModel");
+const { getClubByName } = require("../models/clubModel");
 const { ensureAuth } = require("../middleware/auth");
 const { renderDashboard } = require("../controllers/dashboardController");
 const { findTeamById } = require("../models/teamModel");
@@ -135,85 +134,9 @@ router.post("/login", ensureGuest, rateLimiter, async (req, res) => {
   }
 });
 
-router.get("/register", ensureGuest, (req, res) => {
-  res.render("auth/register");
-});
-
-router.post("/register", ensureGuest, async (req, res) => {
-  const { name, email, password, password2, club_code } = req.body;
-  if (!name || !email || !password) {
-    req.flash("error", "Todos los campos son obligatorios.");
-    return res.redirect("/register");
-  }
-  if (password !== password2) {
-    req.flash("error", "Las contraseñas no coinciden.");
-    return res.redirect("/register");
-  }
-
-  if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
-    req.flash("error", "El email no tiene un formato válido.");
-    return res.redirect("/register");
-  }
-
-  if (password.length < 8) {
-    req.flash("error", "La contraseña debe tener al menos 8 caracteres.");
-    return res.redirect("/register");
-  }
-
-  try {
-    const existing = await findUserByEmail(email);
-    if (existing) {
-      req.flash("error", "Ya existe un usuario con ese email.");
-      return res.redirect("/register");
-    }
-
-    if (!club_code || !club_code.trim()) {
-      req.flash(
-        "error",
-        "Es obligatorio indicar un código de club válido para registrarse.",
-      );
-      return res.redirect("/register");
-    }
-
-    const club = await getClubByCode(club_code.trim());
-    if (!club) {
-      req.flash(
-        "error",
-        "El código de club no es válido. Contacta con tu responsable para que te facilite un código correcto.",
-      );
-      return res.redirect("/register");
-    }
-
-    await createUser({
-      name,
-      email,
-      password,
-      clubId: club.id,
-      defaultClub: club.name,
-    });
-
-    logger.info("User registered", {
-      type: "auth",
-      action: "register_success",
-      email,
-      clubId: club.id,
-      ip: req.ip,
-    });
-
-    req.flash("success", "Usuario creado. Ahora puedes iniciar sesión.");
-    return res.redirect("/login");
-  } catch (err) {
-    logger.error("Register error", {
-      type: "auth",
-      action: "register_error",
-      email,
-      ip: req.ip,
-      error: logger.formatError(err),
-    });
-    req.flash("error", "Ha ocurrido un error al registrar usuario.");
-    return res.redirect("/register");
-  }
-});
+// Public account creation is replaced by a reviewed access request.
+router.get('/register', ensureGuest, (_req, res) => res.redirect(302, '/request-access'));
+router.post('/register', ensureGuest, (_req, res) => res.redirect(303, '/request-access'));
 
 router.post("/logout", ensureAuth, (req, res) => {
   const user = req.session.user;

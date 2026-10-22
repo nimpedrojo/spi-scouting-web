@@ -1,0 +1,32 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h1 class="h3 mb-0">Solicitud de acceso</h1>
+  <a href="/admin/access-requests" class="btn btn-outline-secondary">Volver a solicitudes</a>
+</div>
+<div class="card"><div class="card-body">
+  <dl class="row">
+    <dt class="col-sm-3">Nombre</dt><dd class="col-sm-9 text-break"><%= item.name %></dd>
+    <dt class="col-sm-3">Email</dt><dd class="col-sm-9 text-break"><%= item.email %></dd>
+    <dt class="col-sm-3">Organización</dt><dd class="col-sm-9 text-break"><%= item.organization %></dd>
+    <dt class="col-sm-3">Cargo</dt><dd class="col-sm-9 text-break"><%= item.position || 'No indicado' %></dd>
+    <dt class="col-sm-3">Motivo</dt><dd class="col-sm-9 text-break"><%= item.message || 'No indicado' %></dd>
+    <dt class="col-sm-3">Estado</dt><dd class="col-sm-9"><%= labels[item.status] %></dd>
+    <dt class="col-sm-3">Recibida</dt><dd class="col-sm-9"><%= new Date(item.created_at).toLocaleString('es-ES') %></dd>
+    <% if (item.reviewed_at) { %><dt class="col-sm-3">Última revisión</dt><dd class="col-sm-9"><%= new Date(item.reviewed_at).toLocaleString('es-ES') %></dd><% } %>
+  </dl>
+  <p class="text-muted">Contacta con la persona antes de darla de alta. Marcar una solicitud como contactada no crea usuarios ni envía correos. Verifica el club y asigna únicamente los permisos necesarios desde la gestión de usuarios.</p>
+  <div class="d-flex gap-2 flex-wrap">
+    <% if (item.status === 'pending') { %>
+      <form method="POST" action="/admin/access-requests/<%= item.id %>/status">
+        <input type="hidden" name="_csrf" value="<%= csrf %>" /><input type="hidden" name="version" value="<%= item.version %>" />
+        <button name="status" value="contacted" class="btn btn-primary">Marcar como contactada</button>
+      </form>
+    <% } %>
+    <% if (item.status !== 'rejected') { %>
+      <form method="POST" action="/admin/access-requests/<%= item.id %>/status">
+        <input type="hidden" name="_csrf" value="<%= csrf %>" /><input type="hidden" name="version" value="<%= item.version %>" />
+        <button name="status" value="rejected" class="btn btn-outline-danger">Rechazar</button>
+      </form>
+    <% } %>
+    <a href="/admin/users/new" class="btn btn-outline-secondary">Alta manual de usuario</a>
+  </div>
+</div></div>

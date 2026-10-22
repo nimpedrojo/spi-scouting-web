@@ -1,58 +1,6 @@
-<h1 class="mb-4">Registro de usuario</h1>
-
-<form method="POST" action="/register" class="col-md-4">
-  <div class="mb-3">
-    <label for="name" class="form-label">Nombre</label>
-    <input
-      type="text"
-      class="form-control"
-      id="name"
-      name="name"
-      required
-    />
-  </div>
-  <div class="mb-3">
-    <label for="email" class="form-label">Email</label>
-    <input
-      type="email"
-      class="form-control"
-      id="email"
-      name="email"
-      required
-    />
-  </div>
-  <div class="mb-3">
-    <label for="club_code" class="form-label">Código de club</label>
-    <input
-      type="text"
-      class="form-control"
-      id="club_code"
-      name="club_code"
-      required
-    />
-    <div class="form-text">
-      Introduce el código que te ha facilitado el responsable del club. Es necesario para vincular tu usuario al club correcto.
-    </div>
-  </div>
-  <div class="mb-3">
-    <label for="password" class="form-label">Contraseña</label>
-    <input
-      type="password"
-      class="form-control"
-      id="password"
-      name="password"
-      required
-    />
-  </div>
-  <div class="mb-3">
-    <label for="password2" class="form-label">Repite la contraseña</label>
-    <input
-      type="password"
-      class="form-control"
-      id="password2"
-      name="password2"
-      required
-    />
-  </div>
-  <button type="submit" class="btn btn-sr-primary">Crear usuario</button>
-</form>
+<section class="card mx-auto"><div class="card-body">
+  <h1 class="h3">Solicitar acceso</h1>
+  <p>El alta de usuarios se realiza tras revisar una solicitud de acceso.</p>
+  <a href="/request-access" class="btn btn-primary">Solicitar acceso</a>
+  <a href="/login" class="btn btn-link">Iniciar sesión</a>
+</div></section>
